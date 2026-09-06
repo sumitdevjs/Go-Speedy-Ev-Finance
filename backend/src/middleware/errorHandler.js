@@ -1,0 +1,32 @@
+const { errorResponse } = require('../utils/response');
+const { ZodError } = require('zod');
+
+const errorHandler = (err, req, res, next) => {
+  // Catch Zod validation errors
+  if (err instanceof ZodError) {
+    const formattedErrors = err.errors.map((e) => ({
+      field: e.path.join('.'),
+      message: e.message,
+    }));
+    return errorResponse(res, 400, 'Validation Error', formattedErrors);
+  }
+
+  // Handle SyntaxError from Express JSON parsing (e.g., malformed JSON)
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return errorResponse(res, 400, 'Invalid JSON body');
+  }
+
+  // Handle specific Supabase or Postgres errors if needed here
+  
+  // Default fallback
+  console.error('[Error handler]', err);
+  const isDev = process.env.NODE_ENV !== 'production';
+  return errorResponse(
+    res,
+    err.status || 500,
+    isDev ? err.message : 'Internal Server Error',
+    isDev ? err.stack : null
+  );
+};
+
+module.exports = errorHandler;
