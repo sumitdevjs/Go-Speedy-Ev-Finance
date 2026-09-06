@@ -1,0 +1,185 @@
+const express = require('express');
+const { z } = require('zod');
+const staffController = require('./staff.controller');
+const requireAuth = require('../../middleware/auth');
+const { requireAdmin } = require('../../middleware/roleGuard');
+const requestLogger = require('../../middleware/requestLogger');
+
+const router = express.Router();
+
+// Apply auth and admin guard to all staff routes
+router.use(requireAuth);
+router.use(requireAdmin);
+
+// Validation Schemas
+const createStaffSchema = z.object({
+  name: z.string().min(1),
+  phone: z.string().min(10),
+  email: z.string().email().optional().or(z.literal('')),
+  password: z.string().min(6),
+  role: z.enum(['admin', 'staff']),
+});
+
+const updateStaffSchema = z.object({
+  name: z.string().min(1).optional(),
+  phone: z.string().min(10).optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  role: z.enum(['admin', 'staff']).optional(),
+});
+
+const validateBody = (schema) => (req, res, next) => {
+  schema.parse(req.body);
+  next();
+};
+
+/**
+ * @openapi
+ * /api/staff:
+ *   get:
+ *     summary: List all staff
+ *     tags: [Staff]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: List of staff
+ */
+router.get('/', staffController.getAll.bind(staffController));
+
+/**
+ * @openapi
+ * /api/staff:
+ *   post:
+ *     summary: Create new staff
+ *     tags: [Staff]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, phone, password, role]
+ *             properties:
+ *               name: { type: string }
+ *               phone: { type: string }
+ *               email: { type: string }
+ *               password: { type: string }
+ *               role: { type: string, enum: [admin, staff] }
+ *     responses:
+ *       201:
+ *         description: Created
+ */
+router.post(
+  '/', 
+  validateBody(createStaffSchema), 
+  requestLogger('users', 'CREATE_STAFF'), 
+  staffController.create.bind(staffController)
+);
+
+/**
+ * @openapi
+ * /api/staff/{id}:
+ *   patch:
+ *     summary: Update staff details
+ *     tags: [Staff]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               phone: { type: string }
+ *               email: { type: string }
+ *               role: { type: string, enum: [admin, staff] }
+ *     responses:
+ *       200:
+ *         description: Updated
+ */
+router.patch(
+  '/:id', 
+  validateBody(updateStaffSchema), 
+  requestLogger('users', 'UPDATE_STAFF'), 
+  staffController.update.bind(staffController)
+);
+
+/**
+ * @openapi
+ * /api/staff/{id}/password:
+ *   patch:
+ *     summary: Change staff password
+ *     tags: [Staff]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [password]
+ *             properties:
+ *               password: { type: string }
+ *     responses:
+ *       200:
+ *         description: Password updated
+ */
+router.patch(
+  '/:id/password', 
+  validateBody(z.object({ password: z.string().min(6) })), 
+  requestLogger('users', 'CHANGE_PASSWORD'), 
+  staffController.changePassword.bind(staffController)
+);
+
+/**
+ * @openapi
+ * /api/staff/{id}/deactivate:
+ *   patch:
+ *     summary: Activate or deactivate staff
+ *     tags: [Staff]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [is_active]
+ *             properties:
+ *               is_active: { type: boolean }
+ *     responses:
+ *       200:
+ *         description: Activation status updated
+ */
+router.patch(
+  '/:id/deactivate', 
+  validateBody(z.object({ is_active: z.boolean() })), 
+  requestLogger('users', 'TOGGLE_ACTIVE'), 
+  staffController.toggleActive.bind(staffController)
+);
+
+module.exports = router;

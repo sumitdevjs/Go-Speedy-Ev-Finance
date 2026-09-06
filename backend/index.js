@@ -1,0 +1,65 @@
+const express = require('express');
+const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
+const swaggerUi = require('swagger-ui-express');
+
+const env = require('./src/config/env');
+const cors = require('./src/config/cors');
+const swaggerSpec = require('./src/config/swagger');
+const errorHandler = require('./src/middleware/errorHandler');
+
+const app = express();
+
+// Security and utility middleware
+app.use(helmet());
+app.use(cors);
+app.use(express.json());
+app.use(cookieParser());
+
+// Swagger Docs (enabled by default unless explicitly disabled)
+if (env.SWAGGER_ENABLED) {
+  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  app.get('/api/docs.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(swaggerSpec);
+  });
+}
+
+// Basic Health Check
+app.get('/health', (req, res) => {
+  res.status(200).json({ success: true, message: 'Server is healthy' });
+});
+
+// Import Routes
+const authRoutes = require('./src/modules/auth/auth.routes');
+const staffRoutes = require('./src/modules/staff/staff.routes');
+const modelsRoutes = require('./src/modules/models/models.routes');
+const rentalsRoutes = require('./src/modules/rentals/rentals.routes');
+const paymentsRoutes = require('./src/modules/payments/payments.routes');
+const bookingsRoutes = require('./src/modules/bookings/bookings.routes');
+const documentsRoutes = require('./src/modules/documents/documents.routes');
+const purchasesRoutes = require('./src/modules/purchases/purchases.routes');
+const auditRoutes = require('./src/modules/audit/audit.routes');
+
+// Use Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/staff', staffRoutes);
+app.use('/api/models', modelsRoutes);
+app.use('/api/rentals', rentalsRoutes);
+app.use('/api/payments', paymentsRoutes);
+app.use('/api/bookings', bookingsRoutes);
+app.use('/api/documents', documentsRoutes);
+app.use('/api/purchases', purchasesRoutes);
+app.use('/api/audit', auditRoutes);
+
+// Global Error Handler (must be last)
+app.use(errorHandler);
+
+const PORT = env.PORT || 5000;
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT} in ${env.NODE_ENV} mode`);
+  if (env.SWAGGER_ENABLED) {
+    console.log(`📄 Swagger docs available at http://localhost:${PORT}/api/docs`);
+  }
+});
