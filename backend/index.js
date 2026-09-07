@@ -63,3 +63,4 @@ app.listen(PORT, () => {
     console.log(`📄 Swagger docs available at http://localhost:${PORT}/api/docs`);
   }
 });
+// Trigger restart

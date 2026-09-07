@@ -243,7 +243,9 @@ export default function TenantDetailPage() {
               {formatCurrency(tenant.total_price)}
             </h4>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              Downpayment: {formatCurrency(tenant.downpayment_paid)}
+              Total Upfront: {formatCurrency(Number(tenant.downpayment_paid) + Number(tenant.booking_amount || 0))}
+              <br />
+              (DP: {formatCurrency(tenant.downpayment_paid)}, Booking: {formatCurrency(tenant.booking_amount || 0)})
             </p>
           </Card>
 

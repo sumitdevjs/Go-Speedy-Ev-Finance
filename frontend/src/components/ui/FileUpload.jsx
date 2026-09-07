@@ -37,9 +37,9 @@ export default function FileUpload({
 
       // 2. Upload via FormData
       const formData = new FormData();
-      formData.append('document', compressed.file);
+      formData.append('file', compressed.file);
       formData.append('doc_type', docType);
-      if (tenantId) {
+      if (tenantId && tenantId !== 'undefined' && tenantId !== 'null') {
         formData.append('tenant_id', tenantId);
       }
 

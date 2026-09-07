@@ -231,8 +231,9 @@ export default function NewRentalWizardPage() {
     setErrorMessage('');
 
     try {
+      const { booking_id, ...restFormData } = formData;
       const payload = {
-        ...formData,
+        ...restFormData,
         has_pending_docs: hasPendingDocs,
         booking_amount: Number(formData.booking_amount || 0),
         downpayment_paid: Number(formData.downpayment_paid || 0),

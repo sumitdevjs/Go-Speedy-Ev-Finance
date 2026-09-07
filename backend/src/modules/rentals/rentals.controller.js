@@ -24,7 +24,7 @@ class RentalsController {
     }
   }
 
-  async create(req, res) {
+  async create(req, res, next) {
     try {
       const data = await rentalsService.createRental(req.body, req.user.id);
       return successResponse(res, 201, data, 'Rental created successfully');
@@ -32,8 +32,7 @@ class RentalsController {
       if (error.message.includes('out of stock') || error.message.includes('Unique constraint violation')) {
         return errorResponse(res, 409, error.message);
       }
-      console.error(error);
-      return errorResponse(res, 500, 'Internal Server Error');
+      next(error);
     }
   }
 

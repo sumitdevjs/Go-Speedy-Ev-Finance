@@ -1,0 +1,15 @@
+2026-09-07T14:47:48.556Z: MulterError: Unexpected field
+    at wrappedFileFilter (D:\Go Speedy Ev Finance Scheme\backend\node_modules\multer\index.js:41:19)
+    at Multipart.<anonymous> (D:\Go Speedy Ev Finance Scheme\backend\node_modules\multer\lib\make-middleware.js:284:7)
+    at Multipart.emit (node:events:518:28)
+    at HeaderParser.cb (D:\Go Speedy Ev Finance Scheme\backend\node_modules\busboy\lib\types\multipart.js:358:14)
+    at HeaderParser.push (D:\Go Speedy Ev Finance Scheme\backend\node_modules\busboy\lib\types\multipart.js:162:20)
+    at SBMH.ssCb [as _cb] (D:\Go Speedy Ev Finance Scheme\backend\node_modules\busboy\lib\types\multipart.js:394:37)
+    at feed (D:\Go Speedy Ev Finance Scheme\backend\node_modules\streamsearch\lib\sbmh.js:219:14)
+    at SBMH.push (D:\Go Speedy Ev Finance Scheme\backend\node_modules\streamsearch\lib\sbmh.js:104:16)
+    at Multipart._write (D:\Go Speedy Ev Finance Scheme\backend\node_modules\busboy\lib\types\multipart.js:567:19)
+    at writeOrBuffer (node:internal/streams/writable:572:12)
+2026-09-07T14:54:19.683Z: Could not find the 'booking_id' column of 'tenants' in the schema cache
+2026-09-07T14:58:22.590Z: ZOD ERROR: [{"field":"notes","message":"Invalid input: expected string, received null"}]
+2026-09-07T14:58:29.761Z: ZOD ERROR: [{"field":"notes","message":"Invalid input: expected string, received null"}]
+2026-09-07T15:00:18.409Z: ZOD ERROR: [{"field":"notes","message":"Invalid input: expected string, received null"}]

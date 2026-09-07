@@ -16,13 +16,16 @@ class DocumentsController {
     }
   }
 
-  async upload(req, res) {
+  async upload(req, res, next) {
     try {
       if (!req.file) {
         return errorResponse(res, 400, 'No file uploaded');
       }
 
-      const { tenant_id, doc_type } = req.body;
+      let { tenant_id, doc_type } = req.body;
+      if (tenant_id === 'undefined' || tenant_id === 'null') {
+        tenant_id = undefined;
+      }
       
       const allowedDocTypes = [
         'aadhar_path', 'pan_path', 'cheque_path', 
@@ -42,8 +45,7 @@ class DocumentsController {
 
       return successResponse(res, 201, data, 'Document uploaded successfully');
     } catch (error) {
-      console.error(error);
-      return errorResponse(res, 500, 'Internal Server Error');
+      next(error);
     }
   }
 }

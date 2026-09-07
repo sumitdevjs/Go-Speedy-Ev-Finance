@@ -83,6 +83,13 @@ class RentalsService {
   }
 
   async createRental(tenantData, createdBy) {
+    // Sanitize empty strings to undefined so they are inserted as NULL in DB
+    Object.keys(tenantData).forEach(key => {
+      if (tenantData[key] === '') {
+        delete tenantData[key];
+      }
+    });
+
     // 1. Fetch Model to get price and check stock
     const { data: model, error: modelError } = await supabase
       .from('ev_models')
@@ -137,6 +144,13 @@ class RentalsService {
   }
 
   async updateRental(id, updates) {
+    // Sanitize empty strings to undefined so they are updated as NULL in DB
+    Object.keys(updates).forEach(key => {
+      if (updates[key] === '') {
+        updates[key] = null; // Use null for update to explicitly clear it
+      }
+    });
+
     // Handle expected_end_date recalculation if start_date changes
     if (updates.start_date || updates.total_months) {
       const { data: existing, error: err } = await supabase.from('tenants').select('start_date, total_months').eq('id', id).single();

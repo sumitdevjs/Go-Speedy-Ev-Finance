@@ -12,7 +12,7 @@ const recordPaymentSchema = z.object({
   amount: z.number().positive(),
   payment_date: z.string(), // YYYY-MM-DD
   mode: z.enum(['cash', 'online']),
-  notes: z.string().optional()
+  notes: z.string().nullable().optional()
 });
 
 const validateBody = (schema) => (req, res, next) => {
