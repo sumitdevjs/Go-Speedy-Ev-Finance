@@ -14,7 +14,7 @@ const createBookingSchema = z.object({
   phone: z.string().min(10),
   booking_amount: z.number().min(0).optional(),
   booking_date: z.string().optional(),
-  notes: z.string().optional(),
+  notes: z.string().nullable().optional(),
 });
 
 const convertBookingSchema = z.object({

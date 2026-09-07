@@ -12,7 +12,7 @@ class AuthService {
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
-      .eq('email', email)
+      .or(`email.eq.${email},phone.eq.${email}`)
       .single();
 
     if (error || !user) {

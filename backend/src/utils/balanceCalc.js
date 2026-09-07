@@ -17,14 +17,49 @@ function calcBalance(tenant, totalPaid = 0) {
   const overpaid = Math.max(0, totalPaid - installmentTotal);
   
   const dailyRate = tenant.installment_daily_rate ? Number(tenant.installment_daily_rate) : 250;
+  const frequency = tenant.installment_frequency || 'daily';
   
-  // Overdue and advance days
-  const daysOverdue = Math.ceil(outstanding / dailyRate);
-  const daysAdvance = Math.floor(overpaid / dailyRate);
+  // Calculate how much should have been collected by today
+  const startDate = tenant.start_date ? new Date(tenant.start_date) : new Date(tenant.created_at);
+  startDate.setHours(0, 0, 0, 0); // Start of day
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Start of day today
+
+  // Calculate full days elapsed since start date
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const daysElapsed = Math.max(0, Math.floor((today - startDate) / msPerDay));
+
+  let expectedCollection = 0;
+  if (frequency === 'daily') {
+    expectedCollection = daysElapsed * dailyRate;
+  } else if (frequency === 'weekly') {
+    const weeksElapsed = Math.floor(daysElapsed / 7);
+    expectedCollection = weeksElapsed * (dailyRate * 7);
+  } else if (frequency === 'monthly') {
+    // Approx 30 days for financial calculation
+    const monthsElapsed = Math.floor(daysElapsed / 30);
+    expectedCollection = monthsElapsed * (dailyRate * 30);
+  }
+
+  // Cap expected collection at the max possible remaining
+  expectedCollection = Math.min(expectedCollection, installmentTotal);
+
+  const shortfall = expectedCollection - totalPaid;
   
+  let daysOverdue = 0;
+  let daysAdvance = 0;
+  
+  if (shortfall > 0) {
+    daysOverdue = Math.ceil(shortfall / dailyRate);
+  } else if (shortfall < 0) {
+    daysAdvance = Math.floor(Math.abs(shortfall) / dailyRate);
+  }
+
   let contractExpired = false;
   if (tenant.expected_end_date) {
-    contractExpired = new Date(tenant.expected_end_date) < new Date();
+    const endDate = new Date(tenant.expected_end_date);
+    endDate.setHours(0, 0, 0, 0);
+    contractExpired = endDate < today && outstanding > 0;
   }
 
   return {

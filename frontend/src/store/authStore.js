@@ -43,7 +43,7 @@ export const useAuthStore = create((set, get) => ({
   login: async (identifier, password) => {
     set({ isLoading: true });
     try {
-      const res = await api.post('/api/auth/login', { identifier, password });
+      const res = await api.post('/api/auth/login', { email: identifier, password });
       if (res.data?.success) {
         const user = res.data.data.user;
         set({
@@ -57,7 +57,13 @@ export const useAuthStore = create((set, get) => ({
       throw new Error(res.data?.message || 'Login failed');
     } catch (error) {
       set({ isLoading: false });
-      const message = error.response?.data?.message || error.message || 'Login failed';
+      let message = error.response?.data?.message || error.message || 'Login failed';
+      
+      // If there are detailed validation errors, show the first one
+      if (error.response?.data?.errors?.length > 0) {
+        message = error.response.data.errors[0].message;
+      }
+      
       return { success: false, error: message };
     }
   },

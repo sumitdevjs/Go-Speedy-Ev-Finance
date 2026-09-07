@@ -5,6 +5,7 @@ class BookingsService {
     const { data, error } = await supabase
       .from('bookings')
       .select('*, ev_models(name, company), users!bookings_created_by_fkey(name)')
+      .eq('status', 'pending')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
