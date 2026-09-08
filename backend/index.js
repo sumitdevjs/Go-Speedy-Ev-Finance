@@ -11,7 +11,9 @@ const errorHandler = require('./src/middleware/errorHandler');
 const app = express();
 
 // Security and utility middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false, // Disabled to allow Swagger UI scripts from unpkg CDN
+}));
 app.use(cors);
 app.use(express.json());
 app.use(cookieParser());
