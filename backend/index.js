@@ -21,6 +21,7 @@ app.use(cookieParser());
 // Swagger Docs (enabled by default unless explicitly disabled)
 if (env.SWAGGER_ENABLED) {
   app.get(['/api/docs', '/api/docs/'], (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.send(`
       <!DOCTYPE html>
       <html lang="en">
