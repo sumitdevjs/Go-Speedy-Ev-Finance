@@ -11,7 +11,7 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url('SUPABASE_URL must be a valid URL'),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, 'SUPABASE_SERVICE_ROLE_KEY is required'),
   JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
-  FRONTEND_URL: z.string().url('FRONTEND_URL must be a valid URL'),
+  FRONTEND_URL: z.string().optional().default('*'),
   SWAGGER_ENABLED: z.string().transform((val) => val === 'true').default('true'),
 });
 
