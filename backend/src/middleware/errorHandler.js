@@ -8,7 +8,7 @@ const errorHandler = (err, req, res, next) => {
       field: e.path ? e.path.join('.') : 'unknown',
       message: e.message,
     }));
-    require('fs').appendFileSync('error.log', new Date().toISOString() + ': ZOD ERROR: ' + JSON.stringify(formattedErrors) + '\n');
+    console.error('[ZOD ERROR]:', JSON.stringify(formattedErrors));
     return errorResponse(res, 400, 'Validation Error', formattedErrors);
   }
 
@@ -21,7 +21,6 @@ const errorHandler = (err, req, res, next) => {
   
   // Default fallback
   console.error('[Error handler]', err);
-  require('fs').appendFileSync('error.log', new Date().toISOString() + ': ' + (err.stack || err.message) + '\n');
   const isDev = process.env.NODE_ENV !== 'production';
   return errorResponse(
     res,
