@@ -18,7 +18,7 @@ app.use(cookieParser());
 
 // Swagger Docs (enabled by default unless explicitly disabled)
 if (env.SWAGGER_ENABLED) {
-  app.get('/api/docs', (req, res) => {
+  app.get(['/api/docs', '/api/docs/'], (req, res) => {
     res.send(`
       <!DOCTYPE html>
       <html lang="en">
