@@ -10,14 +10,14 @@ export default function Table({
 }) {
   return (
     <div className="w-full overflow-x-auto rounded-xl border border-slate-200 bg-white card-elevation">
-      <table className="w-full text-left text-sm text-slate-600">
-        <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-700">
+      <table className="w-full text-sm text-slate-600">
+        <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wider text-slate-500">
           <tr>
             {columns.map((col, idx) => (
               <th
                 key={col.key || idx}
                 scope="col"
-                className={`px-5 py-3.5 ${col.className || ''}`}
+                className={`px-6 py-4 text-center ${col.className || ''}`}
               >
                 {col.header}
               </th>
@@ -27,14 +27,14 @@ export default function Table({
         <tbody className="divide-y divide-slate-100">
           {loading ? (
             <tr>
-              <td colSpan={columns.length} className="px-5 py-12 text-center">
+              <td colSpan={columns.length} className="px-6 py-14 text-center">
                 <Spinner size="lg" className="text-blue-600 mx-auto" />
                 <p className="mt-2 text-xs font-medium text-slate-500">Loading records...</p>
               </td>
             </tr>
           ) : data.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="px-5 py-12 text-center text-slate-400">
+              <td colSpan={columns.length} className="px-6 py-14 text-center text-slate-400">
                 <p className="text-sm font-medium">{emptyText}</p>
               </td>
             </tr>
@@ -48,7 +48,10 @@ export default function Table({
                 }`}
               >
                 {columns.map((col, colIdx) => (
-                  <td key={col.key || colIdx} className={`px-5 py-4 ${col.cellClassName || ''}`}>
+                  <td
+                    key={col.key || colIdx}
+                    className={`px-6 py-4 text-center align-middle ${col.cellClassName || ''}`}
+                  >
                     {col.render ? col.render(row) : row[col.key]}
                   </td>
                 ))}
