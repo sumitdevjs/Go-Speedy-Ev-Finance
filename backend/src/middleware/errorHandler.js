@@ -3,7 +3,7 @@ const { ZodError } = require('zod');
 
 const errorHandler = (err, req, res, next) => {
   // Catch Zod validation errors
-  if (err instanceof ZodError) {
+  if (err instanceof ZodError || err.name === 'ZodError') {
     const formattedErrors = (err.errors || err.issues || []).map((e) => ({
       field: e.path ? e.path.join('.') : 'unknown',
       message: e.message,
@@ -21,7 +21,7 @@ const errorHandler = (err, req, res, next) => {
   
   // Default fallback
   console.error('[Error handler]', err);
-  const isDev = process.env.NODE_ENV !== 'production';
+  const isDev = true; // Temporary debug override to see exact 500 errors in production
   return errorResponse(
     res,
     err.status || 500,
