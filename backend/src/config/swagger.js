@@ -24,8 +24,8 @@ const options = {
     ],
     servers: [
       {
-        url: `http://localhost:${env.PORT}`,
-        description: 'Local development server',
+        url: '/',
+        description: 'Current environment server',
       },
     ],
     components: {
