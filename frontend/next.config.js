@@ -10,6 +10,17 @@ const nextConfig = {
       },
     ];
   },
+
+  // Redirect old /login route to root (login is now on the landing page)
+  async redirects() {
+    return [
+      {
+        source: '/login',
+        destination: '/',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

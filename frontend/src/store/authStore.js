@@ -6,6 +6,7 @@ export const useAuthStore = create((set, get) => ({
   role: null,
   isLoggedIn: false,
   isLoading: false,
+  hasCheckedAuth: false,
 
   setUser: (user) => {
     set({
@@ -13,6 +14,7 @@ export const useAuthStore = create((set, get) => ({
       role: user?.role || null,
       isLoggedIn: !!user,
       isLoading: false,
+      hasCheckedAuth: true,
     });
   },
 
@@ -26,6 +28,7 @@ export const useAuthStore = create((set, get) => ({
           role: res.data.data.user.role,
           isLoggedIn: true,
           isLoading: false,
+          hasCheckedAuth: true,
         });
         return res.data.data.user;
       }
@@ -35,6 +38,7 @@ export const useAuthStore = create((set, get) => ({
         role: null,
         isLoggedIn: false,
         isLoading: false,
+        hasCheckedAuth: true,
       });
     }
     return null;
@@ -81,7 +85,7 @@ export const useAuthStore = create((set, get) => ({
         isLoading: false,
       });
       if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+        window.location.href = '/';
       }
     }
   },

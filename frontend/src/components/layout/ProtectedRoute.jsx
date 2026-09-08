@@ -8,23 +8,25 @@ import Spinner from '../ui/Spinner';
 export default function ProtectedRoute({ children, adminOnly = false }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, role, isLoggedIn, isLoading, checkAuth } = useAuthStore();
+  const { user, role, isLoggedIn, isLoading, hasCheckedAuth, checkAuth } = useAuthStore();
 
   useEffect(() => {
-    checkAuth();
-  }, []);
+    if (!hasCheckedAuth) {
+      checkAuth();
+    }
+  }, [hasCheckedAuth, checkAuth]);
 
   useEffect(() => {
-    if (!isLoading) {
+    if (hasCheckedAuth && !isLoading) {
       if (!isLoggedIn) {
-        router.replace('/login');
+        router.replace('/');
       } else if (adminOnly && role !== 'admin') {
         router.replace('/dashboard');
       }
     }
-  }, [isLoading, isLoggedIn, role, adminOnly, router]);
+  }, [isLoading, isLoggedIn, role, adminOnly, router, hasCheckedAuth]);
 
-  if (isLoading) {
+  if (!hasCheckedAuth || isLoading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-slate-50">
         <div className="text-center">
