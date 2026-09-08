@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || '',
+  baseURL: '', // Always hit the Next.js proxy (/api/...) to avoid CORS and cross-site cookie issues
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
