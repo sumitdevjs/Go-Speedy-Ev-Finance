@@ -57,10 +57,14 @@ app.use(errorHandler);
 
 const PORT = env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT} in ${env.NODE_ENV} mode`);
-  if (env.SWAGGER_ENABLED) {
-    console.log(`📄 Swagger docs available at http://localhost:${PORT}/api/docs`);
-  }
-});
-// Trigger restart
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT} in ${env.NODE_ENV} mode`);
+    if (env.SWAGGER_ENABLED) {
+      console.log(`📄 Swagger docs available at http://localhost:${PORT}/api/docs`);
+    }
+  });
+}
+
+// Export for Vercel Serverless Functions
+module.exports = app;
