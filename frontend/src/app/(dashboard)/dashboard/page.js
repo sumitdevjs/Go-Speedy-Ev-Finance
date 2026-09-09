@@ -46,10 +46,16 @@ export default function DashboardPage() {
       const models = modelsRes.data?.data || [];
       const totalStock = models.reduce((sum, m) => sum + (m.stock_count || 0), 0);
 
-      // Fetch Rentals
-      const rentalsRes = await api.get('/api/rentals?limit=50');
+      // Fetch Rentals (Active/Cancelled)
+      const rentalsRes = await api.get('/api/rentals?limit=10000');
       const rentals = rentalsRes.data?.data || [];
       const active = rentals.filter((r) => r.status === 'rented');
+
+      // Fetch Purchases (Completed/Direct)
+      const purchasesRes = await api.get('/api/purchases?limit=10000');
+      const purchases = purchasesRes.data?.data || [];
+
+      const allTenants = [...rentals, ...purchases];
 
       // Calculate overdue tenants
       const overdue = active
@@ -57,9 +63,14 @@ export default function DashboardPage() {
         .sort((a, b) => b.computed_balance.daysOverdue - a.computed_balance.daysOverdue);
 
       // Fetch Payments
-      const paymentsRes = await api.get('/api/payments');
+      const paymentsRes = await api.get('/api/payments?limit=10000');
       const payments = paymentsRes.data?.data || [];
-      const totalCol = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      
+      const totalPayments = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const totalDownpayments = allTenants.reduce((sum, t) => sum + Number(t.downpayment_paid || 0), 0);
+      const totalBookings = allTenants.reduce((sum, t) => sum + Number(t.booking_amount || 0), 0);
+
+      const totalCol = totalPayments + totalDownpayments + totalBookings;
 
       setStats({
         totalStock,

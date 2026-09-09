@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { CalendarCheck, Plus, ArrowRight, XCircle, AlertCircle } from 'lucide-react';
+import { CalendarCheck, Plus, ArrowRight, XCircle, AlertCircle, Edit } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
 import Button from '../../../components/ui/Button';
@@ -27,8 +27,14 @@ export default function BookingsPage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [modelId, setModelId] = useState('');
+  const [customModel, setCustomModel] = useState('');
   const [bookingAmount, setBookingAmount] = useState('2000');
   const [notes, setNotes] = useState('');
+
+  // Edit Modal
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editData, setEditData] = useState({ id: '', name: '', phone: '', booking_amount: '', notes: '', modelId: '', customModel: '' });
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -69,7 +75,8 @@ export default function BookingsPage() {
       const res = await api.post('/api/bookings', {
         name: name.trim(),
         phone: phone.trim(),
-        ev_model_id: modelId || null,
+        ev_model_id: modelId !== 'other' ? (modelId || null) : null,
+        model_name_raw: modelId === 'other' ? customModel.trim() : null,
         booking_amount: Number(bookingAmount || 0),
         notes: notes.trim() || null,
       });
@@ -95,6 +102,29 @@ export default function BookingsPage() {
       fetchData();
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to cancel booking');
+    }
+  };
+
+  const handleEditBooking = async (e) => {
+    e.preventDefault();
+    try {
+      setIsEditing(true);
+      const res = await api.patch(`/api/bookings/${editData.id}`, {
+        name: editData.name,
+        phone: editData.phone,
+        ev_model_id: editData.modelId !== 'other' ? (editData.modelId || null) : null,
+        model_name_raw: editData.modelId === 'other' ? editData.customModel.trim() : null,
+        booking_amount: Number(editData.booking_amount),
+        notes: editData.notes,
+      });
+      if (res.data?.success) {
+        setIsEditModalOpen(false);
+        fetchData();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to edit booking');
+    } finally {
+      setIsEditing(false);
     }
   };
 
@@ -131,6 +161,11 @@ export default function BookingsPage() {
       render: (row) => <span className="text-xs text-slate-500">{formatDate(row.booking_date)}</span>,
     },
     {
+      header: 'Updated Date',
+      key: 'updated_at',
+      render: (row) => <span className="text-xs text-slate-500">{formatDate(row.updated_at)}</span>,
+    },
+    {
       header: 'Status',
       key: 'status',
       render: (row) => <Badge status={row.status} size="sm" />,
@@ -153,6 +188,24 @@ export default function BookingsPage() {
                   Convert <ArrowRight className="w-3.5 h-3.5 ml-1" />
                 </Button>
               </Link>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEditData({ 
+                    id: row.id, 
+                    name: row.name, 
+                    phone: row.phone, 
+                    booking_amount: row.booking_amount, 
+                    notes: row.notes || '',
+                    modelId: row.ev_model_id || (row.model_name_raw ? 'other' : ''),
+                    customModel: row.model_name_raw || ''
+                  });
+                  setIsEditModalOpen(true);
+                }}
+              >
+                <Edit className="w-4 h-4" />
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -240,12 +293,25 @@ export default function BookingsPage() {
             label="Select EV Model"
             value={modelId}
             onChange={(e) => setModelId(e.target.value)}
-            options={models.map((m) => ({
-              value: m.id,
-              label: `${m.name} (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
-            }))}
+            options={[
+              ...models.map((m) => ({
+                value: m.id,
+                label: `${m.name} (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
+              })),
+              { value: 'other', label: 'Other / Future Model' }
+            ]}
             placeholder="Select EV model..."
           />
+
+          {modelId === 'other' && (
+            <Input
+              label="Custom / Future Model Name"
+              placeholder="e.g. Speedy Eco X2 (Future)"
+              value={customModel}
+              onChange={(e) => setCustomModel(e.target.value)}
+              required
+            />
+          )}
 
           <Input
             label="Booking Token Amount (₹)"
@@ -278,6 +344,82 @@ export default function BookingsPage() {
               loading={isSubmitting}
             >
               Save Booking
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Booking Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title="Edit Walk-in Booking"
+      >
+        <form onSubmit={handleEditBooking} className="space-y-4">
+          <Input
+            label="Customer Full Name"
+            value={editData.name}
+            onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+            required
+          />
+          <Input
+            label="Contact Phone Number"
+            value={editData.phone}
+            onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+            required
+          />
+          <Select
+            label="Select EV Model"
+            value={editData.modelId}
+            onChange={(e) => setEditData({ ...editData, modelId: e.target.value })}
+            options={[
+              ...models.map((m) => ({
+                value: m.id,
+                label: `${m.name} (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
+              })),
+              { value: 'other', label: 'Other / Future Model' }
+            ]}
+            placeholder="Select EV model..."
+          />
+
+          {editData.modelId === 'other' && (
+            <Input
+              label="Custom / Future Model Name"
+              placeholder="e.g. Speedy Eco X2 (Future)"
+              value={editData.customModel}
+              onChange={(e) => setEditData({ ...editData, customModel: e.target.value })}
+              required
+            />
+          )}
+          <Input
+            label="Booking Token Amount (₹)"
+            type="number"
+            value={editData.booking_amount}
+            onChange={(e) => setEditData({ ...editData, booking_amount: e.target.value })}
+            required
+          />
+          <Input
+            label="Internal Notes"
+            value={editData.notes}
+            onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
+          />
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button
+              variant="outline"
+              size="md"
+              type="button"
+              onClick={() => setIsEditModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              loading={isEditing}
+            >
+              Save Changes
             </Button>
           </div>
         </form>

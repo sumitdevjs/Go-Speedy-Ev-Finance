@@ -62,6 +62,17 @@ function calcBalance(tenant, totalPaid = 0) {
     contractExpired = endDate < today && outstanding > 0;
   }
 
+  if (tenant.status === 'cancelled') {
+    return {
+      contractAmount,
+      installmentTotal,
+      outstanding,
+      daysOverdue: 0,
+      daysAdvance: 0,
+      contractExpired: false,
+    };
+  }
+
   return {
     contractAmount,
     installmentTotal,

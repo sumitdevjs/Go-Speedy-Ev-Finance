@@ -49,6 +49,20 @@ class BookingsController {
       return errorResponse(res, 500, 'Internal Server Error');
     }
   }
+
+  async update(req, res) {
+    try {
+      const { id } = req.params;
+      const data = await bookingsService.updateBooking(id, req.body);
+      return successResponse(res, 200, data, 'Booking updated successfully');
+    } catch (error) {
+      if (error.message === 'Booking not found') {
+        return errorResponse(res, 404, error.message);
+      }
+      console.error(error);
+      return errorResponse(res, 500, 'Internal Server Error');
+    }
+  }
 }
 
 module.exports = new BookingsController();

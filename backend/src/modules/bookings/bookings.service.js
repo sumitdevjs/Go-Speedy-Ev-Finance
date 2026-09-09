@@ -124,6 +124,21 @@ class BookingsService {
     }
     return data;
   }
+
+  async updateBooking(id, updates) {
+    const { data, error } = await supabase
+      .from('bookings')
+      .update(updates)
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) {
+       if(error.code === 'PGRST116') throw new Error('Booking not found');
+       throw error;
+    }
+    return data;
+  }
 }
 
 module.exports = new BookingsService();

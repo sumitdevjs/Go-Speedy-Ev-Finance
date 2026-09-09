@@ -163,9 +163,14 @@ export default function StaffPage() {
       ),
     },
     {
-      header: 'Created On',
-      key: 'created_at',
-      render: (row) => <span className="text-xs text-slate-500">{formatDate(row.created_at)}</span>,
+      header: 'Created / Updated',
+      key: 'dates',
+      render: (row) => (
+        <div>
+          <p className="text-xs text-slate-800">C: {formatDate(row.created_at)}</p>
+          <p className="text-[11px] text-slate-500">U: {formatDate(row.updated_at)}</p>
+        </div>
+      ),
     },
     {
       header: 'Actions',

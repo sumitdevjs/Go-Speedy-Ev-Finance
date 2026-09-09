@@ -17,6 +17,15 @@ const createBookingSchema = z.object({
   notes: z.string().nullable().optional(),
 });
 
+const updateBookingSchema = z.object({
+  name: z.string().min(1).optional(),
+  phone: z.string().min(10).optional(),
+  ev_model_id: z.string().uuid().optional().nullable(),
+  model_name_raw: z.string().optional().nullable(),
+  booking_amount: z.number().min(0).optional(),
+  notes: z.string().nullable().optional(),
+});
+
 const convertBookingSchema = z.object({
   ev_model_id: z.string().uuid().optional(),
   gender: z.enum(['male', 'female']),
@@ -111,6 +120,34 @@ router.patch(
   '/:id/cancel', 
   requestLogger('bookings', 'CANCEL_BOOKING'), 
   bookingsController.cancel.bind(bookingsController)
+);
+
+/**
+ * @openapi
+ * /api/bookings/{id}:
+ *   patch:
+ *     summary: Update a booking details
+ *     tags: [Bookings]
+ *     security: [{ cookieAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object }
+ *     responses:
+ *       200:
+ *         description: Updated
+ */
+router.patch(
+  '/:id', 
+  validateBody(updateBookingSchema), 
+  requestLogger('bookings', 'UPDATE_BOOKING'), 
+  bookingsController.update.bind(bookingsController)
 );
 
 module.exports = router;
