@@ -76,7 +76,7 @@ router.get('/', staffController.getAll.bind(staffController));
  *               name: { type: string }
  *               phone: { type: string }
  *               email: { type: string }
- *               password: { type: string }
+ *               password: { type: string, description: "Must be >= 6 chars, contain an uppercase letter, a number, and a special character" }
  *               role: { type: string, enum: [admin, staff] }
  *     responses:
  *       201:
@@ -147,7 +147,7 @@ router.patch(
  *             type: object
  *             required: [password]
  *             properties:
- *               password: { type: string }
+ *               password: { type: string, description: "Must be >= 6 chars, contain an uppercase letter, a number, and a special character" }
  *     responses:
  *       200:
  *         description: Password updated

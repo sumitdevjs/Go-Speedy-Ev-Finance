@@ -40,7 +40,6 @@ export const REFERENCE_CATEGORIES = [
   { value: 'dsgmc_member', label: 'DSGMC Member' },
   { value: 'nigam_parshad', label: 'Nigam Parshad' },
   { value: 'mla', label: 'MLA' },
-  { value: 'other', label: 'Other Notable Reference' },
 ];
 
 export const RTO_TYPES = [
