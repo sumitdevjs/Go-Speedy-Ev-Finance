@@ -22,6 +22,7 @@ export default function RentalsListPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [showCancelled, setShowCancelled] = useState(false);
   const [overdueFilter, setOverdueFilter] = useState(searchParams.get('overdue_days') || '');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -29,14 +30,18 @@ export default function RentalsListPage() {
 
   useEffect(() => {
     fetchRentals();
-  }, [search, statusFilter, overdueFilter, page]);
+  }, [search, statusFilter, overdueFilter, page, showCancelled]);
 
   const fetchRentals = async () => {
     try {
       setLoading(true);
       let query = `/api/rentals?page=${page}&limit=15`;
       if (search) query += `&search=${encodeURIComponent(search)}`;
-      if (statusFilter) query += `&status=${statusFilter}`;
+      if (showCancelled) {
+        query += `&status=cancelled`;
+      } else if (statusFilter) {
+        query += `&status=${statusFilter}`;
+      }
       if (overdueFilter) query += `&overdue_days=${overdueFilter}`;
 
       const res = await api.get(query);
@@ -140,6 +145,16 @@ export default function RentalsListPage() {
         ),
     },
     {
+      header: 'Created / Updated',
+      key: 'dates',
+      render: (row) => (
+        <div>
+          <p className="text-xs text-slate-800">C: {formatDate(row.created_at)}</p>
+          <p className="text-[11px] text-slate-500">U: {formatDate(row.updated_at)}</p>
+        </div>
+      ),
+    },
+    {
       header: 'Actions',
       key: 'actions',
       render: (row) => (
@@ -180,7 +195,19 @@ export default function RentalsListPage() {
           />
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            <select
+            <Button
+              variant={showCancelled ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => {
+                setShowCancelled(!showCancelled);
+                setPage(1);
+              }}
+            >
+              {showCancelled ? 'Show Active Rentals' : 'Show Cancelled'}
+            </Button>
+
+            {!showCancelled && (
+              <select
               value={statusFilter}
               onChange={(e) => {
                 setStatusFilter(e.target.value);
@@ -188,12 +215,10 @@ export default function RentalsListPage() {
               }}
               className="rounded-lg border border-slate-200 bg-white py-2 px-3 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100"
             >
-              <option value="">All Statuses</option>
+              <option value="">All Active Statuses</option>
               <option value="rented">Active Rented</option>
-              <option value="completed">Completed (Owned)</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="direct_purchase">Direct Purchase</option>
             </select>
+            )}
 
             <select
               value={overdueFilter}

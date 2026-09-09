@@ -24,6 +24,9 @@ class AuthService {
     }
 
     // Check password
+    if (!user.password_hash) {
+      throw new Error('Invalid credentials');
+    }
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       throw new Error('Invalid credentials');

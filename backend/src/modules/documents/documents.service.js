@@ -1,5 +1,5 @@
 const supabase = require('../../config/db');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 
 const BUCKET_NAME = 'ev-documents';
 const SIGNED_URL_EXPIRY = 900; // 15 minutes
@@ -39,7 +39,7 @@ class DocumentsService {
     else if (fileMimetype.includes('png')) ext = 'png';
     else if (fileMimetype.includes('pdf')) ext = 'pdf'; // if allowed
 
-    const filename = `${uuidv4()}.${ext}`;
+    const filename = `${crypto.randomUUID()}.${ext}`;
 
     // 1. Check if an old file exists and delete it to save space
     if (tenantId) {

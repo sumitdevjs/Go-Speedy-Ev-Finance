@@ -36,7 +36,7 @@ import {
 
 const DRAFT_KEY = 'gs_rental_form_draft';
 
-const STEPS = [
+const ALL_STEPS = [
   { id: 1, name: 'EV Model', icon: Bike },
   { id: 2, name: 'Personal', icon: User },
   { id: 3, name: 'Documents', icon: FileText },
@@ -61,6 +61,10 @@ export default function NewRentalWizardPage() {
   const [missingDocsList, setMissingDocsList] = useState([]);
 
   // Form State
+  const [isDirectPurchase, setIsDirectPurchase] = useState(searchParams.get('mode') === 'direct_purchase');
+  const STEPS = isDirectPurchase 
+    ? ALL_STEPS.filter(s => s.id !== 5 && s.id !== 8) 
+    : ALL_STEPS;
   const [formData, setFormData] = useState({
     // Step 1: Model
     ev_model_id: searchParams.get('model_id') || '',
@@ -135,7 +139,9 @@ export default function NewRentalWizardPage() {
     if (saved && !searchParams.get('booking_id')) {
       try {
         const parsed = JSON.parse(saved);
-        setFormData((prev) => ({ ...prev, ...parsed }));
+        if (parsed.isDirectPurchase !== undefined) setIsDirectPurchase(parsed.isDirectPurchase);
+        const { isDirectPurchase: _, ...validData } = parsed;
+        setFormData((prev) => ({ ...prev, ...validData }));
       } catch (err) {
         console.warn('Could not parse saved draft:', err);
       }
@@ -144,8 +150,8 @@ export default function NewRentalWizardPage() {
 
   // Autosave to localStorage
   useEffect(() => {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
-  }, [formData]);
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...formData, isDirectPurchase }));
+  }, [formData, isDirectPurchase]);
 
   const updateField = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -190,13 +196,19 @@ export default function NewRentalWizardPage() {
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep((prev) => Math.min(prev + 1, 8));
+      const currentIndex = STEPS.findIndex(s => s.id === currentStep);
+      if (currentIndex < STEPS.length - 1) {
+        setCurrentStep(STEPS[currentIndex + 1].id);
+      }
     }
   };
 
   const handlePrev = () => {
     setErrorMessage('');
-    setCurrentStep((prev) => Math.max(prev - 1, 1));
+    const currentIndex = STEPS.findIndex(s => s.id === currentStep);
+    if (currentIndex > 0) {
+      setCurrentStep(STEPS[currentIndex - 1].id);
+    }
   };
 
   // Submit Flow with Pending Docs check
@@ -231,14 +243,15 @@ export default function NewRentalWizardPage() {
     setErrorMessage('');
 
     try {
-      const { booking_id, ...restFormData } = formData;
+      const { booking_id, isDirectPurchase: _, ...restFormData } = formData;
       const payload = {
         ...restFormData,
         has_pending_docs: hasPendingDocs,
-        booking_amount: Number(formData.booking_amount || 0),
-        downpayment_paid: Number(formData.downpayment_paid || 0),
+        booking_amount: isDirectPurchase ? 0 : Number(formData.booking_amount || 0),
+        downpayment_paid: isDirectPurchase ? 0 : Number(formData.downpayment_paid || 0),
         installment_daily_rate: Number(formData.installment_daily_rate || 250),
         total_months: Number(formData.total_months || 24),
+        status: isDirectPurchase ? 'direct_purchase' : undefined,
       };
 
       let res;
@@ -273,9 +286,23 @@ export default function NewRentalWizardPage() {
         title="Issue New EV Rental"
         subtitle="8-Step fast registration wizard with draft autosave"
         action={
-          <Button variant="ghost" size="sm" icon={RotateCcw} onClick={clearDraft}>
-            Discard Draft
-          </Button>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer bg-white py-1.5 px-3 rounded-lg border border-slate-200">
+              <input
+                type="checkbox"
+                checked={isDirectPurchase}
+                onChange={(e) => {
+                  setIsDirectPurchase(e.target.checked);
+                  setCurrentStep(1); // Reset to step 1 to prevent getting stuck
+                }}
+                className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-xs font-bold text-slate-700">Direct Purchase Mode</span>
+            </label>
+            <Button variant="ghost" size="sm" icon={RotateCcw} onClick={clearDraft}>
+              Discard Draft
+            </Button>
+          </div>
         }
       />
 
@@ -822,7 +849,7 @@ export default function NewRentalWizardPage() {
               Previous
             </Button>
 
-            {currentStep < 8 ? (
+            {currentStep !== STEPS[STEPS.length - 1].id ? (
               <Button
                 variant="primary"
                 size="md"

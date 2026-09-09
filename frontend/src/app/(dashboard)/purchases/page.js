@@ -6,6 +6,7 @@ import { ShoppingBag, CheckCircle, ArrowRight } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
 import Badge from '../../../components/ui/Badge';
+import Button from '../../../components/ui/Button';
 import api from '../../../lib/api';
 import { formatCurrency, formatDate } from '../../../lib/constants';
 
@@ -78,19 +79,29 @@ export default function PurchasesPage() {
       ),
     },
     {
-      header: 'Contract Completed',
+      header: 'Purchase Date',
       key: 'updated_at',
       render: (row) => (
         <span className="text-xs text-slate-500">{formatDate(row.updated_at)}</span>
       ),
     },
     {
+      header: 'Pending Docs',
+      key: 'has_pending_docs',
+      render: (row) =>
+        row.has_pending_docs ? (
+          <Badge status="Docs Pending" variant="amber" size="sm" />
+        ) : (
+          <span className="text-xs text-emerald-600 font-medium">Verified</span>
+        ),
+    },
+    {
       header: 'Status',
       key: 'status',
       render: (row) => (
         <Badge
-          status="Fully Owned"
-          variant="emerald"
+          status={row.status === 'direct_purchase' ? 'Direct Purchase' : 'Fully Owned'}
+          variant={row.status === 'direct_purchase' ? 'blue' : 'emerald'}
           size="sm"
         />
       ),
@@ -114,6 +125,13 @@ export default function PurchasesPage() {
       <Header
         title="Completed Purchases & Ownerships"
         subtitle="Ledger of all vehicles fully paid and transferred to tenants"
+        action={
+          <Link href="/rentals/new?mode=direct_purchase">
+            <Button variant="primary" size="sm" icon={ShoppingBag}>
+              Purchase EV
+            </Button>
+          </Link>
+        }
       />
 
       <div className="p-8 max-w-7xl mx-auto space-y-6">

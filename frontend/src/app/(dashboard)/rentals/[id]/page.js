@@ -16,8 +16,12 @@ import {
   XCircle,
   Clock,
   Download,
-  Eye,
   ShieldAlert,
+  Edit,
+  CheckCircle,
+  Eye,
+  Save,
+  X
 } from 'lucide-react';
 import Header from '../../../../components/layout/Header';
 import Card from '../../../../components/ui/Card';
@@ -44,6 +48,11 @@ export default function TenantDetailPage() {
   const [payments, setPayments] = useState([]);
   const [signedDocs, setSignedDocs] = useState({});
   const [loading, setLoading] = useState(true);
+
+  // Edit Mode
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editData, setEditData] = useState({});
 
   // Record Payment Modal
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -78,7 +87,24 @@ export default function TenantDetailPage() {
       ]);
 
       if (tenantRes.data?.success) {
-        setTenant(tenantRes.data.data);
+        const t = tenantRes.data.data;
+        setTenant(t);
+        setEditData({
+          name: t.name || '',
+          phone: t.phone || '',
+          address: t.address || '',
+          chassis_no: t.chassis_no || '',
+          motor_ctrl_no: t.motor_ctrl_no || '',
+          battery_no: t.battery_no || '',
+          date_of_purchase: t.date_of_purchase ? t.date_of_purchase.split('T')[0] : '',
+          rto_type: t.rto_type || '',
+          hp_financer: t.hp_financer || '',
+          start_date: t.start_date ? t.start_date.split('T')[0] : '',
+          installment_daily_rate: t.installment_daily_rate || '',
+          installment_frequency: t.installment_frequency || '',
+          references: Array.isArray(t.references) ? t.references : [],
+          guarantors: Array.isArray(t.guarantors) ? t.guarantors : [],
+        });
       }
       if (paymentsRes.data?.success) {
         setPayments(paymentsRes.data.data || []);
@@ -96,12 +122,10 @@ export default function TenantDetailPage() {
   const handleRecordPayment = async (e) => {
     e.preventDefault();
     setPaymentError('');
-
     if (!paymentAmount || Number(paymentAmount) <= 0) {
       setPaymentError('Amount must be greater than 0');
       return;
     }
-
     try {
       setIsSubmittingPayment(true);
       const res = await api.post('/api/payments', {
@@ -116,11 +140,9 @@ export default function TenantDetailPage() {
         setIsPaymentModalOpen(false);
         setPaymentAmount('250');
         setPaymentNotes('');
-
         if (res.data.data?.autoCompleted) {
           setAutoCompleteNotice(true);
         }
-
         loadAllData();
       }
     } catch (err) {
@@ -143,6 +165,47 @@ export default function TenantDetailPage() {
     } finally {
       setIsCancelling(false);
     }
+  };
+
+  const handleCompleteRental = async () => {
+    if (!confirm('Convert to completed purchase?')) return;
+    try {
+      const res = await api.patch(`/api/rentals/${tenantId}/complete`);
+      if (res.data?.success) {
+        alert('Rental converted to completed purchase!');
+        loadAllData();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to complete rental');
+    }
+  };
+
+  const handleSaveChanges = async () => {
+    try {
+      setIsSaving(true);
+      const res = await api.patch(`/api/rentals/${tenantId}`, editData);
+      if (res.data?.success) {
+        setIsEditMode(false);
+        loadAllData();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to save changes');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Edit Array Helpers
+  const updateReference = (index, field, value) => {
+    const newRefs = [...editData.references];
+    newRefs[index] = { ...newRefs[index], [field]: value };
+    setEditData({ ...editData, references: newRefs });
+  };
+
+  const updateGuarantor = (index, field, value) => {
+    const newGuarantors = [...editData.guarantors];
+    newGuarantors[index] = { ...newGuarantors[index], [field]: value };
+    setEditData({ ...editData, guarantors: newGuarantors });
   };
 
   if (loading) {
@@ -170,28 +233,73 @@ export default function TenantDetailPage() {
   return (
     <div className="min-h-screen">
       <Header
-        title={tenant.name}
+        title={isEditMode ? `Editing Details: ${tenant.name}` : tenant.name}
         subtitle={`Tenant ID: ${tenant.id.slice(0, 8)} • Phone: ${tenant.phone}`}
         action={
           <div className="flex items-center gap-2">
-            {isRented && (
+            {isEditMode ? (
               <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon={X}
+                  onClick={() => setIsEditMode(false)}
+                  disabled={isSaving}
+                >
+                  Cancel Edit
+                </Button>
                 <Button
                   variant="primary"
                   size="sm"
-                  icon={PlusCircle}
-                  onClick={() => setIsPaymentModalOpen(true)}
+                  icon={Save}
+                  onClick={handleSaveChanges}
+                  loading={isSaving}
                 >
-                  Record Payment
+                  Save Changes
                 </Button>
+              </>
+            ) : (
+              <>
                 <Button
-                  variant="danger"
+                  variant="outline"
                   size="sm"
-                  icon={XCircle}
-                  onClick={() => setIsCancelModalOpen(true)}
+                  icon={Edit}
+                  onClick={() => setIsEditMode(true)}
                 >
-                  Cancel Rental
+                  Edit Details
                 </Button>
+                {isRented && (
+                  <>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon={PlusCircle}
+                      onClick={() => setIsPaymentModalOpen(true)}
+                    >
+                      Record Payment
+                    </Button>
+                    {balance.outstanding === 0 && (
+                      <Button
+                        variant="success"
+                        size="sm"
+                        icon={CheckCircle}
+                        onClick={handleCompleteRental}
+                      >
+                        Convert to Purchase
+                      </Button>
+                    )}
+                  </>
+                )}
+                {tenant.status !== 'cancelled' && (
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    icon={XCircle}
+                    onClick={() => setIsCancelModalOpen(true)}
+                  >
+                    Cancel Contract
+                  </Button>
+                )}
               </>
             )}
           </div>
@@ -200,7 +308,7 @@ export default function TenantDetailPage() {
 
       <div className="p-8 max-w-7xl mx-auto space-y-6">
         {/* Auto Complete Success Banner */}
-        {autoCompleteNotice && (
+        {autoCompleteNotice && !isEditMode && (
           <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-800 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="h-6 w-6 text-emerald-600 shrink-0" />
@@ -221,73 +329,89 @@ export default function TenantDetailPage() {
           </div>
         )}
 
-        {/* 24-month Expiry Warning */}
-        {balance.contractExpired && isRented && (
-          <div className="p-4 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 flex items-center gap-3">
-            <AlertTriangle className="h-6 w-6 text-amber-600 shrink-0" />
-            <div>
-              <p className="text-sm font-bold">24-Month Contract Limit Breached</p>
-              <p className="text-xs text-amber-700">
-                The expected contract period has ended with a remaining balance of{' '}
-                {formatCurrency(balance.outstanding)}. Administrator action required.
+        {/* Financial KPI Grid (Hidden in Edit Mode for focus) */}
+        {!isEditMode && (
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <Card className="text-center p-4">
+              <span className="text-[11px] font-bold text-slate-400 uppercase">Sticker Price</span>
+              <h4 className="text-xl font-black text-slate-900 mt-1">
+                {formatCurrency(tenant.total_price)}
+              </h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Total Upfront: {formatCurrency(Number(tenant.downpayment_paid) + Number(tenant.booking_amount || 0))}
               </p>
-            </div>
+            </Card>
+
+            <Card className="text-center p-4">
+              <span className="text-[11px] font-bold text-slate-400 uppercase">Installment Total</span>
+              <h4 className="text-xl font-black text-blue-600 mt-1">
+                {formatCurrency(balance.installmentTotal)}
+              </h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">To pay in installments</p>
+            </Card>
+
+            <Card className="text-center p-4">
+              <span className="text-[11px] font-bold text-slate-400 uppercase">Total Collected</span>
+              <h4 className="text-xl font-black text-emerald-600 mt-1">
+                {formatCurrency(tenant.total_paid || 0)}
+              </h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">{payments.length} payment(s) recorded</p>
+            </Card>
+
+            <Card className="text-center p-4">
+              <span className="text-[11px] font-bold text-slate-400 uppercase">Remaining Balance</span>
+              <h4 className="text-xl font-black text-slate-900 mt-1">
+                {formatCurrency(balance.outstanding)}
+              </h4>
+              <div className="mt-1">
+                {balance.outstanding === 0 ? (
+                  <Badge status="Fully Paid" variant="emerald" size="sm" />
+                ) : balance.daysOverdue > 0 ? (
+                  <Badge status={`${balance.daysOverdue} days overdue`} variant="rose" size="sm" />
+                ) : balance.daysAdvance > 0 ? (
+                  <Badge status={`${balance.daysAdvance} days advance`} variant="emerald" size="sm" />
+                ) : (
+                  <Badge status="On Track" variant="blue" size="sm" />
+                )}
+              </div>
+            </Card>
           </div>
         )}
 
-        {/* Financial KPI Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          <Card className="text-center p-4">
-            <span className="text-[11px] font-bold text-slate-400 uppercase">Sticker Price</span>
-            <h4 className="text-xl font-black text-slate-900 mt-1">
-              {formatCurrency(tenant.total_price)}
-            </h4>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              Total Upfront: {formatCurrency(Number(tenant.downpayment_paid) + Number(tenant.booking_amount || 0))}
-              <br />
-              (DP: {formatCurrency(tenant.downpayment_paid)}, Booking: {formatCurrency(tenant.booking_amount || 0)})
-            </p>
-          </Card>
-
-          <Card className="text-center p-4">
-            <span className="text-[11px] font-bold text-slate-400 uppercase">Installment Total</span>
-            <h4 className="text-xl font-black text-blue-600 mt-1">
-              {formatCurrency(balance.installmentTotal)}
-            </h4>
-            <p className="text-[11px] text-slate-500 mt-0.5">To pay in installments</p>
-          </Card>
-
-          <Card className="text-center p-4">
-            <span className="text-[11px] font-bold text-slate-400 uppercase">Total Collected</span>
-            <h4 className="text-xl font-black text-emerald-600 mt-1">
-              {formatCurrency(tenant.total_paid || 0)}
-            </h4>
-            <p className="text-[11px] text-slate-500 mt-0.5">{payments.length} payment(s) recorded</p>
-          </Card>
-
-          <Card className="text-center p-4">
-            <span className="text-[11px] font-bold text-slate-400 uppercase">Remaining Balance</span>
-            <h4 className="text-xl font-black text-slate-900 mt-1">
-              {formatCurrency(balance.outstanding)}
-            </h4>
-            <div className="mt-1">
-              {balance.outstanding === 0 ? (
-                <Badge status="Fully Paid" variant="emerald" size="sm" />
-              ) : balance.daysOverdue > 0 ? (
-                <Badge status={`${balance.daysOverdue} days overdue`} variant="rose" size="sm" />
-              ) : balance.daysAdvance > 0 ? (
-                <Badge status={`${balance.daysAdvance} days advance`} variant="emerald" size="sm" />
-              ) : (
-                <Badge status="On Track" variant="blue" size="sm" />
-              )}
-            </div>
-          </Card>
-        </div>
-
         {/* Details & Documents Tabs/Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Hardware & Contract Details */}
-          <Card title="Vehicle & Contract Profile" className="lg:col-span-2">
+          
+          {/* Main Details (Personal, Hardware, Contract) */}
+          <Card title={isEditMode ? "Edit Profile & Contract" : "Vehicle & Contract Profile"} className="lg:col-span-2">
+            
+            {/* PERSONAL INFO (Only shown as editable in Edit Mode) */}
+            {isEditMode && (
+              <>
+                <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Personal Details</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                  <Input
+                    label="Full Name"
+                    value={editData.name}
+                    onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                  />
+                  <Input
+                    label="Phone Number"
+                    value={editData.phone}
+                    onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                  />
+                  <div className="sm:col-span-2">
+                    <Input
+                      label="Address"
+                      value={editData.address}
+                      onChange={(e) => setEditData({ ...editData, address: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <hr className="my-6 border-slate-100" />
+              </>
+            )}
+
+            <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Vehicle Details</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div>
                 <p className="font-bold text-slate-400 uppercase text-[10px]">EV Model</p>
@@ -297,91 +421,231 @@ export default function TenantDetailPage() {
               </div>
 
               <div>
-                <p className="font-bold text-slate-400 uppercase text-[10px]">Chassis Serial</p>
-                <p className="text-sm font-semibold text-slate-800 mt-0.5">
-                  {tenant.chassis_no || '—'}
-                </p>
-              </div>
-
-              <div>
-                <p className="font-bold text-slate-400 uppercase text-[10px]">Motor Controller</p>
-                <p className="text-sm font-semibold text-slate-800 mt-0.5">
-                  {tenant.motor_ctrl_no || '—'}
-                </p>
-              </div>
-
-              <div>
-                <p className="font-bold text-slate-400 uppercase text-[10px]">Battery Serial</p>
-                <p className="text-sm font-semibold text-slate-800 mt-0.5">
-                  {tenant.battery_no || '—'}
-                </p>
-              </div>
-
-              <div>
-                <p className="font-bold text-slate-400 uppercase text-[10px]">RTO Classification</p>
-                <p className="text-sm font-semibold text-slate-800 mt-0.5 uppercase">
-                  {tenant.rto_type || 'RTO'}
-                </p>
-              </div>
-
-              <div>
-                <p className="font-bold text-slate-400 uppercase text-[10px]">HP Financer</p>
-                <p className="text-sm font-semibold text-slate-800 mt-0.5 uppercase">
-                  {tenant.hp_financer || 'Go Speedy'}
-                </p>
-              </div>
-
-              <div>
-                <p className="font-bold text-slate-400 uppercase text-[10px]">Agreement Dates</p>
-                <p className="text-xs text-slate-700 mt-0.5">
-                  Start: {formatDate(tenant.start_date)} • End: {formatDate(tenant.expected_end_date)}
-                </p>
-              </div>
-
-              <div>
-                <p className="font-bold text-slate-400 uppercase text-[10px]">Installment Terms</p>
-                <p className="text-xs text-slate-700 mt-0.5">
-                  ₹{tenant.installment_daily_rate}/day ({tenant.installment_frequency})
-                </p>
-              </div>
-            </div>
-
-            {/* References & Guarantors summary */}
-            <div className="mt-5 pt-5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div>
-                <p className="font-bold text-slate-500 uppercase text-[10px] mb-1">References Listed</p>
-                {Array.isArray(tenant.references) && tenant.references.length > 0 ? (
-                  <ul className="space-y-1 text-slate-700">
-                    {tenant.references.map((r, i) => (
-                      <li key={i}>
-                        <span className="font-semibold">{r.name}</span> ({r.category}) — {r.phone}
-                      </li>
-                    ))}
-                  </ul>
+                {isEditMode ? (
+                  <Input
+                    label="Chassis Serial"
+                    value={editData.chassis_no}
+                    onChange={(e) => setEditData({ ...editData, chassis_no: e.target.value })}
+                  />
                 ) : (
-                  <p className="text-slate-400">None provided</p>
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Chassis Serial</p>
+                    <p className="text-sm font-semibold text-slate-800 mt-0.5">{tenant.chassis_no || '—'}</p>
+                  </>
                 )}
               </div>
 
               <div>
-                <p className="font-bold text-slate-500 uppercase text-[10px] mb-1">Guarantors</p>
-                {Array.isArray(tenant.guarantors) && tenant.guarantors.length > 0 ? (
-                  <ul className="space-y-1 text-slate-700">
-                    {tenant.guarantors.map((g, i) => (
-                      <li key={i}>
-                        <span className="font-semibold">{g.name}</span> ({g.gender}) — {g.phone}
-                      </li>
-                    ))}
-                  </ul>
+                {isEditMode ? (
+                  <Input
+                    label="Motor Controller"
+                    value={editData.motor_ctrl_no}
+                    onChange={(e) => setEditData({ ...editData, motor_ctrl_no: e.target.value })}
+                  />
                 ) : (
-                  <p className="text-slate-400">None provided</p>
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Motor Controller</p>
+                    <p className="text-sm font-semibold text-slate-800 mt-0.5">{tenant.motor_ctrl_no || '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Battery Serial"
+                    value={editData.battery_no}
+                    onChange={(e) => setEditData({ ...editData, battery_no: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Battery Serial</p>
+                    <p className="text-sm font-semibold text-slate-800 mt-0.5">{tenant.battery_no || '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="RTO Classification"
+                    value={editData.rto_type}
+                    onChange={(e) => setEditData({ ...editData, rto_type: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">RTO Classification</p>
+                    <p className="text-sm font-semibold text-slate-800 mt-0.5 uppercase">{tenant.rto_type || 'RTO'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="HP Financer"
+                    value={editData.hp_financer}
+                    onChange={(e) => setEditData({ ...editData, hp_financer: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">HP Financer</p>
+                    <p className="text-sm font-semibold text-slate-800 mt-0.5 uppercase">{tenant.hp_financer || 'Go Speedy'}</p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <hr className="my-6 border-slate-100" />
+            <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Contract & Financials</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                {isEditMode ? (
+                  <Input
+                    type="date"
+                    label="Start Date"
+                    value={editData.start_date}
+                    onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Agreement Dates</p>
+                    <p className="text-xs text-slate-700 mt-0.5">
+                      Start: {formatDate(tenant.start_date)} • End: {formatDate(tenant.expected_end_date)}
+                    </p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    type="number"
+                    label="Installment Rate (₹)"
+                    value={editData.installment_daily_rate}
+                    onChange={(e) => setEditData({ ...editData, installment_daily_rate: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Installment Terms</p>
+                    <p className="text-xs text-slate-700 mt-0.5">
+                      ₹{tenant.installment_daily_rate}/day ({tenant.installment_frequency})
+                    </p>
+                  </>
+                )}
+              </div>
+              
+              {isEditMode && (
+                <div>
+                  <Select
+                    label="Frequency"
+                    value={editData.installment_frequency}
+                    onChange={(e) => setEditData({ ...editData, installment_frequency: e.target.value })}
+                    options={[
+                      { value: 'daily', label: 'Daily' },
+                      { value: 'weekly', label: 'Weekly' },
+                      { value: 'monthly', label: 'Monthly' },
+                    ]}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* References & Guarantors summary */}
+            <div className="mt-6 pt-5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                <p className="font-bold text-slate-500 uppercase text-[10px] mb-2">References Listed</p>
+                {isEditMode ? (
+                  <div className="space-y-3">
+                    {editData.references.map((r, i) => (
+                      <div key={i} className="p-2 border border-slate-100 bg-slate-50 rounded-lg space-y-2">
+                        <Input
+                          placeholder="Reference Name"
+                          value={r.name || ''}
+                          onChange={(e) => updateReference(i, 'name', e.target.value)}
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                           <Input
+                            placeholder="Phone"
+                            value={r.phone || ''}
+                            onChange={(e) => updateReference(i, 'phone', e.target.value)}
+                          />
+                          <Select
+                            value={r.category || ''}
+                            onChange={(e) => updateReference(i, 'category', e.target.value)}
+                            options={[
+                              { value: 'relative', label: 'Relative' },
+                              { value: 'friend', label: 'Friend' },
+                              { value: 'colleague', label: 'Colleague' }
+                            ]}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  Array.isArray(tenant.references) && tenant.references.length > 0 ? (
+                    <ul className="space-y-1 text-slate-700">
+                      {tenant.references.map((r, i) => (
+                        <li key={i}>
+                          <span className="font-semibold">{r.name}</span> ({r.category}) — {r.phone}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-slate-400">None provided</p>
+                  )
+                )}
+              </div>
+
+              <div>
+                <p className="font-bold text-slate-500 uppercase text-[10px] mb-2">Guarantors</p>
+                {isEditMode ? (
+                  <div className="space-y-3">
+                    {editData.guarantors.map((g, i) => (
+                      <div key={i} className="p-2 border border-slate-100 bg-slate-50 rounded-lg space-y-2">
+                        <Input
+                          placeholder="Guarantor Name"
+                          value={g.name || ''}
+                          onChange={(e) => updateGuarantor(i, 'name', e.target.value)}
+                        />
+                         <div className="grid grid-cols-2 gap-2">
+                           <Input
+                            placeholder="Phone"
+                            value={g.phone || ''}
+                            onChange={(e) => updateGuarantor(i, 'phone', e.target.value)}
+                          />
+                          <Select
+                            value={g.gender || ''}
+                            onChange={(e) => updateGuarantor(i, 'gender', e.target.value)}
+                            options={[
+                              { value: 'male', label: 'Male' },
+                              { value: 'female', label: 'Female' }
+                            ]}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  Array.isArray(tenant.guarantors) && tenant.guarantors.length > 0 ? (
+                    <ul className="space-y-1 text-slate-700">
+                      {tenant.guarantors.map((g, i) => (
+                        <li key={i}>
+                          <span className="font-semibold">{g.name}</span> ({g.gender}) — {g.phone}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-slate-400">None provided</p>
+                  )
                 )}
               </div>
             </div>
           </Card>
 
           {/* Documents Vault */}
-          <Card title="Secured Documents (15-min Signed URLs)">
+          <Card title={isEditMode ? "Edit Documents" : "Secured Documents"}>
             <div className="space-y-3">
               {[
                 { label: 'Aadhar Card', url: signedDocs.aadhar_url, path: tenant.aadhar_path, docType: 'aadhar_path' },
@@ -391,90 +655,105 @@ export default function TenantDetailPage() {
                 { label: 'Tenant Photo', url: signedDocs.tenant_photo_url, path: tenant.tenant_photo_path, docType: 'tenant_photo_path' },
                 { label: 'Scooty Photo', url: signedDocs.scooty_photo_url, path: tenant.scooty_photo_path, docType: 'scooty_photo_path' },
               ].map((item, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 bg-slate-50/60"
-                >
-                  <div className="min-w-0 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-slate-400 shrink-0" />
-                    <span className="text-xs font-semibold text-slate-800 truncate">
-                      {item.label}
-                    </span>
+                isEditMode ? (
+                  <div key={idx} className="mb-4">
+                    <FileUpload
+                      label={item.label}
+                      docType={item.docType}
+                      currentPath={item.path}
+                      currentUrl={item.url}
+                      tenantId={tenantId}
+                      onUploaded={() => loadAllData()}
+                    />
                   </div>
+                ) : (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 bg-slate-50/60"
+                  >
+                    <div className="min-w-0 flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-slate-400 shrink-0" />
+                      <span className="text-xs font-semibold text-slate-800 truncate">
+                        {item.label}
+                      </span>
+                    </div>
 
-                  {item.url ? (
-                    <button
-                      type="button"
-                      onClick={() => setViewingDoc({ label: item.label, url: item.url })}
-                      className="inline-flex items-center text-xs font-semibold text-blue-600 hover:text-blue-800"
-                    >
-                      <Eye className="w-3.5 h-3.5 mr-1" /> View
-                    </button>
-                  ) : (
-                    <span className="text-[11px] font-semibold text-amber-600">Pending</span>
-                  )}
-                </div>
+                    {item.url ? (
+                      <button
+                        type="button"
+                        onClick={() => setViewingDoc({ label: item.label, url: item.url })}
+                        className="inline-flex items-center text-xs font-semibold text-blue-600 hover:text-blue-800"
+                      >
+                        <Eye className="w-3.5 h-3.5 mr-1" /> View
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-amber-600">Pending</span>
+                    )}
+                  </div>
+                )
               ))}
             </div>
           </Card>
         </div>
 
-        {/* Payment History Timeline */}
-        <Card
-          title="Payment Ledger & Collection Timeline"
-          subtitle="All installments and settlements recorded"
-          action={
-            isRented && (
-              <Button
-                variant="primary"
-                size="sm"
-                icon={PlusCircle}
-                onClick={() => setIsPaymentModalOpen(true)}
-              >
-                Record Payment
-              </Button>
-            )
-          }
-        >
-          {payments.length === 0 ? (
-            <div className="py-8 text-center text-slate-400">
-              <p className="text-xs font-medium">No installment payments recorded yet.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-600">
-                <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                  <tr>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Amount</th>
-                    <th className="px-4 py-3">Mode</th>
-                    <th className="px-4 py-3">Collected By</th>
-                    <th className="px-4 py-3">Notes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {payments.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50/60">
-                      <td className="px-4 py-3 font-mono text-xs text-slate-700">
-                        {formatDate(p.payment_date)}
-                      </td>
-                      <td className="px-4 py-3 font-bold text-slate-900">
-                        {formatCurrency(p.amount)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge status={p.mode} size="sm" />
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-600">
-                        {p.users?.name || 'Operator'}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-400">{p.notes || '—'}</td>
+        {/* Payment History Timeline (Hidden in edit mode) */}
+        {!isEditMode && (
+          <Card
+            title="Payment Ledger & Collection Timeline"
+            subtitle="All installments and settlements recorded"
+            action={
+              isRented && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={PlusCircle}
+                  onClick={() => setIsPaymentModalOpen(true)}
+                >
+                  Record Payment
+                </Button>
+              )
+            }
+          >
+            {payments.length === 0 ? (
+              <div className="py-8 text-center text-slate-400">
+                <p className="text-xs font-medium">No installment payments recorded yet.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-600">
+                  <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                    <tr>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Amount</th>
+                      <th className="px-4 py-3">Mode</th>
+                      <th className="px-4 py-3">Collected By</th>
+                      <th className="px-4 py-3">Notes</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {payments.map((p) => (
+                      <tr key={p.id} className="hover:bg-slate-50/60">
+                        <td className="px-4 py-3 font-mono text-xs text-slate-700">
+                          {formatDate(p.payment_date)}
+                        </td>
+                        <td className="px-4 py-3 font-bold text-slate-900">
+                          {formatCurrency(p.amount)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge status={p.mode} size="sm" />
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          {p.users?.name || 'Operator'}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-400">{p.notes || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        )}
       </div>
 
       {/* Record Payment Modal */}
@@ -552,7 +831,7 @@ export default function TenantDetailPage() {
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-700">
-            Are you sure you want to cancel the rental for <span className="font-bold">{tenant.name}</span>?
+            Are you sure you want to cancel the contract for <span className="font-bold">{tenant.name}</span>?
             The EV model stock will automatically increase by 1 in the inventory.
           </p>
 
@@ -562,7 +841,7 @@ export default function TenantDetailPage() {
               size="md"
               onClick={() => setIsCancelModalOpen(false)}
             >
-              No, Keep Rental
+              No, Keep Active
             </Button>
             <Button
               variant="danger"
@@ -570,7 +849,7 @@ export default function TenantDetailPage() {
               loading={isCancelling}
               onClick={handleCancelRental}
             >
-              Yes, Cancel Rental
+              Yes, Cancel Contract
             </Button>
           </div>
         </div>

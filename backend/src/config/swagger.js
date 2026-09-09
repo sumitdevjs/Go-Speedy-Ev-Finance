@@ -1,6 +1,8 @@
 const swaggerJSDoc = require('swagger-jsdoc');
 const env = require('./env');
 
+const path = require('path');
+
 const options = {
   definition: {
     openapi: '3.0.0',
@@ -22,8 +24,8 @@ const options = {
     ],
     servers: [
       {
-        url: `http://localhost:${env.PORT}`,
-        description: 'Local development server',
+        url: '/',
+        description: 'Current environment server',
       },
     ],
     components: {
@@ -41,7 +43,10 @@ const options = {
       },
     ],
   },
-  apis: ['./src/modules/**/*.routes.js', './src/modules/**/*.controller.js'],
+  apis: [
+    path.join(__dirname, '../modules/**/*.routes.js'),
+    path.join(__dirname, '../modules/**/*.controller.js')
+  ],
 };
 
 const swaggerSpec = swaggerJSDoc(options);

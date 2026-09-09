@@ -12,6 +12,10 @@ class RentalsService {
 
     if (query.status) {
       queryBuilder = queryBuilder.eq('status', query.status);
+    } else {
+      queryBuilder = queryBuilder.neq('status', 'cancelled');
+      queryBuilder = queryBuilder.neq('status', 'completed');
+      queryBuilder = queryBuilder.neq('status', 'direct_purchase');
     }
     
     if (query.search) {
@@ -90,6 +94,21 @@ class RentalsService {
       }
     });
 
+    // Prevent new rental if an active one exists for this phone
+    if (tenantData.phone) {
+      const { data: existingActive } = await supabase
+        .from('tenants')
+        .select('id')
+        .eq('phone', tenantData.phone)
+        .eq('status', 'rented')
+        .limit(1)
+        .maybeSingle();
+
+      if (existingActive) {
+        throw new Error('This person already has an active rental contract. Cannot create a new one.');
+      }
+    }
+
     // 1. Fetch Model to get price and check stock
     const { data: model, error: modelError } = await supabase
       .from('ev_models')
@@ -122,8 +141,8 @@ class RentalsService {
         .insert([{
           ...tenantData,
           total_price: model.total_price, // snapshot price
-          start_date: startDate.toISOString().split('T')[0],
-          expected_end_date: expectedEndDate.toISOString().split('T')[0],
+          start_date: tenantData.status === 'direct_purchase' ? null : startDate.toISOString().split('T')[0],
+          expected_end_date: tenantData.status === 'direct_purchase' ? null : expectedEndDate.toISOString().split('T')[0],
           created_by: createdBy
         }])
         .select('*')
