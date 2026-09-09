@@ -10,18 +10,24 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE TABLE IF NOT EXISTS users (
   id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name                     TEXT NOT NULL,
-  phone                    TEXT NOT NULL UNIQUE,
+  phone                    TEXT UNIQUE,                  -- NULL for OAuth users until updated
   email                    TEXT UNIQUE,
-  password_hash            TEXT NOT NULL,
+  password_hash            TEXT,                         -- NULL for OAuth users
+  oauth_provider           TEXT,                         -- 'google', etc.
+  oauth_id                 TEXT,                         -- Google profile ID
   role                     TEXT NOT NULL
                              CHECK (role IN ('admin', 'staff')),
   is_active                BOOLEAN NOT NULL DEFAULT true,
   refresh_token_hash       TEXT,                         -- bcrypt hash; NULL = logged out
   refresh_token_expires_at TIMESTAMPTZ,
+  reset_otp_hash           TEXT,                         -- bcrypt hash of 6-digit reset OTP
+  reset_otp_expires_at     TIMESTAMPTZ,                  -- 10-minute expiry for reset OTP
   created_by               UUID REFERENCES users(id),
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id);
 
 -- ── TABLE 2: ev_models ──────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ev_models (

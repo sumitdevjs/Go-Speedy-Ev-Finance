@@ -13,6 +13,7 @@ import Badge from '../../../components/ui/Badge';
 import Pagination from '../../../components/ui/Pagination';
 import api from '../../../lib/api';
 import { formatCurrency, formatDate } from '../../../lib/constants';
+import { staggerFadeIn } from '../../../lib/gsap';
 
 export default function RentalsListPage() {
   const router = useRouter();
@@ -32,6 +33,11 @@ export default function RentalsListPage() {
     fetchRentals();
   }, [search, statusFilter, overdueFilter, page, showCancelled]);
 
+  // One-time entrance for the header/filter chrome when the page first mounts.
+  useEffect(() => {
+    staggerFadeIn('.gsap-filter-bar', { y: 14, duration: 0.45, stagger: 0 });
+  }, []);
+
   const fetchRentals = async () => {
     try {
       setLoading(true);
@@ -47,8 +53,8 @@ export default function RentalsListPage() {
       const res = await api.get(query);
       if (res.data?.success) {
         setTenants(res.data.data || []);
-        setTotalPages(res.data.meta?.totalPages || 1);
-        setTotalRecords(res.data.meta?.totalRecords || 0);
+        setTotalPages(res.data.pagination?.totalPages || 1);
+        setTotalRecords(res.data.pagination?.totalItems || 0);
       }
     } catch (err) {
       console.error('Failed to load rentals:', err);
@@ -65,11 +71,11 @@ export default function RentalsListPage() {
         <div>
           <Link
             href={`/rentals/${row.id}`}
-            className="font-bold text-slate-900 hover:text-blue-600 block"
+            className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 block"
           >
             {row.name}
           </Link>
-          <span className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+          <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
             <Phone className="h-3 w-3" /> {row.phone}
           </span>
         </div>
@@ -80,7 +86,7 @@ export default function RentalsListPage() {
       key: 'model',
       render: (row) => (
         <div>
-          <p className="font-semibold text-slate-800">{row.ev_models?.name || 'EV Scooter'}</p>
+          <p className="font-semibold text-slate-800 dark:text-slate-200">{row.ev_models?.name || 'EV Scooter'}</p>
           <p className="text-[11px] text-slate-400">Total: {formatCurrency(row.total_price)}</p>
         </div>
       ),
@@ -90,7 +96,7 @@ export default function RentalsListPage() {
       key: 'downpayment_paid',
       render: (row) => (
         <div>
-          <span className="font-bold text-slate-800">{formatCurrency(row.downpayment_paid)}</span>
+          <span className="font-bold text-slate-800 dark:text-slate-200">{formatCurrency(row.downpayment_paid)}</span>
           <p className="text-[11px] text-slate-400 capitalize">{row.downpayment_mode || 'Cash'}</p>
         </div>
       ),
@@ -112,7 +118,7 @@ export default function RentalsListPage() {
 
         return (
           <div>
-            <span className="font-bold text-slate-900">{formatCurrency(bal.outstanding)}</span>
+            <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(bal.outstanding)}</span>
             {bal.daysOverdue > 0 ? (
               <p className="text-[11px] font-bold text-rose-600 flex items-center">
                 <AlertTriangle className="w-3 h-3 mr-0.5 shrink-0" />
@@ -149,8 +155,8 @@ export default function RentalsListPage() {
       key: 'dates',
       render: (row) => (
         <div>
-          <p className="text-xs text-slate-800">C: {formatDate(row.created_at)}</p>
-          <p className="text-[11px] text-slate-500">U: {formatDate(row.updated_at)}</p>
+          <p className="text-xs text-slate-800 dark:text-slate-200">C: {formatDate(row.created_at)}</p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">U: {formatDate(row.updated_at)}</p>
         </div>
       ),
     },
@@ -181,9 +187,9 @@ export default function RentalsListPage() {
         }
       />
 
-      <div className="p-8 max-w-7xl mx-auto space-y-6">
+      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
         {/* Filters and Search Bar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 card-elevation">
+        <div className="gsap-filter-bar flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 md:gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
           <SearchBar
             value={search}
             onChange={(val) => {
@@ -191,13 +197,14 @@ export default function RentalsListPage() {
               setPage(1);
             }}
             placeholder="Search tenant name or phone..."
-            className="w-full sm:max-w-md"
+            className="w-full sm:max-w-md md:flex-1 md:min-w-0"
           />
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="grid grid-cols-2 md:flex md:flex-wrap md:shrink-0 items-center gap-2 md:gap-3 w-full md:w-auto">
             <Button
               variant={showCancelled ? 'primary' : 'outline'}
               size="sm"
+              className="col-span-2 md:col-span-1 w-full md:w-auto justify-center"
               onClick={() => {
                 setShowCancelled(!showCancelled);
                 setPage(1);
@@ -208,16 +215,16 @@ export default function RentalsListPage() {
 
             {!showCancelled && (
               <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setPage(1);
-              }}
-              className="rounded-lg border border-slate-200 bg-white py-2 px-3 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="">All Active Statuses</option>
-              <option value="rented">Active Rented</option>
-            </select>
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full md:w-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
+              >
+                <option value="" className="dark:bg-slate-900">All Active Statuses</option>
+                <option value="rented" className="dark:bg-slate-900">Active Rented</option>
+              </select>
             )}
 
             <select
@@ -226,12 +233,12 @@ export default function RentalsListPage() {
                 setOverdueFilter(e.target.value);
                 setPage(1);
               }}
-              className="rounded-lg border border-slate-200 bg-white py-2 px-3 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100"
+              className={`w-full md:w-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors ${showCancelled ? 'col-span-2 md:col-span-1' : 'col-span-1'}`}
             >
-              <option value="">Overdue Filter: All</option>
-              <option value="1">1+ Days Overdue</option>
-              <option value="2">2+ Days Overdue</option>
-              <option value="7">7+ Days Overdue (1+ Wk)</option>
+              <option value="" className="dark:bg-slate-900">Overdue Filter: All</option>
+              <option value="1" className="dark:bg-slate-900">1+ Days Overdue</option>
+              <option value="2" className="dark:bg-slate-900">2+ Days Overdue</option>
+              <option value="7" className="dark:bg-slate-900">7+ Days Overdue (1+ Wk)</option>
             </select>
           </div>
         </div>

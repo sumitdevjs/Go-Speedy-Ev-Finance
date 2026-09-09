@@ -22,6 +22,32 @@ class AuditService {
 
     if (error) throw error;
 
+    // entity_id is polymorphic (users/tenants/bookings/payments/...), so it has
+    // no FK constraint and PostgREST can't embed it automatically like `users`
+    // (the actor) above. For staff/user actions specifically, batch-resolve the
+    // target user's name so the log can say *who* the change was made to.
+    const targetUserIds = [...new Set(
+      data
+        .filter(row => row.entity_type === 'users' && row.entity_id)
+        .map(row => row.entity_id)
+    )];
+
+    if (targetUserIds.length > 0) {
+      const { data: targets, error: targetsError } = await supabase
+        .from('users')
+        .select('id, name')
+        .in('id', targetUserIds);
+
+      if (targetsError) console.error('[Audit] Failed to resolve target user names:', targetsError);
+
+      const nameById = new Map((targets || []).map(u => [u.id, u.name]));
+      data.forEach(row => {
+        if (row.entity_type === 'users' && row.entity_id) {
+          row.entity_name = nameById.get(row.entity_id) || null;
+        }
+      });
+    }
+
     const meta = getPaginationMeta(count, page, limit);
     return { data, meta };
   }

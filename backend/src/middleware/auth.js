@@ -20,7 +20,7 @@ const requireAuth = async (req, res, next) => {
     // Verify user is still active
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, role, is_active')
+      .select('id, name, email, phone, role, is_active')
       .eq('id', decoded.id)
       .single();
 
@@ -35,6 +35,9 @@ const requireAuth = async (req, res, next) => {
     // Attach user to request
     req.user = {
       id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
       role: user.role,
     };
     

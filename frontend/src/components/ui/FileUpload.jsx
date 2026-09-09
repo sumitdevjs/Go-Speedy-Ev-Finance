@@ -68,12 +68,12 @@ export default function FileUpload({
   return (
     <div className={`w-full ${className}`}>
       {label && (
-        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
           <span>
-            {label} {required && <span className="text-rose-500">*</span>}
+            {label} {required && <span className="text-rose-500 dark:text-rose-400">*</span>}
           </span>
           {isComplete && (
-            <span className="inline-flex items-center text-[11px] font-medium text-emerald-600 lowercase tracking-normal">
+            <span className="inline-flex items-center text-[11px] font-medium text-emerald-600 dark:text-emerald-400 lowercase tracking-normal">
               <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> uploaded
             </span>
           )}
@@ -84,8 +84,8 @@ export default function FileUpload({
         onClick={() => fileInputRef.current?.click()}
         className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 text-center transition-smooth cursor-pointer ${
           isComplete
-            ? 'border-emerald-300 bg-emerald-50/20 hover:bg-emerald-50/40'
-            : 'border-slate-300 bg-slate-50/50 hover:border-blue-400 hover:bg-blue-50/20'
+            ? 'border-emerald-300 dark:border-emerald-500/40 bg-emerald-50/20 dark:bg-emerald-500/10 hover:bg-emerald-50/40 dark:hover:bg-emerald-500/15'
+            : 'border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50/20 dark:hover:bg-blue-500/10'
         }`}
       >
         <input
@@ -98,14 +98,14 @@ export default function FileUpload({
 
         {compressing || uploading ? (
           <div className="flex flex-col items-center py-2">
-            <Spinner size="md" className="text-blue-600 mb-2" />
-            <p className="text-xs font-medium text-slate-600">
+            <Spinner size="md" className="text-blue-600 dark:text-blue-400 mb-2" />
+            <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
               {compressing ? 'Compressing WebP...' : 'Uploading...'}
             </p>
           </div>
         ) : preview ? (
           <div className="flex items-center gap-3 w-full">
-            <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800">
               <img
                 src={preview}
                 alt={label}
@@ -113,27 +113,27 @@ export default function FileUpload({
               />
             </div>
             <div className="flex-1 text-left min-w-0">
-              <p className="text-xs font-semibold text-slate-800 truncate">
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">
                 {currentPath ? currentPath.split('/').pop() : 'Document attached'}
               </p>
-              <p className="text-[11px] text-slate-500 flex items-center mt-0.5">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center mt-0.5">
                 <RefreshCw className="w-3 h-3 mr-1" /> Click to replace photo
               </p>
             </div>
           </div>
         ) : (
           <div className="flex flex-col items-center py-2">
-            <UploadCloud className="h-7 w-7 text-slate-400 mb-1.5" />
-            <p className="text-xs font-medium text-slate-700">
-              Upload <span className="text-blue-600">file / image</span>
+            <UploadCloud className="h-7 w-7 text-slate-400 dark:text-slate-500 mb-1.5" />
+            <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
+              Upload <span className="text-blue-600 dark:text-blue-400">file / image</span>
             </p>
-            <p className="text-[10px] text-slate-400 mt-0.5">Auto-compressed to WebP ≤ 300KB</p>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Auto-compressed to WebP ≤ 300KB</p>
           </div>
         )}
       </div>
 
       {uploadError && (
-        <p className="mt-1.5 text-xs text-rose-600 flex items-center">
+        <p className="mt-1.5 text-xs text-rose-600 dark:text-rose-400 flex items-center">
           <AlertCircle className="w-3.5 h-3.5 mr-1 shrink-0" />
           {uploadError}
         </p>

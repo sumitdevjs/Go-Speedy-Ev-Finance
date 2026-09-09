@@ -11,8 +11,13 @@ import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import Modal from '../../../components/ui/Modal';
 import Badge from '../../../components/ui/Badge';
+import SearchBar from '../../../components/ui/SearchBar';
+import Pagination from '../../../components/ui/Pagination';
 import api from '../../../lib/api';
 import { formatCurrency, formatDate } from '../../../lib/constants';
+import { staggerFadeIn } from '../../../lib/gsap';
+import { toast } from '../../../lib/toast';
+import { confirmDialog } from '../../../lib/confirmDialog';
 
 export default function BookingsPage() {
   const router = useRouter();
@@ -22,6 +27,10 @@ export default function BookingsPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
 
   // Form fields
   const [name, setName] = useState('');
@@ -38,18 +47,28 @@ export default function BookingsPage() {
 
   useEffect(() => {
     fetchData();
+  }, [search, page]);
+
+  // One-time entrance for the header/filter chrome when the page first mounts.
+  useEffect(() => {
+    staggerFadeIn('.gsap-filter-bar', { y: 14, duration: 0.45, stagger: 0 });
   }, []);
 
   const fetchData = async () => {
     try {
       setLoading(true);
+      let bookingsQuery = `/api/bookings?page=${page}&limit=15`;
+      if (search) bookingsQuery += `&search=${encodeURIComponent(search)}`;
+
       const [bookingsRes, modelsRes] = await Promise.all([
-        api.get('/api/bookings'),
+        api.get(bookingsQuery),
         api.get('/api/models'),
       ]);
 
       if (bookingsRes.data?.success) {
         setBookings(bookingsRes.data.data || []);
+        setTotalPages(bookingsRes.data.pagination?.totalPages || 1);
+        setTotalRecords(bookingsRes.data.pagination?.totalItems || 0);
       }
       if (modelsRes.data?.success) {
         setModels(modelsRes.data.data || []);
@@ -96,12 +115,20 @@ export default function BookingsPage() {
   };
 
   const handleCancelBooking = async (id) => {
-    if (!confirm('Are you sure you want to cancel this booking?')) return;
+    const ok = await confirmDialog({
+      title: 'Cancel this booking?',
+      message: 'The reserved token amount will no longer hold this model for the customer.',
+      tone: 'danger',
+      confirmLabel: 'Cancel Booking',
+      cancelLabel: 'Keep Booking',
+    });
+    if (!ok) return;
     try {
       await api.patch(`/api/bookings/${id}/cancel`);
+      toast.success('Booking cancelled.');
       fetchData();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to cancel booking');
+      toast.error(err.response?.data?.message || 'Failed to cancel booking');
     }
   };
 
@@ -119,10 +146,11 @@ export default function BookingsPage() {
       });
       if (res.data?.success) {
         setIsEditModalOpen(false);
+        toast.success('Booking updated.');
         fetchData();
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to edit booking');
+      toast.error(err.response?.data?.message || 'Failed to edit booking');
     } finally {
       setIsEditing(false);
     }
@@ -134,8 +162,8 @@ export default function BookingsPage() {
       key: 'name',
       render: (row) => (
         <div>
-          <p className="font-bold text-slate-900">{row.name}</p>
-          <p className="text-xs text-slate-500">{row.phone}</p>
+          <p className="font-bold text-slate-900 dark:text-white">{row.name}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{row.phone}</p>
         </div>
       ),
     },
@@ -143,7 +171,7 @@ export default function BookingsPage() {
       header: 'Reserved EV Model',
       key: 'model',
       render: (row) => (
-        <span className="font-medium text-slate-800">
+        <span className="font-medium text-slate-800 dark:text-slate-200">
           {row.ev_models?.name || row.model_name_raw || 'Unspecified'}
         </span>
       ),
@@ -244,17 +272,38 @@ export default function BookingsPage() {
             icon={Plus}
             onClick={() => setIsAddModalOpen(true)}
           >
-            New Booking
+            <span className="hidden sm:inline">New Booking</span>
+            <span className="sm:hidden">New</span>
           </Button>
         }
       />
 
-      <div className="p-8 max-w-7xl mx-auto space-y-6">
+      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+        {/* Search Bar */}
+        <div className="gsap-filter-bar flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
+          <SearchBar
+            value={search}
+            onChange={(val) => {
+              setSearch(val);
+              setPage(1);
+            }}
+            placeholder="Search customer name or phone..."
+            className="w-full sm:max-w-md sm:flex-1 sm:min-w-0"
+          />
+        </div>
+
         <Table
           columns={columns}
           data={bookings}
           loading={loading}
           emptyText="No bookings found. Click 'New Booking' to record a reservation."
+        />
+
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={totalRecords}
+          onPageChange={setPage}
         />
       </div>
 

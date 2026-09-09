@@ -12,11 +12,8 @@ class AuthController {
 
       return successResponse(res, 200, { user: result.user }, 'Login successful');
     } catch (error) {
-      if (error.message === 'Invalid credentials' || error.message === 'Account is deactivated') {
-        return errorResponse(res, 401, error.message);
-      }
-      console.error(error);
-      return errorResponse(res, 500, 'Internal Server Error');
+      const status = error.message?.includes('deactivated') ? 403 : 401;
+      return errorResponse(res, status, error.message || 'Invalid credentials');
     }
   }
 
@@ -63,6 +60,28 @@ class AuthController {
   async me(req, res) {
     // req.user is set by auth middleware
     return successResponse(res, 200, { user: req.user }, 'User profile retrieved');
+  }
+
+  async forgotPassword(req, res) {
+    try {
+      const { email } = req.body;
+      const result = await authService.requestPasswordReset(email);
+      return successResponse(res, 200, null, result.message);
+    } catch (error) {
+      const status = error.message.includes('deactivated') ? 403 : 400;
+      return errorResponse(res, status, error.message);
+    }
+  }
+
+  async resetPassword(req, res) {
+    try {
+      const { email, otp, newPassword } = req.body;
+      const ip = req.ip || req.headers['x-forwarded-for'];
+      const result = await authService.resetPasswordWithOtp(email, otp, newPassword, ip);
+      return successResponse(res, 200, null, result.message);
+    } catch (error) {
+      return errorResponse(res, 400, error.message);
+    }
   }
 
   _setCookies(res, accessToken, refreshToken, userId) {

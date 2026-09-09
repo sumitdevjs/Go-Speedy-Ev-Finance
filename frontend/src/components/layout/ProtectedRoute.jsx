@@ -28,10 +28,10 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
 
   if (!hasCheckedAuth || isLoading) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-slate-50">
+      <div className="flex h-screen w-screen items-center justify-center bg-slate-50 dark:bg-[#090d16] transition-colors">
         <div className="text-center">
-          <Spinner size="lg" className="text-blue-600 mb-3 mx-auto" />
-          <p className="text-sm font-medium text-slate-500">Checking authorization...</p>
+          <Spinner size="lg" className="text-blue-600 dark:text-blue-400 mb-3 mx-auto" />
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Loading workspace...</p>
         </div>
       </div>
     );

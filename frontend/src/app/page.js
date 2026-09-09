@@ -1,20 +1,82 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
-import dynamic from 'next/dynamic';
-import { Lock, Phone, Eye, EyeOff, AlertCircle, ArrowRight, Shield } from 'lucide-react';
+import {
+  User,
+  Lock,
+  ArrowRight,
+  Shield,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  Zap,
+  Leaf,
+  Car,
+  Calendar,
+  BarChart3,
+  Crown,
+  Users,
+  Mail,
+  KeyRound,
+  CheckCircle2,
+  RefreshCw,
+  X,
+} from 'lucide-react';
+import ThemeToggle from '../components/ui/ThemeToggle';
 import { useAuthStore } from '../store/authStore';
-import Button from '../components/ui/Button';
+import { gsap } from '../lib/gsap';
+import api from '../lib/api';
 
-const MoltenMetal = dynamic(() => import('../components/ui/MoltenMetal'), { ssr: false });
+const FEATURES = [
+  { icon: Car, title: 'Fleet Management', desc: 'Track and manage your EV fleet' },
+  { icon: Calendar, title: 'Rental Operations', desc: 'Streamline bookings and rentals' },
+  { icon: BarChart3, title: 'Finance & Collections', desc: 'Stay in control of your revenue' },
+];
+
+
+/* Brand lock-up: "GoSpeedy" + "EV FLEET FINANCE". `nav` scales up on the desktop split layout.
+   `nav` always sits over the (theme-invariant) hero photo, so it stays white. `lg` sits inside the
+   login card instead, which now follows the page theme, so it needs light/dark text of its own. */
+function Brand({ size = 'nav' }) {
+  const s =
+    size === 'lg'
+      ? {
+          box: 'w-14 h-14 rounded-2xl',
+          bolt: 'h-6 w-6',
+          name: 'text-[30px]',
+          sub: 'text-[11px] tracking-[0.2em] mt-1',
+          nameColor: 'text-slate-900 dark:text-white',
+          subColor: 'text-slate-500 dark:text-slate-400',
+        }
+      : {
+          box: 'w-9 h-9 rounded-xl desk:w-14 desk:h-14 desk:rounded-2xl',
+          bolt: 'h-[18px] w-[18px] desk:h-6 desk:w-6',
+          name: 'text-[22px] desk:text-[30px]',
+          sub: 'text-[8px] tracking-[0.2em] mt-0.5 desk:text-[11px] desk:mt-1',
+          nameColor: 'text-white',
+          subColor: 'text-slate-400',
+        };
+  return (
+    <div className="flex items-center gap-2.5 desk:gap-3">
+      <div
+        className={`${s.box} flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-600 shadow-md shadow-emerald-500/25`}
+      >
+        <Zap className={`${s.bolt} fill-white text-white`} />
+      </div>
+      <div className="flex flex-col leading-none">
+        <span className={`${s.name} font-extrabold tracking-tight ${s.nameColor} leading-none`}>
+          Go<span className="text-emerald-400">Speedy</span>
+        </span>
+        <span className={`${s.sub} font-bold ${s.subColor} uppercase`}>EV Fleet Finance</span>
+      </div>
+    </div>
+  );
+}
 
 export default function RootPage() {
   const router = useRouter();
-  const { checkAuth, login } = useAuthStore();
-  const [isChecking, setIsChecking] = useState(true);
-  const [user, setUser] = useState(null);
+  const { login, checkAuth } = useAuthStore();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -24,10 +86,112 @@ export default function RootPage() {
   const [mounted, setMounted] = useState(false);
   const [showVideo, setShowVideo] = useState(true);
 
+  // Forgot Password modal state
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  const [forgotStep, setForgotStep] = useState('request'); // 'request' | 'verify' | 'success'
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotNewPass, setForgotNewPass] = useState('');
+  const [forgotConfirmPass, setForgotConfirmPass] = useState('');
+  const [showForgotPass, setShowForgotPass] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState('');
+  const [resendTimer, setResendTimer] = useState(0);
+
+  // Resend OTP countdown timer
+  useEffect(() => {
+    let interval = null;
+    if (resendTimer > 0) {
+      interval = setInterval(() => setResendTimer((prev) => prev - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
+
+  const handleRequestOtp = async (e) => {
+    if (e) e.preventDefault();
+    if (!forgotEmail || !forgotEmail.includes('@')) {
+      setForgotError('Please enter a valid email address.');
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError('');
+    try {
+      const res = await api.post('/api/auth/forgot-password', { email: forgotEmail });
+      setForgotSuccess(res.data?.message || 'Verification code sent to your email!');
+      setForgotStep('verify');
+      setResendTimer(60);
+    } catch (err) {
+      setForgotError(err.response?.data?.message || 'Failed to send OTP. Please check your email and try again.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    if (e) e.preventDefault();
+    if (!forgotOtp || forgotOtp.trim().length !== 6) {
+      setForgotError('Please enter the 6-digit OTP code sent to your email.');
+      return;
+    }
+    if (!forgotNewPass || forgotNewPass.length < 6) {
+      setForgotError('Password must be at least 6 characters long.');
+      return;
+    }
+    if (forgotNewPass !== forgotConfirmPass) {
+      setForgotError('Passwords do not match. Please re-enter.');
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError('');
+    try {
+      const res = await api.post('/api/auth/reset-password', {
+        email: forgotEmail,
+        otp: forgotOtp.trim(),
+        newPassword: forgotNewPass,
+      });
+      setForgotStep('success');
+      setForgotSuccess(res.data?.message || 'Password reset successful!');
+    } catch (err) {
+      setForgotError(err.response?.data?.message || 'Failed to reset password. Please check your OTP.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleBackToLoginFromForgot = () => {
+    setIsForgotModalOpen(false);
+    if (forgotEmail) {
+      setIdentifier(forgotEmail);
+    }
+    setForgotStep('request');
+    setForgotError('');
+    setForgotSuccess('');
+    setForgotOtp('');
+    setForgotNewPass('');
+    setForgotConfirmPass('');
+  };
+
   useEffect(() => {
     const hasPlayed = sessionStorage.getItem('introVideoPlayed');
     if (hasPlayed) {
       setShowVideo(false);
+    }
+
+    // Check for OAuth error query params (e.g. ?error=account_deactivated)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const errParam = params.get('error');
+      if (errParam === 'not_registered') {
+        setError('Access denied. Your email is not registered. Kindly contact admin to get an account.');
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (errParam === 'account_deactivated') {
+        setError('Your account is deactivated. Kindly contact admin.');
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (errParam === 'oauth_failed') {
+        setError('Google sign-in failed or was cancelled. Please try again.');
+        window.history.replaceState({}, '', window.location.pathname);
+      }
     }
   }, []);
 
@@ -37,47 +201,82 @@ export default function RootPage() {
   };
 
   useEffect(() => {
-    checkAuth().then((u) => { setUser(u); setIsChecking(false); });
-    const t = setTimeout(() => setMounted(true), 80);
-    return () => clearTimeout(t);
-  }, [checkAuth]);
+    checkAuth().then((u) => {
+      if (u) router.push('/dashboard');
+    });
+    setMounted(true);
+  }, [checkAuth, router]);
+
+  // Subtle GSAP entrance animation
+  useEffect(() => {
+    if (!showVideo && mounted) {
+      gsap.fromTo(
+        '.hero-bg-layer',
+        { opacity: 0, scale: 1.02 },
+        { opacity: 1, scale: 1, duration: 0.6, ease: 'power2.out', clearProps: 'transform' }
+      );
+      gsap.fromTo(
+        '.gsap-left-content',
+        { opacity: 0, y: 15 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out', delay: 0.1 }
+      );
+      gsap.fromTo(
+        '.gsap-login-card',
+        { opacity: 0, y: 15, scale: 0.98 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: 'power2.out', delay: 0.2 }
+      );
+    }
+  }, [showVideo, mounted]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!identifier.trim()) { setError('Please enter your phone number or email'); return; }
-    if (!password) { setError('Please enter your password'); return; }
+
+    // Specific validation messages for required fields
+    if (!identifier?.trim() && !password?.trim()) {
+      setError('Phone number/email and password are both required.');
+      return;
+    }
+    if (!identifier?.trim()) {
+      setError('Phone number or email is required.');
+      return;
+    }
+    if (!password?.trim()) {
+      setError('Password is required.');
+      return;
+    }
+
     try {
       setSubmitting(true);
       const res = await login(identifier.trim(), password);
-      if (res.success) { router.replace('/dashboard'); }
-      else { setError(res.error || 'Invalid credentials'); }
+      if (res && res.success) {
+        router.push('/dashboard');
+      } else {
+        setError(res?.error || 'Wrong password! Please check your password and try again.');
+      }
     } catch (err) {
-      setError(err.message || 'Login failed');
-    } finally { setSubmitting(false); }
+      console.error(err);
+      setError(err.response?.data?.message || err.message || 'Wrong password! Please check your password and try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const fillCredentials = (type) => {
-    setError('');
-    if (type === 'admin') { setIdentifier('9999999999'); setPassword('Admin@123'); }
-    else { setIdentifier('8888888888'); setPassword('Staff@123'); }
-  };
 
   if (showVideo) {
     return (
       <div className="fixed inset-0 bg-black z-50 flex items-center justify-center overflow-hidden">
-        <video 
-          src="/generate_a_video_in_which_the (1).mp4" 
-          autoPlay 
+        <video
+          src="/generate_a_video_in_which_the (1).mp4"
+          autoPlay
           muted
-          playsInline 
+          playsInline
           onEnded={handleVideoEnd}
           className="w-full h-full object-cover"
         />
-        <button 
+        <button
           onClick={handleVideoEnd}
-          className="absolute top-6 right-6 z-50 text-white/70 hover:text-white px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 transition-all font-medium text-sm"
-          style={{ fontFamily: "'Inter', sans-serif" }}
+          className="absolute top-6 right-6 z-50 text-white/70 hover:text-white px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 transition-all font-medium text-sm cursor-pointer"
         >
           Skip Intro
         </button>
@@ -86,274 +285,544 @@ export default function RootPage() {
   }
 
   return (
-    <div className="min-h-screen text-white flex flex-col" style={{ fontFamily: "'Inter', sans-serif" }}>
-      <style dangerouslySetInnerHTML={{ __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-
-        /* ─── PAGE BACKGROUND ─── */
-        .page-bg {
-          position: fixed; inset: 0; z-index: 0;
-          background: #020818;
-          overflow: hidden;
-        }
-
-        /* ── NAVBAR ── */
-        .gs-nav {
-          position: relative; z-index: 20;
-          display: flex; align-items: center;
-          padding: 16px 36px;
-          border-bottom: 1px solid rgba(255,255,255,0.05);
-          background: rgba(1,4,15,0.55);
-          backdrop-filter: blur(20px);
-        }
-
-        /* ── 3D Entry ── */
-        .outer-container {
-          position: relative; z-index: 10;
-          opacity: 0;
-          transform: rotateY(-16deg) rotateX(9deg) scale(0.84) translateY(50px);
-          transition: opacity 0.85s cubic-bezier(0.22,1,0.36,1), transform 0.85s cubic-bezier(0.22,1,0.36,1);
-          transform-style: preserve-3d;
-        }
-        .outer-container.is-visible {
-          opacity: 1;
-          transform: rotateY(0) rotateX(0) scale(1) translateY(0);
-        }
-
-        /* ── UNIFIED CARD ── */
-        .login-card {
-          display: flex; gap: 0; width: 100%;
-          font-family: 'Inter', sans-serif;
-          overflow: hidden; border-radius: 28px;
-          padding: 14px 0 14px 14px;
-          background: transparent;
-          box-shadow: none;
-        }
-
-        /* ── LEFT: Form ── */
-        .login-left {
-          flex: 0.88;
-          background: #ffffff;
-          display: flex; flex-direction: column; justify-content: center;
-          padding: 48px 44px;
-          position: relative; z-index: 3;
-          min-width: 360px;
-          border-radius: 18px;
-          box-shadow: 0 4px 24px rgba(0,0,0,0.12);
-        }
-
-        .brand-title {
-          font-size: 30px; font-weight: 900; color: #0f172a;
-          letter-spacing: -0.5px; line-height: 1; margin-bottom: 6px;
-        }
-        .brand-sub {
-          font-size: 10px; font-weight: 700; text-transform: uppercase;
-          letter-spacing: 0.14em; color: #64748b; margin-bottom: 32px;
-        }
-        .field-label {
-          display: block; font-size: 10.5px; font-weight: 700;
-          text-transform: uppercase; letter-spacing: 0.08em;
-          color: #475569; margin-bottom: 6px;
-        }
-        .input-wrap { position: relative; margin-bottom: 20px; }
-        .input-icon {
-          position: absolute; left: 13px; top: 50%;
-          transform: translateY(-50%); color: #94a3b8;
-          pointer-events: none; display: flex;
-        }
-        .field-input {
-          width: 100%; border: 1.5px solid #e2e8f0; border-radius: 12px;
-          padding: 13px 42px 13px 40px; font-size: 14px; color: #0f172a;
-          background: #f8fafc; outline: none;
-          transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
-          font-family: 'Inter', sans-serif;
-        }
-        .field-input::placeholder { color: #94a3b8; }
-        .field-input:focus { border-color: #3b82f6; background: #fff; box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
-        .eye-btn {
-          position: absolute; right: 13px; top: 50%; transform: translateY(-50%);
-          background: none; border: none; cursor: pointer; color: #94a3b8;
-          display: flex; align-items: center; padding: 4px; transition: color 0.15s;
-        }
-        .eye-btn:hover { color: #475569; }
-        .error-box {
-          background: #fff1f2; border: 1.5px solid #fecdd3; border-radius: 10px;
-          padding: 11px 14px; display: flex; align-items: flex-start; gap: 8px;
-          color: #be123c; font-size: 13px; margin-bottom: 18px;
-        }
-        .divider { border: none; border-top: 1.5px solid #f1f5f9; margin: 22px 0 16px; }
-        .demo-label {
-          font-size: 10.5px; font-weight: 700; text-transform: uppercase;
-          letter-spacing: 0.08em; color: #94a3b8; text-align: center;
-          display: flex; align-items: center; justify-content: center;
-          gap: 6px; margin-bottom: 12px;
-        }
-        .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .demo-btn {
-          background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px;
-          padding: 11px 13px; text-align: left; cursor: pointer;
-          transition: background 0.18s, border-color 0.18s;
-        }
-        .demo-btn:hover { background: #eff6ff; border-color: #bfdbfe; }
-        .demo-btn-title { font-size: 12px; font-weight: 700; color: #1e293b; display: block; margin-bottom: 2px; }
-        .demo-btn:hover .demo-btn-title { color: #2563eb; }
-        .demo-btn-creds { font-size: 10.5px; color: #64748b; display: block; }
-
-        /* ── RIGHT: Scooty ── */
-        .login-right {
-          flex: 1.12;
-          background: transparent;
-          display: flex; flex-direction: column; align-items: center; justify-content: center;
-          position: relative; overflow: hidden; min-height: 560px;
-          border-radius: 0;
-          margin-left: 20px;
-        }
-        .login-right::after {
-          content: ''; position: absolute; inset: 0;
-          background: radial-gradient(ellipse at center, transparent 50%, rgba(2,8,20,0.6) 100%);
-          pointer-events: none; z-index: 2;
-        }
-        .scooty-wrap {
-          position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-          animation: floatY 6s ease-in-out infinite; z-index: 1;
-          transform: scale(1.1);
-        }
-        @keyframes floatY {
-          0%,100% { transform: scale(1.1) translateY(0) rotate(-0.4deg); }
-          50%      { transform: scale(1.1) translateY(-20px) rotate(0.4deg); }
-        }
-
-        /* ── RESPONSIVE ── */
-        @media (max-width: 780px) {
-          .login-right { display: none; }
-          .login-left { min-width: unset; padding: 36px 28px; }
-          .login-card { border-radius: 24px; }
-        }
-      `}} />
-
-      {/* ── BACKGROUND: MoltenMetal WebGL ── */}
-      <div className="page-bg">
-        <div style={{ position: 'absolute', inset: 0 }}>
-          <MoltenMetal
-            color1="#0a1628"
-            color2="#1a4480"
-            color3="#0ea5e9"
-            speed={0.18}
-            scale={3.5}
-            detail={3}
-            glow={1.8}
-            coreSize={0.12}
-            swirl={0.8}
-            fold={-0.15}
-            blackPoint={0.0}
-            brightness={1.0}
-            colorMode="molten"
-            grain
-            grainIntensity={0.03}
-            mouseInteraction
-            mouseStrength={0.2}
-            opacity={1}
-          />
+    <div className="relative min-h-screen bg-[#070c18] text-white flex flex-col overflow-x-hidden select-none">
+      {/* ── DESKTOP HERO PHOTO (split layout only): cinematic, near full-height photo on the left ~62% of the
+          screen. It is anchored to its right edge so the scooter sits centre-left and the charging station
+          ends just before the login-card column; only the far-left (tree) is trimmed, under the headline. ── */}
+      <div className="hero-bg-layer hidden desk:block fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-y-0 left-0 w-[60%] xl:w-[61%] 2xl:w-[63%] min-[1700px]:w-[65%] max-w-[calc(50vw_+_260px)] flex items-center">
+          <div className="relative w-full h-[90%] max-h-[900px] overflow-hidden">
+            <img
+              src="/ev-hero-bg.jpg"
+              alt=""
+              className="w-full h-full object-cover object-right"
+            />
+            {/* Left: typography contrast (wider on smaller desktops where the copy reaches further right) */}
+            <div className="absolute inset-y-0 left-0 w-[64%] xl:w-[56%] bg-gradient-to-r from-[#070c18]/90 via-[#070c18]/45 to-transparent" />
+            {/* Right: soft fade towards the login card */}
+            <div className="absolute inset-y-0 right-0 w-[5%] bg-gradient-to-r from-transparent to-[#070c18]" />
+            {/* Top / bottom: melt into the page */}
+            <div className="absolute inset-x-0 top-0 h-[14%] bg-gradient-to-b from-[#070c18] via-[#070c18]/55 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-[12%] bg-gradient-to-t from-[#070c18] via-[#070c18]/55 to-transparent" />
+          </div>
         </div>
-        {/* subtle dark vignette overlay so the card reads clearly */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.45) 100%)',
-          pointerEvents: 'none'
-        }} />
       </div>
 
       {/* ── NAVBAR ── */}
-      <nav className="gs-nav">
-        <div className="flex items-center gap-3">
-          <div className="relative w-11 h-11 flex items-center justify-center rounded-[14px] shadow-[0_0_20px_rgba(16,185,129,0.35)]"
-               style={{ background: 'linear-gradient(135deg, #10b981, #065f46)' }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
-              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-            </svg>
-            <div className="absolute inset-0 rounded-[14px] ring-1 ring-white/20" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[22px] font-black tracking-tight text-white uppercase leading-none">
-              Go<span className="text-emerald-400">Speedy</span>
-            </span>
-            <span className="text-[9px] font-bold text-slate-400 tracking-[0.22em] uppercase mt-0.5">
-              EV Fleet Finance
-            </span>
-          </div>
-        </div>
+      <nav className="relative z-20 flex items-center justify-between px-5 sm:px-8 desk:px-16 py-3 desk:py-5 [@media(max-height:720px)]:desk:!py-3 w-full max-w-[1720px] mx-auto">
+        <Brand size="nav" />
+        <ThemeToggle variant="glass" />
       </nav>
 
-      {/* ── MAIN ── */}
-      <main className="relative flex-1 flex flex-col items-center justify-center p-6 md:p-10 overflow-hidden" style={{ perspective: '1400px' }}>
-        <div className={`outer-container ${mounted ? 'is-visible' : ''}`} style={{ maxWidth: 1160, width: '100%' }}>
-          <div className="login-card">
+      {/* ── MOBILE / TABLET HERO (stacked layout): the photo sits behind the copy, scooter on the right,
+          copy on the darkened left, and it melts into the page just above the login card. ── */}
+      <section className="hero-bg-layer desk:hidden relative isolate -mt-[60px] pt-[60px] overflow-hidden">
+        <div className="absolute inset-0 -z-10 pointer-events-none">
+          <img
+            src="/ev-hero-bg.jpg"
+            alt=""
+            className="w-full h-full object-cover object-[80%_center] sm:object-[70%_center]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#070c18]/95 via-[#070c18]/60 to-[#070c18]/10" />
+          <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#070c18]/80 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-[#070c18] via-[#070c18]/60 to-transparent" />
+        </div>
 
-            {/* LEFT: Form */}
-            <div className="login-left">
-              <div className="brand-title">Go<span style={{ color: '#10b981' }}>Speedy</span></div>
-              <div className="brand-sub">Electric Mobility Rental &amp; Finance System</div>
+        <div className="gsap-left-content px-5 sm:px-8 pt-6 sm:pt-8 pb-4 sm:pb-6 w-full max-w-[1720px] mx-auto [text-shadow:0_1px_2px_rgba(7,12,24,0.9),0_2px_14px_rgba(7,12,24,0.8)]">
+          <p className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.18em] text-emerald-400 leading-relaxed">
+            Clean Mobility.
+            <br className="sm:hidden" />
+            <span className="hidden sm:inline"> </span>
+            Better Tomorrow.
+          </p>
+
+          <h1 className="mt-2 sm:mt-3 text-[26px] sm:text-5xl font-black tracking-tight leading-[1.12] sm:leading-[1.1] max-w-[70%] sm:max-w-[60%] text-white">
+            Powering Smarter <br />
+            <span className="text-emerald-400">Electric Mobility.</span>
+          </h1>
+
+          <p className="mt-2.5 sm:mt-4 text-[13px] sm:text-lg text-slate-300/90 leading-relaxed max-w-[68%] sm:max-w-[58%]">
+            Manage EV rentals, fleet operations and finance — all from one simple platform.
+          </p>
+
+          {/* Feature row (icon + title) */}
+          <div className="mt-5 sm:mt-7 grid grid-cols-3 gap-2 sm:gap-4">
+            {FEATURES.map((f) => {
+              const Icon = f.icon;
+              return (
+                <div key={f.title} className="flex items-center gap-2 sm:gap-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-emerald-950/80 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </div>
+                  <h4 className="text-[11px] sm:text-sm font-bold text-white leading-tight">{f.title}</h4>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ── MAIN: desktop = split (copy left / card right); stacked = card only (copy lives in the hero above) ── */}
+      <main className="relative z-10 flex-1 flex items-center px-5 sm:px-8 desk:px-16 pt-1 pb-6 sm:pb-8 desk:py-8 [@media(max-height:720px)]:desk:!py-3 w-full max-w-[1720px] mx-auto">
+        <div className="w-full grid grid-cols-1 desk:grid-cols-12 desk:gap-12 items-center">
+          {/* LEFT SIDE (desktop only): intro & features */}
+          <div className="gsap-left-content hidden desk:flex desk:col-span-7 flex-col justify-center text-left [text-shadow:0_1px_2px_rgba(7,12,24,0.9),0_2px_14px_rgba(7,12,24,0.8)]">
+            {/* Pill Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-950/70 border border-emerald-500/40 text-emerald-400 text-sm font-semibold tracking-wide self-start mb-6">
+              <Leaf className="w-4 h-4 fill-emerald-400 text-emerald-400" />
+              <span>Clean Mobility. Better Tomorrow.</span>
+            </div>
+
+            {/* Headline */}
+            <h1 className="text-[52px] xl:text-[58px] 2xl:text-[64px] font-black text-white tracking-tight leading-[1.08]">
+              Powering Smarter <br />
+              <span className="text-emerald-400">Electric Mobility.</span>
+            </h1>
+
+            {/* Subtitle */}
+            <p className="text-lg xl:text-xl text-slate-300/90 mt-5 max-w-[520px] leading-relaxed">
+              Manage EV rentals, fleet operations and finance — all from one simple platform.
+            </p>
+
+            {/* Feature columns */}
+            <div className="grid grid-cols-3 gap-6 mt-9 max-w-[640px]">
+              {FEATURES.map((f) => {
+                const Icon = f.icon;
+                return (
+                  <div key={f.title} className="flex items-start gap-3.5">
+                    <div className="w-11 h-11 rounded-xl bg-emerald-950/80 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-sm">
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div className="max-w-[140px]">
+                      <h4 className="text-[17px] font-bold text-white leading-snug">{f.title}</h4>
+                      <p className="hidden xl:block text-[13px] text-slate-400 mt-1 leading-snug">{f.desc}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Tagline */}
+            <div className="mt-9 pt-4 border-t border-emerald-500/20 max-w-[640px] flex items-center gap-2 text-sm text-slate-400">
+              <span className="w-1 h-4 bg-emerald-400 rounded-full inline-block" />
+              <span>Built for a cleaner, smarter, and more sustainable future.</span>
+            </div>
+          </div>
+
+          {/* LOGIN CARD */}
+          <div className="gsap-login-card desk:col-span-5 w-full max-w-[540px] mx-auto desk:mr-0 desk:max-w-[520px] xl:max-w-[540px]">
+            <div className="bg-white/90 dark:bg-[#0b1222]/85 backdrop-blur-2xl rounded-2xl desk:rounded-[28px] p-5 sm:p-7 desk:p-8 xl:p-9 [@media(max-height:720px)]:desk:!p-6 shadow-[0_25px_60px_rgba(15,23,42,0.15)] dark:shadow-[0_25px_60px_rgba(0,0,0,0.7)] border border-slate-200/80 dark:border-white/10 text-slate-900 dark:text-white transition-all">
+              {/* Card brand header (desktop only) */}
+              <div className="hidden desk:block mb-7 [@media(max-height:720px)]:desk:!hidden">
+                <Brand size="lg" />
+              </div>
+
+              <div className="mb-5 desk:mb-6 [@media(max-height:720px)]:desk:!mb-4">
+                <h2 className="text-[22px] desk:text-[34px] [@media(max-height:720px)]:desk:!text-[26px] font-black text-slate-900 dark:text-white tracking-tight leading-tight">Welcome back</h2>
+                <p className="text-[13px] desk:text-base text-slate-500 dark:text-slate-400 mt-1 desk:mt-1.5">Sign in to continue to your dashboard.</p>
+              </div>
 
               {error && (
-                <div className="error-box">
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>{error}</span>
+                <div className="bg-rose-500/10 dark:bg-rose-950/60 border border-rose-400 dark:border-rose-600/80 rounded-xl p-3.5 flex items-start gap-3 text-rose-600 dark:text-rose-300 text-xs font-semibold mb-4 shadow-md shadow-rose-950/20 animate-in fade-in duration-200">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-500 mt-0.5" />
+                  <div className="flex-1 leading-relaxed">
+                    <span className="font-bold">{error}</span>
+                  </div>
                 </div>
               )}
 
-              <form onSubmit={handleSubmit}>
-                <label className="field-label" htmlFor="identifier">Phone Number or Email</label>
-                <div className="input-wrap">
-                  <span className="input-icon"><Phone size={15} /></span>
-                  <input
-                    id="identifier" type="text" className="field-input"
-                    value={identifier} onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="e.g. 9999999999 or admin@gmail.com" autoComplete="username"
-                  />
+              <form onSubmit={handleSubmit} className="space-y-4 desk:space-y-5 [@media(max-height:720px)]:desk:!space-y-4">
+                <div>
+                  <label className="block text-[10px] desk:text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5 desk:mb-2" htmlFor="identifier">
+                    Phone Number or Email
+                  </label>
+                  <div className="relative">
+                    <span className={`absolute left-3.5 desk:left-4 top-1/2 -translate-y-1/2 ${
+                      error && (error.toLowerCase().includes('phone') || error.toLowerCase().includes('email') || error.toLowerCase().includes('account') || (!identifier && error))
+                        ? 'text-rose-500'
+                        : 'text-slate-400 dark:text-slate-500'
+                    }`}>
+                      <User size={16} />
+                    </span>
+                    <input
+                      id="identifier"
+                      type="text"
+                      className={`w-full bg-slate-50 dark:bg-[#131d35]/90 border ${
+                        error && (error.toLowerCase().includes('phone') || error.toLowerCase().includes('email') || error.toLowerCase().includes('account') || (!identifier && error))
+                          ? 'border-rose-500 ring-1 ring-rose-500/40 text-rose-600 dark:text-rose-300'
+                          : 'border-slate-200 dark:border-slate-700/80 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 text-slate-900 dark:text-white'
+                      } rounded-xl pl-10 desk:pl-11 pr-4 py-3 desk:py-3.5 [@media(max-height:720px)]:desk:!py-3 text-sm desk:text-base placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none transition-all font-sans`}
+                      value={identifier}
+                      onChange={(e) => {
+                        setIdentifier(e.target.value);
+                        if (error) setError('');
+                      }}
+                      placeholder="e.g. 9999999999 or admin@gmail.com"
+                      autoComplete="username"
+                    />
+                  </div>
                 </div>
 
-                <label className="field-label" htmlFor="password">Password</label>
-                <div className="input-wrap">
-                  <span className="input-icon"><Lock size={15} /></span>
-                  <input
-                    id="password" type={showPassword ? 'text' : 'password'} className="field-input"
-                    value={password} onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••" autoComplete="current-password"
-                  />
-                  <button type="button" className="eye-btn" onClick={() => setShowPassword(!showPassword)} tabIndex={-1}>
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
+                <div>
+                  <div className="mb-1.5 desk:mb-2">
+                    <label className="block text-[10px] desk:text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300" htmlFor="password">
+                      Password
+                    </label>
+                  </div>
+                  <div className="relative">
+                    <span className={`absolute left-3.5 desk:left-4 top-1/2 -translate-y-1/2 ${
+                      error && (error.toLowerCase().includes('password') || error.toLowerCase().includes('pass') || (!password && error))
+                        ? 'text-rose-500'
+                        : 'text-slate-400 dark:text-slate-500'
+                    }`}>
+                      <Lock size={16} />
+                    </span>
+                    <input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      className={`w-full bg-slate-50 dark:bg-[#131d35]/90 border ${
+                        error && (error.toLowerCase().includes('password') || error.toLowerCase().includes('pass') || (!password && error))
+                          ? 'border-rose-500 ring-1 ring-rose-500/40 text-rose-600 dark:text-rose-300'
+                          : 'border-slate-200 dark:border-slate-700/80 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 text-slate-900 dark:text-white'
+                      } rounded-xl pl-10 desk:pl-11 pr-11 py-3 desk:py-3.5 [@media(max-height:720px)]:desk:!py-3 text-sm desk:text-base placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none transition-all font-sans`}
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (error) setError('');
+                      }}
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer transition-colors"
+                      onClick={() => setShowPassword(!showPassword)}
+                      tabIndex={-1}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                 </div>
 
-                <Button type="submit" loading={submitting} variant="primary" size="lg" className="w-full">
-                  Sign In to Dashboard <ArrowRight className="h-4 w-4 ml-1" />
-                </Button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full mt-1 py-3 desk:py-3.5 [@media(max-height:720px)]:desk:!py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-white font-bold text-sm desk:text-base tracking-wide flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/25 cursor-pointer disabled:opacity-60"
+                >
+                  {submitting ? (
+                    <span>Signing In...</span>
+                  ) : (
+                    <>
+                      <span>Sign In to Dashboard</span>
+                      <ArrowRight className="h-4 w-4 desk:h-5 desk:w-5" />
+                    </>
+                  )}
+                </button>
               </form>
 
-              <hr className="divider" />
-              <div className="demo-label"><Shield size={13} /> One-Click Demo Access</div>
-              <div className="demo-grid">
-                <button type="button" className="demo-btn" onClick={() => fillCredentials('admin')}>
-                  <span className="demo-btn-title">Admin Account</span>
-                  <span className="demo-btn-creds">9999999999 / Admin@123</span>
-                </button>
-                <button type="button" className="demo-btn" onClick={() => fillCredentials('staff')}>
-                  <span className="demo-btn-title">Staff Account</span>
-                  <span className="demo-btn-creds">8888888888 / Staff@123</span>
+              {/* ── Google OAuth Button ── */}
+              <a
+                href="/api/auth/google"
+                className="mt-3 w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-xl
+                           bg-white hover:bg-slate-50 active:bg-slate-100
+                           text-slate-800 font-semibold text-sm tracking-wide
+                           shadow-md shadow-black/10 dark:shadow-black/20 border border-slate-200 dark:border-white/20
+                           transition-all duration-200 cursor-pointer group"
+              >
+                {/* Official Google "G" SVG */}
+                <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                  <path fill="none" d="M0 0h48v48H0z"/>
+                </svg>
+                <span>Continue with Google</span>
+              </a>
+
+              {/* ── Forgot Password Section (Bottom) ── */}
+              <div className="mt-5 pt-4 border-t border-slate-200/80 dark:border-slate-800/80 flex flex-col items-center justify-center text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotEmail(identifier.includes('@') ? identifier : '');
+                    setForgotStep('request');
+                    setForgotError('');
+                    setForgotSuccess('');
+                    setForgotOtp('');
+                    setForgotNewPass('');
+                    setForgotConfirmPass('');
+                    setIsForgotModalOpen(true);
+                  }}
+                  className="group inline-flex items-center gap-2 text-xs desk:text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer py-1.5 px-3 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5"
+                >
+                  <KeyRound size={15} className="text-emerald-500 group-hover:scale-110 transition-transform" />
+                  <span>Forgot your password?</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400 underline underline-offset-2">Reset Password</span>
                 </button>
               </div>
             </div>
-
-            {/* RIGHT: EV Scooty */}
-            <div className="login-right">
-              <div className="scooty-wrap">
-                <Image src="/hero-scooty.png" alt="Go Speedy EV Scooty" fill className="object-contain" priority />
-              </div>
-            </div>
-
           </div>
         </div>
       </main>
+
+      {/* ── FOOTER ── */}
+      <footer className="relative z-10 pt-2 pb-5 desk:py-5 px-5 sm:px-8 desk:px-16 w-full max-w-[1720px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 text-xs text-slate-400 text-center sm:text-left">
+        <div className="leading-relaxed">
+          <span>© {new Date().getFullYear()} Go Speedy</span>
+          <span className="hidden sm:inline"> • </span>
+          <br className="sm:hidden" />
+          <span>Electric Mobility Rental &amp; Finance</span>
+        </div>
+        <div className="flex items-center gap-2 text-slate-400 hover:text-white cursor-pointer transition-colors">
+          <span>Need Help?</span>
+          <span className="text-slate-600">|</span>
+          <span className="flex items-center gap-1 font-medium">
+            Contact Support <ArrowRight size={12} />
+          </span>
+        </div>
+      </footer>
+
+      {/* ── FORGOT PASSWORD MODAL ── */}
+      {isForgotModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div
+            className="relative w-full max-w-md bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/40 text-slate-900 dark:text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => setIsForgotModalOpen(false)}
+              className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            {/* STEP 1: REQUEST OTP */}
+            {forgotStep === 'request' && (
+              <div>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
+                    <KeyRound size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">Reset Password</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Receive a 6-digit OTP on your registered email</p>
+                  </div>
+                </div>
+
+                {forgotError && (
+                  <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{forgotError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleRequestOtp} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
+                      Registered Email Address
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                        <Mail size={16} />
+                      </span>
+                      <input
+                        type="email"
+                        required
+                        placeholder="e.g. staff@gmail.com"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-[#131d35] border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-sans"
+                        autoFocus
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1.5">
+                      Enter the email address associated with your staff or admin account.
+                    </p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={forgotLoading}
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-sm tracking-wide shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {forgotLoading ? (
+                      <>
+                        <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                        <span>Sending OTP...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Send Verification Code</span>
+                        <ArrowRight size={16} />
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* STEP 2: VERIFY OTP & RESET */}
+            {forgotStep === 'verify' && (
+              <div>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
+                    <Shield size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">Enter OTP &amp; New Password</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Code sent to <span className="text-emerald-500 font-semibold">{forgotEmail}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {forgotSuccess && (
+                  <div className="mb-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>{forgotSuccess}</span>
+                  </div>
+                )}
+
+                {forgotError && (
+                  <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{forgotError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleResetPassword} className="space-y-4">
+                  {/* OTP Input */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
+                      6-Digit OTP Code
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      required
+                      placeholder="000000"
+                      value={forgotOtp}
+                      onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, ''))}
+                      className="w-full bg-slate-50 dark:bg-[#131d35] border border-slate-200 dark:border-slate-700 rounded-xl py-3 text-center text-2xl font-mono tracking-[8px] font-black text-emerald-600 dark:text-emerald-400 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* New Password */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
+                      New Password
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                        <Lock size={16} />
+                      </span>
+                      <input
+                        type={showForgotPass ? 'text' : 'password'}
+                        required
+                        minLength={6}
+                        placeholder="Min 6 characters"
+                        value={forgotNewPass}
+                        onChange={(e) => setForgotNewPass(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-[#131d35] border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-10 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-sans"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotPass(!showForgotPass)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
+                      >
+                        {showForgotPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
+                      Confirm New Password
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                        <Lock size={16} />
+                      </span>
+                      <input
+                        type={showForgotPass ? 'text' : 'password'}
+                        required
+                        minLength={6}
+                        placeholder="Re-enter new password"
+                        value={forgotConfirmPass}
+                        onChange={(e) => setForgotConfirmPass(e.target.value)}
+                        className="w-full bg-slate-50 dark:bg-[#131d35] border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-sans"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setForgotStep('request')}
+                      className="text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors underline cursor-pointer"
+                    >
+                      Change email
+                    </button>
+                    {resendTimer > 0 ? (
+                      <span className="text-slate-400">Resend code in {resendTimer}s</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleRequestOtp}
+                        className="text-emerald-500 hover:underline font-semibold cursor-pointer flex items-center gap-1"
+                      >
+                        <RefreshCw size={12} /> Resend OTP
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={forgotLoading}
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-sm tracking-wide shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {forgotLoading ? (
+                      <>
+                        <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                        <span>Updating Password...</span>
+                      </>
+                    ) : (
+                      <span>Reset Password</span>
+                    )}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* STEP 3: SUCCESS */}
+            {forgotStep === 'success' && (
+              <div className="text-center py-4">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <CheckCircle2 size={36} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Password Reset Successfully!</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto mb-6 leading-relaxed">
+                  Your GoSpeedy password has been updated. You can now sign in using your new password.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleBackToLoginFromForgot}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-sm tracking-wide shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Sign In Now</span>
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

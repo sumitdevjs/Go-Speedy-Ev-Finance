@@ -1,15 +1,28 @@
 const supabase = require('../../config/db');
+const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
+const { buildSearchFilter } = require('../../utils/searchFilter');
 
 class BookingsService {
-  async getBookings() {
-    const { data, error } = await supabase
+  async getBookings(query = {}) {
+    const { page, limit, offset } = getPaginationOptions(query);
+
+    let queryBuilder = supabase
       .from('bookings')
-      .select('*, ev_models(name, company), users!bookings_created_by_fkey(name)')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
+      .select('*, ev_models(name, company), users!bookings_created_by_fkey(name)', { count: 'exact' })
+      .eq('status', 'pending');
+
+    if (query.search) {
+      queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'phone'], query.search));
+    }
+
+    const { data, count, error } = await queryBuilder
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
-    return data;
+
+    const meta = getPaginationMeta(count, page, limit);
+    return { data, meta };
   }
 
   async createBooking(bookingData, createdBy) {

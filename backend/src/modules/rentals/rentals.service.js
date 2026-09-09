@@ -1,6 +1,7 @@
 const supabase = require('../../config/db');
 const { calcBalance } = require('../../utils/balanceCalc');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
+const { buildSearchFilter } = require('../../utils/searchFilter');
 
 class RentalsService {
   async getRentals(query = {}) {
@@ -19,7 +20,7 @@ class RentalsService {
     }
     
     if (query.search) {
-      queryBuilder = queryBuilder.ilike('name', `%${query.search}%`);
+      queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'phone'], query.search));
     }
 
     const { data: tenants, count, error } = await queryBuilder

@@ -4,8 +4,8 @@ const { successResponse, errorResponse } = require('../../utils/response');
 class BookingsController {
   async getAll(req, res) {
     try {
-      const data = await bookingsService.getBookings();
-      return successResponse(res, 200, data, 'Bookings retrieved successfully');
+      const { data, meta } = await bookingsService.getBookings(req.query);
+      return successResponse(res, 200, data, 'Bookings retrieved successfully', meta);
     } catch (error) {
       console.error(error);
       return errorResponse(res, 500, 'Internal Server Error');

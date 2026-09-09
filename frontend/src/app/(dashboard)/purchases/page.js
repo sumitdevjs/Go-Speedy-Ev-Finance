@@ -7,23 +7,40 @@ import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
 import Badge from '../../../components/ui/Badge';
 import Button from '../../../components/ui/Button';
+import SearchBar from '../../../components/ui/SearchBar';
+import Pagination from '../../../components/ui/Pagination';
 import api from '../../../lib/api';
 import { formatCurrency, formatDate } from '../../../lib/constants';
+import { staggerFadeIn } from '../../../lib/gsap';
 
 export default function PurchasesPage() {
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
 
   useEffect(() => {
     fetchPurchases();
+  }, [search, page]);
+
+  // One-time entrance for the header/filter chrome when the page first mounts.
+  useEffect(() => {
+    staggerFadeIn('.gsap-filter-bar', { y: 14, duration: 0.45, stagger: 0 });
   }, []);
 
   const fetchPurchases = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/api/purchases');
+      let query = `/api/purchases?page=${page}&limit=15`;
+      if (search) query += `&search=${encodeURIComponent(search)}`;
+
+      const res = await api.get(query);
       if (res.data?.success) {
         setPurchases(res.data.data || []);
+        setTotalPages(res.data.pagination?.totalPages || 1);
+        setTotalRecords(res.data.pagination?.totalItems || 0);
       }
     } catch (err) {
       console.error('Failed to load purchases:', err);
@@ -44,11 +61,11 @@ export default function PurchasesPage() {
           <div>
             <Link
               href={`/rentals/${row.id}`}
-              className="font-bold text-slate-900 hover:text-blue-600"
+              className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400"
             >
               {row.name}
             </Link>
-            <p className="text-xs text-slate-500">{row.phone}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{row.phone}</p>
           </div>
         </div>
       ),
@@ -57,7 +74,7 @@ export default function PurchasesPage() {
       header: 'EV Model Owned',
       key: 'model',
       render: (row) => (
-        <span className="font-semibold text-slate-800">
+        <span className="font-semibold text-slate-800 dark:text-slate-200">
           {row.ev_models?.name || 'EV Scooter'}
         </span>
       ),
@@ -66,7 +83,7 @@ export default function PurchasesPage() {
       header: 'Total Value',
       key: 'total_price',
       render: (row) => (
-        <span className="font-bold text-slate-900">{formatCurrency(row.total_price)}</span>
+        <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(row.total_price)}</span>
       ),
     },
     {
@@ -128,18 +145,39 @@ export default function PurchasesPage() {
         action={
           <Link href="/rentals/new?mode=direct_purchase">
             <Button variant="primary" size="sm" icon={ShoppingBag}>
-              Purchase EV
+              <span className="hidden sm:inline">Purchase EV</span>
+              <span className="sm:hidden">Buy</span>
             </Button>
           </Link>
         }
       />
 
-      <div className="p-8 max-w-7xl mx-auto space-y-6">
+      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+        {/* Search Bar */}
+        <div className="gsap-filter-bar flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
+          <SearchBar
+            value={search}
+            onChange={(val) => {
+              setSearch(val);
+              setPage(1);
+            }}
+            placeholder="Search owner name or phone..."
+            className="w-full sm:max-w-md sm:flex-1 sm:min-w-0"
+          />
+        </div>
+
         <Table
           columns={columns}
           data={purchases}
           loading={loading}
           emptyText="No completed purchases yet. When tenant balance reaches ₹0, contracts auto-complete here."
+        />
+
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={totalRecords}
+          onPageChange={setPage}
         />
       </div>
     </div>

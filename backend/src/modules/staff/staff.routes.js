@@ -3,7 +3,6 @@ const { z } = require('zod');
 const staffController = require('./staff.controller');
 const requireAuth = require('../../middleware/auth');
 const { requireAdmin } = require('../../middleware/roleGuard');
-const requestLogger = require('../../middleware/requestLogger');
 
 const router = express.Router();
 
@@ -72,9 +71,8 @@ router.get('/', staffController.getAll.bind(staffController));
  *         description: Created
  */
 router.post(
-  '/', 
-  validateBody(createStaffSchema), 
-  requestLogger('users', 'CREATE_STAFF'), 
+  '/',
+  validateBody(createStaffSchema),
   staffController.create.bind(staffController)
 );
 
@@ -108,9 +106,8 @@ router.post(
  *         description: Updated
  */
 router.patch(
-  '/:id', 
-  validateBody(updateStaffSchema), 
-  requestLogger('users', 'UPDATE_STAFF'), 
+  '/:id',
+  validateBody(updateStaffSchema),
   staffController.update.bind(staffController)
 );
 
@@ -142,9 +139,8 @@ router.patch(
  *         description: Password updated
  */
 router.patch(
-  '/:id/password', 
-  validateBody(z.object({ password: z.string().min(6) })), 
-  requestLogger('users', 'CHANGE_PASSWORD'), 
+  '/:id/password',
+  validateBody(z.object({ password: z.string().min(6) })),
   staffController.changePassword.bind(staffController)
 );
 
@@ -176,9 +172,8 @@ router.patch(
  *         description: Activation status updated
  */
 router.patch(
-  '/:id/deactivate', 
-  validateBody(z.object({ is_active: z.boolean() })), 
-  requestLogger('users', 'TOGGLE_ACTIVE'), 
+  '/:id/deactivate',
+  validateBody(z.object({ is_active: z.boolean() })),
   staffController.toggleActive.bind(staffController)
 );
 

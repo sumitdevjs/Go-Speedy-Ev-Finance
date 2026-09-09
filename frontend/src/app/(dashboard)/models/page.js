@@ -85,8 +85,8 @@ export default function ModelsPage() {
             <Bike className="h-5 w-5" />
           </div>
           <div>
-            <p className="font-bold text-slate-900">{row.name}</p>
-            <p className="text-xs text-slate-500">{row.company}</p>
+            <p className="font-bold text-slate-900 dark:text-white">{row.name}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{row.company}</p>
           </div>
         </div>
       ),
@@ -94,13 +94,13 @@ export default function ModelsPage() {
     {
       header: 'Operational Ward',
       key: 'ward',
-      render: (row) => <span className="font-medium text-slate-700">{row.ward}</span>,
+      render: (row) => <span className="font-medium text-slate-700 dark:text-slate-300">{row.ward}</span>,
     },
     {
       header: 'Sticker Price',
       key: 'total_price',
       render: (row) => (
-        <span className="font-bold text-slate-900">{formatCurrency(row.total_price)}</span>
+        <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(row.total_price)}</span>
       ),
     },
     {
@@ -119,8 +119,8 @@ export default function ModelsPage() {
       key: 'dates',
       render: (row) => (
         <div>
-          <p className="text-xs text-slate-800">A: {formatDate(row.created_at)}</p>
-          <p className="text-[11px] text-slate-500">U: {formatDate(row.updated_at)}</p>
+          <p className="text-xs text-slate-800 dark:text-slate-200">A: {formatDate(row.created_at)}</p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">U: {formatDate(row.updated_at)}</p>
         </div>
       ),
     },
@@ -143,7 +143,7 @@ export default function ModelsPage() {
         }
       />
 
-      <div className="p-8 max-w-7xl mx-auto space-y-6">
+      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
         <Table
           columns={columns}
           data={models}

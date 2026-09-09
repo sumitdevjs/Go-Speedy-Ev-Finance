@@ -21,8 +21,22 @@ import Button from '../../../components/ui/Button';
 import Spinner from '../../../components/ui/Spinner';
 import api from '../../../lib/api';
 import { formatCurrency, formatDate } from '../../../lib/constants';
+import { useAuthStore } from '../../../store/authStore';
+import StaffDashboard from '../../../components/staff/StaffDashboard';
+import SustainabilityBanner from '../../../components/dashboard/SustainabilityBanner';
+import { gsap, animateCounter, staggerFadeIn } from '../../../lib/gsap';
 
 export default function DashboardPage() {
+  const { role } = useAuthStore();
+
+  if (role === 'staff') {
+    return <StaffDashboard />;
+  }
+
+  return <AdminDashboard />;
+}
+
+function AdminDashboard() {
   const [stats, setStats] = useState({
     totalStock: 0,
     activeRentals: 0,
@@ -88,6 +102,18 @@ export default function DashboardPage() {
     }
   };
 
+  useEffect(() => {
+    if (!loading) {
+      staggerFadeIn('.gsap-admin-kpi', { stagger: 0.08, y: 15, duration: 0.5, hover: true });
+      staggerFadeIn('.gsap-admin-row', { stagger: 0.04, y: 10, duration: 0.4, delay: 0.1 });
+
+      animateCounter('#gsap-admin-stock', stats.totalStock, { suffix: ' units', duration: 0.8 });
+      animateCounter('#gsap-admin-active', stats.activeRentals, { suffix: ' tenants', duration: 0.8 });
+      animateCounter('#gsap-admin-overdue', stats.overdueCount, { suffix: ' cases', duration: 0.8 });
+      animateCounter('#gsap-admin-collections', stats.totalCollections, { prefix: '₹', duration: 1.2 });
+    }
+  }, [loading, stats]);
+
   return (
     <div className="min-h-screen">
       <Header
@@ -95,69 +121,69 @@ export default function DashboardPage() {
         subtitle="Delhi Fleet & Finance Monitoring"
       />
 
-      <div className="p-8 space-y-8 max-w-7xl mx-auto">
+      <div className="p-4 md:p-8 space-y-6 md:space-y-8 max-w-7xl mx-auto pb-28 md:pb-32">
         {/* KPI Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* Available Stock */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 card-elevation flex items-center justify-between">
+          <div className="gsap-admin-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Available EV Stock
               </p>
-              <h3 className="text-2xl font-black text-slate-900 mt-1">
+              <h3 id="gsap-admin-stock" className="text-2xl font-black text-slate-900 dark:text-white mt-1">
                 {loading ? <Spinner size="sm" /> : `${stats.totalStock} units`}
               </h3>
-              <p className="text-[11px] text-blue-600 font-medium mt-1">Ready for deployment</p>
+              <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium mt-1">Ready for deployment</p>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <div className="h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
               <Bike className="h-6 w-6" />
             </div>
           </div>
 
           {/* Active Tenants */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 card-elevation flex items-center justify-between">
+          <div className="gsap-admin-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Active Rentals
               </p>
-              <h3 className="text-2xl font-black text-slate-900 mt-1">
+              <h3 id="gsap-admin-active" className="text-2xl font-black text-slate-900 dark:text-white mt-1">
                 {loading ? <Spinner size="sm" /> : `${stats.activeRentals} tenants`}
               </h3>
-              <p className="text-[11px] text-emerald-600 font-medium mt-1">Under rent-to-own</p>
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1">Under rent-to-own</p>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <div className="h-12 w-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
               <Users className="h-6 w-6" />
             </div>
           </div>
 
           {/* Overdue Count */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 card-elevation flex items-center justify-between">
+          <div className="gsap-admin-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Overdue Accounts
               </p>
-              <h3 className="text-2xl font-black text-rose-600 mt-1">
+              <h3 id="gsap-admin-overdue" className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
                 {loading ? <Spinner size="sm" /> : `${stats.overdueCount} cases`}
               </h3>
-              <p className="text-[11px] text-rose-500 font-medium mt-1">1+ days payment lag</p>
+              <p className="text-[11px] text-rose-500 dark:text-rose-400 font-medium mt-1">1+ days payment lag</p>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+            <div className="h-12 w-12 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
               <AlertTriangle className="h-6 w-6" />
             </div>
           </div>
 
           {/* Total Collections */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 card-elevation flex items-center justify-between">
+          <div className="gsap-admin-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Total Collections
               </p>
-              <h3 className="text-2xl font-black text-slate-900 mt-1">
+              <h3 id="gsap-admin-collections" className="text-2xl font-black text-slate-900 dark:text-white mt-1">
                 {loading ? <Spinner size="sm" /> : formatCurrency(stats.totalCollections)}
               </h3>
-              <p className="text-[11px] text-slate-500 font-medium mt-1">Recorded to date</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1">Recorded to date</p>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+            <div className="h-12 w-12 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
               <IndianRupee className="h-6 w-6" />
             </div>
           </div>
@@ -167,9 +193,9 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Link
             href="/rentals/new"
-            className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-sm hover:shadow-md transition-smooth"
+            className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-sm hover:shadow-md transition-smooth"
           >
-            <div className="h-10 w-10 rounded-lg bg-white/15 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-xl bg-white/15 flex items-center justify-center">
               <PlusCircle className="h-5 w-5" />
             </div>
             <div>
@@ -180,27 +206,27 @@ export default function DashboardPage() {
 
           <Link
             href="/bookings"
-            className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 shadow-xs transition-smooth"
+            className="flex items-center gap-3 p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl hover:bg-slate-50 dark:hover:bg-slate-800/70 text-slate-800 dark:text-white shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-smooth"
           >
-            <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+            <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
               <CalendarCheck className="h-5 w-5" />
             </div>
             <div>
               <p className="text-sm font-bold">Manage Bookings</p>
-              <p className="text-xs text-slate-500">Convert walk-ins to contracts</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Convert walk-ins to contracts</p>
             </div>
           </Link>
 
           <Link
             href="/models"
-            className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 shadow-xs transition-smooth"
+            className="flex items-center gap-3 p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl hover:bg-slate-50 dark:hover:bg-slate-800/70 text-slate-800 dark:text-white shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-smooth"
           >
-            <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+            <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
               <Bike className="h-5 w-5" />
             </div>
             <div>
               <p className="text-sm font-bold">EV Fleet & Stock</p>
-              <p className="text-xs text-slate-500">Manage models and ward stock</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Manage models and ward stock</p>
             </div>
           </Link>
         </div>
@@ -229,24 +255,24 @@ export default function DashboardPage() {
                   <div className="mx-auto w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
                     <TrendingUp className="h-6 w-6" />
                   </div>
-                  <p className="text-sm font-semibold text-slate-700">All Accounts On Track!</p>
-                  <p className="text-xs text-slate-500">No active tenants are currently overdue.</p>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">All Accounts On Track!</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">No active tenants are currently overdue.</p>
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-100 dark:divide-white/5">
                   {overdueTenants.map((tenant) => (
                     <div
                       key={tenant.id}
-                      className="py-3.5 flex items-center justify-between gap-4 hover:bg-slate-50/70 rounded-lg px-2 transition-smooth"
+                      className="py-3.5 flex items-center justify-between gap-4 hover:bg-slate-50/70 dark:hover:bg-white/5 rounded-xl px-2 transition-smooth"
                     >
                       <div className="min-w-0">
                         <Link
                           href={`/rentals/${tenant.id}`}
-                          className="text-sm font-bold text-slate-900 hover:text-blue-600 truncate block"
+                          className="text-sm font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block"
                         >
                           {tenant.name}
                         </Link>
-                        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
+                        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                           <span className="flex items-center gap-1">
                             <Phone className="h-3 w-3" /> {tenant.phone}
                           </span>
@@ -260,7 +286,7 @@ export default function DashboardPage() {
                           <Badge status="overdue" size="sm">
                             {tenant.computed_balance?.daysOverdue} days overdue
                           </Badge>
-                          <p className="text-xs font-bold text-slate-800 mt-1">
+                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-1">
                             {formatCurrency(tenant.computed_balance?.outstanding)}
                           </p>
                         </div>
@@ -303,17 +329,17 @@ export default function DashboardPage() {
                   </Link>
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-100 dark:divide-white/5">
                   {recentRentals.map((r) => (
-                    <div key={r.id} className="py-3 flex items-center justify-between">
+                    <div key={r.id} className="py-3 flex items-center justify-between hover:bg-slate-50/70 dark:hover:bg-white/5 rounded-xl px-2 transition-smooth">
                       <div className="min-w-0">
                         <Link
                           href={`/rentals/${r.id}`}
-                          className="text-xs font-bold text-slate-800 hover:text-blue-600 truncate block"
+                          className="text-xs font-bold text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 truncate block"
                         >
                           {r.name}
                         </Link>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
                           {formatDate(r.created_at)}
                         </p>
                       </div>
@@ -325,6 +351,9 @@ export default function DashboardPage() {
             </Card>
           </div>
         </div>
+
+        {/* EV Sustainability Banner */}
+        <SustainabilityBanner />
       </div>
     </div>
   );

@@ -40,12 +40,19 @@ const validateBody = (schema) => (req, res, next) => {
  * @openapi
  * /api/bookings:
  *   get:
- *     summary: Get all bookings
+ *     summary: Get all pending bookings
  *     tags: [Bookings]
  *     security: [{ cookieAuth: [] }]
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
  *     responses:
  *       200:
- *         description: List of bookings
+ *         description: Paginated list of pending bookings
  */
 router.get('/', bookingsController.getAll.bind(bookingsController));
 

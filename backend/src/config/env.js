@@ -13,6 +13,18 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
   FRONTEND_URL: z.string().optional().default('*'),
   SWAGGER_ENABLED: z.string().transform((val) => val === 'true').default('true'),
+  // Google OAuth — optional so the app runs without them configured
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CALLBACK_URL: z.string().optional(),
+  BACKEND_URL: z.string().optional(),
+  SESSION_SECRET: z.string().optional().default('gospeedy_session_secret_change_me'),
+
+  // SMTP Email Configuration (Gmail OTP)
+  SMTP_HOST: z.string().default('smtp.gmail.com'),
+  SMTP_PORT: z.string().default('465'),
+  SMTP_USER: z.string().default('gospeedy.admin@gmail.com'),
+  SMTP_PASS: z.string().optional(),
 });
 
 // Validate the environment variables

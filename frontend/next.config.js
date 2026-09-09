@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  devIndicators: {
+    buildActivity: false,
+  },
   // Proxy all /api/* requests to the backend at port 5000.
   // This makes cookies work properly (same-origin from the browser's perspective)
   async rewrites() {

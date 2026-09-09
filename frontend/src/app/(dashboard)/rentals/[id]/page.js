@@ -28,6 +28,8 @@ import Card from '../../../../components/ui/Card';
 import Badge from '../../../../components/ui/Badge';
 import Button from '../../../../components/ui/Button';
 import Modal from '../../../../components/ui/Modal';
+import { toast } from '../../../../lib/toast';
+import { confirmDialog } from '../../../../lib/confirmDialog';
 import Input from '../../../../components/ui/Input';
 import Select from '../../../../components/ui/Select';
 import Spinner from '../../../../components/ui/Spinner';
@@ -142,6 +144,8 @@ export default function TenantDetailPage() {
         setPaymentNotes('');
         if (res.data.data?.autoCompleted) {
           setAutoCompleteNotice(true);
+        } else {
+          toast.success('Payment recorded.');
         }
         loadAllData();
       }
@@ -158,25 +162,32 @@ export default function TenantDetailPage() {
       const res = await api.patch(`/api/rentals/${tenantId}/cancel`);
       if (res.data?.success) {
         setIsCancelModalOpen(false);
+        toast.success('Rental contract cancelled.');
         loadAllData();
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to cancel rental');
+      toast.error(err.response?.data?.message || 'Failed to cancel rental');
     } finally {
       setIsCancelling(false);
     }
   };
 
   const handleCompleteRental = async () => {
-    if (!confirm('Convert to completed purchase?')) return;
+    const ok = await confirmDialog({
+      title: 'Convert to completed purchase?',
+      message: 'This marks the contract as fully paid and transfers ownership to the tenant.',
+      confirmLabel: 'Complete Purchase',
+      cancelLabel: 'Not Yet',
+    });
+    if (!ok) return;
     try {
       const res = await api.patch(`/api/rentals/${tenantId}/complete`);
       if (res.data?.success) {
-        alert('Rental converted to completed purchase!');
+        toast.success('Rental converted to completed purchase!');
         loadAllData();
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to complete rental');
+      toast.error(err.response?.data?.message || 'Failed to complete rental');
     }
   };
 
@@ -186,10 +197,11 @@ export default function TenantDetailPage() {
       const res = await api.patch(`/api/rentals/${tenantId}`, editData);
       if (res.data?.success) {
         setIsEditMode(false);
+        toast.success('Changes saved.');
         loadAllData();
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to save changes');
+      toast.error(err.response?.data?.message || 'Failed to save changes');
     } finally {
       setIsSaving(false);
     }
@@ -219,7 +231,7 @@ export default function TenantDetailPage() {
   if (!tenant) {
     return (
       <div className="p-8 text-center">
-        <p className="text-sm font-semibold text-slate-700">Tenant record not found.</p>
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tenant record not found.</p>
         <Link href="/rentals" className="mt-3 inline-block">
           <Button variant="outline" size="sm">Return to Rentals</Button>
         </Link>
@@ -236,7 +248,7 @@ export default function TenantDetailPage() {
         title={isEditMode ? `Editing Details: ${tenant.name}` : tenant.name}
         subtitle={`Tenant ID: ${tenant.id.slice(0, 8)} • Phone: ${tenant.phone}`}
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 justify-end">
             {isEditMode ? (
               <>
                 <Button
@@ -306,7 +318,7 @@ export default function TenantDetailPage() {
         }
       />
 
-      <div className="p-8 max-w-7xl mx-auto space-y-6">
+      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
         {/* Auto Complete Success Banner */}
         {autoCompleteNotice && !isEditMode && (
           <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-800 flex items-center justify-between">
@@ -334,7 +346,7 @@ export default function TenantDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <Card className="text-center p-4">
               <span className="text-[11px] font-bold text-slate-400 uppercase">Sticker Price</span>
-              <h4 className="text-xl font-black text-slate-900 mt-1">
+              <h4 className="text-xl font-black text-slate-900 dark:text-white mt-1">
                 {formatCurrency(tenant.total_price)}
               </h4>
               <p className="text-[11px] text-slate-500 mt-0.5">
@@ -360,7 +372,7 @@ export default function TenantDetailPage() {
 
             <Card className="text-center p-4">
               <span className="text-[11px] font-bold text-slate-400 uppercase">Remaining Balance</span>
-              <h4 className="text-xl font-black text-slate-900 mt-1">
+              <h4 className="text-xl font-black text-slate-900 dark:text-white mt-1">
                 {formatCurrency(balance.outstanding)}
               </h4>
               <div className="mt-1">
@@ -415,7 +427,7 @@ export default function TenantDetailPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div>
                 <p className="font-bold text-slate-400 uppercase text-[10px]">EV Model</p>
-                <p className="text-sm font-semibold text-slate-800 mt-0.5">
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
                   {tenant.ev_models?.name} ({tenant.ev_models?.company})
                 </p>
               </div>
@@ -430,7 +442,7 @@ export default function TenantDetailPage() {
                 ) : (
                   <>
                     <p className="font-bold text-slate-400 uppercase text-[10px]">Chassis Serial</p>
-                    <p className="text-sm font-semibold text-slate-800 mt-0.5">{tenant.chassis_no || '—'}</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.chassis_no || '—'}</p>
                   </>
                 )}
               </div>
@@ -445,7 +457,7 @@ export default function TenantDetailPage() {
                 ) : (
                   <>
                     <p className="font-bold text-slate-400 uppercase text-[10px]">Motor Controller</p>
-                    <p className="text-sm font-semibold text-slate-800 mt-0.5">{tenant.motor_ctrl_no || '—'}</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.motor_ctrl_no || '—'}</p>
                   </>
                 )}
               </div>
@@ -460,7 +472,7 @@ export default function TenantDetailPage() {
                 ) : (
                   <>
                     <p className="font-bold text-slate-400 uppercase text-[10px]">Battery Serial</p>
-                    <p className="text-sm font-semibold text-slate-800 mt-0.5">{tenant.battery_no || '—'}</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.battery_no || '—'}</p>
                   </>
                 )}
               </div>
@@ -475,7 +487,7 @@ export default function TenantDetailPage() {
                 ) : (
                   <>
                     <p className="font-bold text-slate-400 uppercase text-[10px]">RTO Classification</p>
-                    <p className="text-sm font-semibold text-slate-800 mt-0.5 uppercase">{tenant.rto_type || 'RTO'}</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5 uppercase">{tenant.rto_type || 'RTO'}</p>
                   </>
                 )}
               </div>
@@ -490,7 +502,7 @@ export default function TenantDetailPage() {
                 ) : (
                   <>
                     <p className="font-bold text-slate-400 uppercase text-[10px]">HP Financer</p>
-                    <p className="text-sm font-semibold text-slate-800 mt-0.5 uppercase">{tenant.hp_financer || 'Go Speedy'}</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5 uppercase">{tenant.hp_financer || 'Go Speedy'}</p>
                   </>
                 )}
               </div>
@@ -510,7 +522,7 @@ export default function TenantDetailPage() {
                 ) : (
                   <>
                     <p className="font-bold text-slate-400 uppercase text-[10px]">Agreement Dates</p>
-                    <p className="text-xs text-slate-700 mt-0.5">
+                    <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
                       Start: {formatDate(tenant.start_date)} • End: {formatDate(tenant.expected_end_date)}
                     </p>
                   </>
@@ -528,7 +540,7 @@ export default function TenantDetailPage() {
                 ) : (
                   <>
                     <p className="font-bold text-slate-400 uppercase text-[10px]">Installment Terms</p>
-                    <p className="text-xs text-slate-700 mt-0.5">
+                    <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
                       ₹{tenant.installment_daily_rate}/day ({tenant.installment_frequency})
                     </p>
                   </>
@@ -585,7 +597,7 @@ export default function TenantDetailPage() {
                   </div>
                 ) : (
                   Array.isArray(tenant.references) && tenant.references.length > 0 ? (
-                    <ul className="space-y-1 text-slate-700">
+                    <ul className="space-y-1 text-slate-700 dark:text-slate-300">
                       {tenant.references.map((r, i) => (
                         <li key={i}>
                           <span className="font-semibold">{r.name}</span> ({r.category}) — {r.phone}
@@ -629,7 +641,7 @@ export default function TenantDetailPage() {
                   </div>
                 ) : (
                   Array.isArray(tenant.guarantors) && tenant.guarantors.length > 0 ? (
-                    <ul className="space-y-1 text-slate-700">
+                    <ul className="space-y-1 text-slate-700 dark:text-slate-300">
                       {tenant.guarantors.map((g, i) => (
                         <li key={i}>
                           <span className="font-semibold">{g.name}</span> ({g.gender}) — {g.phone}
@@ -669,11 +681,11 @@ export default function TenantDetailPage() {
                 ) : (
                   <div
                     key={idx}
-                    className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 bg-slate-50/60"
+                    className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-slate-800/40"
                   >
                     <div className="min-w-0 flex items-center gap-2">
                       <FileText className="h-4 w-4 text-slate-400 shrink-0" />
-                      <span className="text-xs font-semibold text-slate-800 truncate">
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
                         {item.label}
                       </span>
                     </div>
@@ -682,7 +694,7 @@ export default function TenantDetailPage() {
                       <button
                         type="button"
                         onClick={() => setViewingDoc({ label: item.label, url: item.url })}
-                        className="inline-flex items-center text-xs font-semibold text-blue-600 hover:text-blue-800"
+                        className="inline-flex items-center text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                       >
                         <Eye className="w-3.5 h-3.5 mr-1" /> View
                       </button>
@@ -720,8 +732,8 @@ export default function TenantDetailPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-600">
-                  <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
+                  <thead className="border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/60 text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
                     <tr>
                       <th className="px-4 py-3">Date</th>
                       <th className="px-4 py-3">Amount</th>
@@ -730,19 +742,19 @@ export default function TenantDetailPage() {
                       <th className="px-4 py-3">Notes</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                     {payments.map((p) => (
-                      <tr key={p.id} className="hover:bg-slate-50/60">
-                        <td className="px-4 py-3 font-mono text-xs text-slate-700">
+                      <tr key={p.id} className="hover:bg-slate-50/60 dark:hover:bg-white/5">
+                        <td className="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">
                           {formatDate(p.payment_date)}
                         </td>
-                        <td className="px-4 py-3 font-bold text-slate-900">
+                        <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">
                           {formatCurrency(p.amount)}
                         </td>
                         <td className="px-4 py-3">
                           <Badge status={p.mode} size="sm" />
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-600">
+                        <td className="px-4 py-3 text-xs text-slate-600 dark:text-slate-400">
                           {p.users?.name || 'Operator'}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400">{p.notes || '—'}</td>
@@ -830,7 +842,7 @@ export default function TenantDetailPage() {
         subtitle="This action restores vehicle stock and closes the active contract"
       >
         <div className="space-y-4">
-          <p className="text-xs text-slate-700">
+          <p className="text-xs text-slate-700 dark:text-slate-300">
             Are you sure you want to cancel the contract for <span className="font-bold">{tenant.name}</span>?
             The EV model stock will automatically increase by 1 in the inventory.
           </p>

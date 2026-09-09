@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: 'class',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -7,6 +8,11 @@ module.exports = {
   ],
   theme: {
     extend: {
+      screens: {
+        // Landing-page split composition (photo left / login card right): only on wide,
+        // landscape-ish viewports. Portrait tablets keep the stacked mobile layout.
+        desk: { raw: '(min-width: 1024px) and (min-aspect-ratio: 4/3)' },
+      },
       colors: {
         brand: {
           50: '#eff6ff',

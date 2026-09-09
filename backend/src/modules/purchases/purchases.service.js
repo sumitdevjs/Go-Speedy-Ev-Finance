@@ -1,5 +1,6 @@
 const supabase = require('../../config/db');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
+const { buildSearchFilter } = require('../../utils/searchFilter');
 
 class PurchasesService {
   async getPurchases(query = {}) {
@@ -11,7 +12,7 @@ class PurchasesService {
       .in('status', ['completed', 'direct_purchase']);
     
     if (query.search) {
-      queryBuilder = queryBuilder.ilike('name', `%${query.search}%`);
+      queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'phone'], query.search));
     }
 
     const { data, count, error } = await queryBuilder
