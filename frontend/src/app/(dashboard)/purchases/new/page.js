@@ -23,8 +23,6 @@ import Button from '../../../../components/ui/Button';
 import Input from '../../../../components/ui/Input';
 import Select from '../../../../components/ui/Select';
 import FileUpload from '../../../../components/ui/FileUpload';
-import { confirmDialog } from '../../../../lib/confirmDialog';
-import { toast } from '../../../../lib/toast';
 import Modal from '../../../../components/ui/Modal';
 import api from '../../../../lib/api';
 import {
@@ -49,7 +47,7 @@ const ALL_STEPS = [
   { id: 8, name: 'Installments', icon: Calendar },
 ];
 
-export default function NewRentalWizardPage() {
+export default function NewPurchaseWizardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -63,8 +61,8 @@ export default function NewRentalWizardPage() {
   const [missingDocsList, setMissingDocsList] = useState([]);
 
   // Form State
-  const isDirectPurchase = false;
-  const STEPS = ALL_STEPS;
+  const isDirectPurchase = true;
+  const STEPS = ALL_STEPS.filter(s => s.id !== 5 && s.id !== 8);
   const [formData, setFormData] = useState({
     // Step 1: Model
     ev_model_id: searchParams.get('model_id') || '',
@@ -166,15 +164,8 @@ export default function NewRentalWizardPage() {
     setFormData((prev) => ({ ...prev, guarantors: updated }));
   };
 
-  const clearDraft = async () => {
-    const ok = await confirmDialog({
-      title: 'Discard draft and start over?',
-      message: 'Everything entered so far will be cleared. This cannot be undone.',
-      tone: 'danger',
-      confirmLabel: 'Discard Draft',
-      cancelLabel: 'Keep Editing',
-    });
-    if (ok) {
+  const clearDraft = () => {
+    if (confirm('Discard draft and start over?')) {
       localStorage.removeItem(DRAFT_KEY);
       window.location.reload();
     }
@@ -204,7 +195,7 @@ export default function NewRentalWizardPage() {
         return false;
       }
     }
-    if (step === 5 && !isDirectPurchase) {
+    if (step === 5) {
       if (formData.booking_amount === '' || formData.downpayment_paid === '' || !formData.downpayment_mode) {
         setErrorMessage('All downpayment details are required');
         return false;
@@ -270,7 +261,7 @@ export default function NewRentalWizardPage() {
       { key: 'pan_path', label: 'PAN Card Photo' },
       { key: 'cheque_path', label: 'Bank Cheque Photo' },
       { key: 'electricity_bill_path', label: 'Electricity Bill Photo' },
-      { key: 'tenant_photo_path', label: 'Tenant Profile Photo' },
+      { key: 'tenant_photo_path', label: 'Buyer Profile Photo' },
       { key: 'scooty_photo_path', label: 'Scooty Handover Photo' },
     ];
 
@@ -313,7 +304,6 @@ export default function NewRentalWizardPage() {
       if (res.data?.success) {
         localStorage.removeItem(DRAFT_KEY);
         const newId = res.data.data?.id;
-        toast.success(isDirectPurchase ? 'Direct purchase recorded!' : 'Rental issued successfully!');
         router.replace(`/rentals/${newId}`);
       } else {
         throw new Error(res.data?.message || 'Submission failed');
@@ -333,8 +323,8 @@ export default function NewRentalWizardPage() {
   return (
     <div>
       <Header
-        title="Issue New EV Rental"
-        subtitle="8-Step fast registration wizard with draft autosave"
+        title="New Direct Purchase"
+        subtitle="6-Step fast registration wizard with draft autosave"
         action={
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" icon={RotateCcw} onClick={clearDraft}>
@@ -344,9 +334,9 @@ export default function NewRentalWizardPage() {
         }
       />
 
-      <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
+      <div className="p-8 max-w-5xl mx-auto space-y-6">
         {/* Step Progress Pills */}
-        <div className="bg-white/90 dark:bg-slate-900/60 p-3 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 backdrop-blur-xl card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] overflow-x-auto -webkit-overflow-scrolling-touch transition-colors">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 card-elevation overflow-x-auto">
           <div className="flex items-center justify-between min-w-[700px]">
             {STEPS.map((s, idx) => {
               const Icon = s.icon;
@@ -405,7 +395,7 @@ export default function NewRentalWizardPage() {
           {currentStep === 1 && (
             <div className="space-y-5">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">Select EV Scooter Model</h3>
+                <h3 className="text-base font-bold text-slate-900">Select EV Scooter Model</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Choose from models currently available in Delhi hubs
                 </p>
@@ -422,26 +412,26 @@ export default function NewRentalWizardPage() {
                       onClick={() => inStock && updateField('ev_model_id', m.id)}
                       className={`p-4 rounded-xl border-2 transition-smooth cursor-pointer ${
                         selected
-                          ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-500/10 shadow-sm'
+                          ? 'border-blue-600 bg-blue-50/40 shadow-sm'
                           : inStock
-                          ? 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/60'
-                          : 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/40 opacity-60 cursor-not-allowed'
+                          ? 'border-slate-200 hover:border-slate-300 bg-white'
+                          : 'border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-900 dark:text-white">{m.name}</span>
+                        <span className="font-bold text-slate-900">{m.name}</span>
                         <span
                           className={`text-xs px-2 py-0.5 rounded-full font-bold ${
                             inStock
-                              ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-                              : 'bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-400'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-rose-100 text-rose-700'
                           }`}
                         >
                           {m.stock_count} in stock
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{m.company} • {m.ward}</p>
-                      <p className="text-sm font-black text-blue-600 dark:text-blue-400 mt-3">
+                      <p className="text-xs text-slate-500 mt-1">{m.company} • {m.ward}</p>
+                      <p className="text-sm font-black text-blue-600 mt-3">
                         {formatCurrency(m.total_price)}
                       </p>
                     </div>
@@ -455,7 +445,7 @@ export default function NewRentalWizardPage() {
           {currentStep === 2 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">Tenant Personal Details</h3>
+                <h3 className="text-base font-bold text-slate-900">Buyer Personal Details</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Legal identity information for contract agreement
                 </p>
@@ -499,7 +489,7 @@ export default function NewRentalWizardPage() {
               </div>
 
               <div className="pt-2">
-                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={formData.rent_agreement_signed}
@@ -516,7 +506,7 @@ export default function NewRentalWizardPage() {
           {currentStep === 3 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">Document Uploads</h3>
+                <h3 className="text-base font-bold text-slate-900">Document Uploads</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Auto-compressed to WebP ≤ 300KB and saved to private storage
                 </p>
@@ -552,7 +542,7 @@ export default function NewRentalWizardPage() {
                 />
 
                 <FileUpload
-                  label="Tenant Photo"
+                  label="Buyer Photo"
                   docType="tenant_photo_path"
                   currentPath={formData.tenant_photo_path}
                   onUploaded={(path) => updateField('tenant_photo_path', path)}
@@ -572,7 +562,7 @@ export default function NewRentalWizardPage() {
           {currentStep === 4 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">EV Hardware Identification</h3>
+                <h3 className="text-base font-bold text-slate-900">EV Hardware Identification</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Unique serial numbers for vehicle tracking and compliance
                 </p>
@@ -644,17 +634,17 @@ export default function NewRentalWizardPage() {
           {currentStep === 5 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">Financial Breakdown & Downpayment</h3>
+                <h3 className="text-base font-bold text-slate-900">Financial Breakdown & Downpayment</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Booking deduction and day-1 initial payment
                 </p>
               </div>
 
               {selectedModel && (
-                <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl border border-slate-200 dark:border-white/10 grid grid-cols-3 gap-4 text-center">
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-3 gap-4 text-center">
                   <div>
                     <span className="text-[11px] font-bold text-slate-400 uppercase">Sticker Price</span>
-                    <p className="text-base font-black text-slate-900 dark:text-white">{formatCurrency(selectedModel.total_price)}</p>
+                    <p className="text-base font-black text-slate-900">{formatCurrency(selectedModel.total_price)}</p>
                   </div>
                   <div>
                     <span className="text-[11px] font-bold text-slate-400 uppercase">Advance Booking</span>
@@ -675,7 +665,6 @@ export default function NewRentalWizardPage() {
                   type="number"
                   value={formData.booking_amount}
                   onChange={(e) => updateField('booking_amount', e.target.value)}
-                  required
                 />
 
                 <Input
@@ -683,7 +672,6 @@ export default function NewRentalWizardPage() {
                   type="number"
                   value={formData.downpayment_paid}
                   onChange={(e) => updateField('downpayment_paid', e.target.value)}
-                  required
                 />
 
                 <Select
@@ -691,12 +679,11 @@ export default function NewRentalWizardPage() {
                   value={formData.downpayment_mode}
                   onChange={(e) => updateField('downpayment_mode', e.target.value)}
                   options={DOWNPAYMENT_MODES}
-                  required
                 />
               </div>
 
               <div className="pt-2 border-t border-slate-100">
-                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={formData.dp_by_other}
@@ -730,7 +717,7 @@ export default function NewRentalWizardPage() {
           {currentStep === 6 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">3 Notable References</h3>
+                <h3 className="text-base font-bold text-slate-900">3 Notable References</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   DSGMC Member, Nigam Parshad, MLA or respected community references
                 </p>
@@ -738,7 +725,7 @@ export default function NewRentalWizardPage() {
 
               <div className="space-y-3">
                 {formData.references.map((ref, idx) => (
-                  <div key={idx} className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-white/10 grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div key={idx} className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-4 gap-3">
                     <Select
                       label={`Reference #${idx + 1} Category`}
                       value={ref.category}
@@ -777,7 +764,7 @@ export default function NewRentalWizardPage() {
           {currentStep === 7 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">2 Co-Signer Guarantors</h3>
+                <h3 className="text-base font-bold text-slate-900">2 Co-Signer Guarantors</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   1 Male and 1 Female guarantor mandatory per policy
                 </p>
@@ -785,9 +772,9 @@ export default function NewRentalWizardPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {formData.guarantors.map((g, idx) => (
-                  <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-white/10 space-y-3">
+                  <div key={idx} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
                         Guarantor #{idx + 1} ({g.gender.toUpperCase()})
                       </span>
                     </div>
@@ -823,7 +810,7 @@ export default function NewRentalWizardPage() {
           {currentStep === 8 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">Installment Plan & Timeline</h3>
+                <h3 className="text-base font-bold text-slate-900">Installment Plan & Timeline</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Standard collection terms: ₹250/day over 24-month horizon
                 </p>
@@ -843,7 +830,6 @@ export default function NewRentalWizardPage() {
                   value={formData.installment_frequency}
                   onChange={(e) => updateField('installment_frequency', e.target.value)}
                   options={INSTALLMENT_FREQUENCIES}
-                  required
                 />
 
                 <Input
@@ -851,7 +837,6 @@ export default function NewRentalWizardPage() {
                   type="number"
                   value={formData.total_months}
                   onChange={(e) => updateField('total_months', e.target.value)}
-                  required
                 />
               </div>
 
@@ -865,7 +850,7 @@ export default function NewRentalWizardPage() {
               </div>
 
               <div className="pt-2 border-t border-slate-100">
-                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={!formData.installment_by_self}
@@ -937,12 +922,12 @@ export default function NewRentalWizardPage() {
         subtitle="Some document photos have not been uploaded"
       >
         <div className="space-y-4">
-          <div className="p-3 bg-amber-50 dark:bg-amber-500/10 rounded-xl border border-amber-200 dark:border-amber-500/30 text-xs text-amber-800 dark:text-amber-300">
+          <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-800">
             <p className="font-bold flex items-center gap-1.5 mb-1.5">
-              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
               The following documents are not yet uploaded:
             </p>
-            <ul className="list-disc list-inside space-y-0.5 ml-1 text-slate-700 dark:text-slate-300">
+            <ul className="list-disc list-inside space-y-0.5 ml-1 text-slate-700">
               {missingDocsList.map((doc, idx) => (
                 <li key={idx}>{doc}</li>
               ))}

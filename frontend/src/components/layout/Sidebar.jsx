@@ -126,7 +126,6 @@ function SidebarInner({ isOpen, onClose }) {
   const adminNavItemsList = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Rentals', href: '/rentals', icon: Users },
-    { name: 'New Rental', href: '/rentals/new', icon: UserPlus },
     { name: 'EV Models', href: '/models', icon: Bike },
     { name: 'Bookings', href: '/bookings', icon: CalendarCheck },
     { name: 'Purchases', href: '/purchases', icon: ShoppingBag },
