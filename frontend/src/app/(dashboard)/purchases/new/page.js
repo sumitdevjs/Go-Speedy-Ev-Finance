@@ -47,7 +47,7 @@ const ALL_STEPS = [
   { id: 8, name: 'Installments', icon: Calendar },
 ];
 
-export default function NewRentalWizardPage() {
+export default function NewPurchaseWizardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -61,8 +61,8 @@ export default function NewRentalWizardPage() {
   const [missingDocsList, setMissingDocsList] = useState([]);
 
   // Form State
-  const isDirectPurchase = false;
-  const STEPS = ALL_STEPS;
+  const isDirectPurchase = true;
+  const STEPS = ALL_STEPS.filter(s => s.id !== 5 && s.id !== 8);
   const [formData, setFormData] = useState({
     // Step 1: Model
     ev_model_id: searchParams.get('model_id') || '',
@@ -195,7 +195,7 @@ export default function NewRentalWizardPage() {
         return false;
       }
     }
-    if (step === 5 && !isDirectPurchase) {
+    if (step === 5) {
       if (formData.booking_amount === '' || formData.downpayment_paid === '' || !formData.downpayment_mode) {
         setErrorMessage('All downpayment details are required');
         return false;
@@ -261,7 +261,7 @@ export default function NewRentalWizardPage() {
       { key: 'pan_path', label: 'PAN Card Photo' },
       { key: 'cheque_path', label: 'Bank Cheque Photo' },
       { key: 'electricity_bill_path', label: 'Electricity Bill Photo' },
-      { key: 'tenant_photo_path', label: 'Tenant Profile Photo' },
+      { key: 'tenant_photo_path', label: 'Buyer Profile Photo' },
       { key: 'scooty_photo_path', label: 'Scooty Handover Photo' },
     ];
 
@@ -323,8 +323,8 @@ export default function NewRentalWizardPage() {
   return (
     <div>
       <Header
-        title="Issue New EV Rental"
-        subtitle="8-Step fast registration wizard with draft autosave"
+        title="New Direct Purchase"
+        subtitle="6-Step fast registration wizard with draft autosave"
         action={
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" icon={RotateCcw} onClick={clearDraft}>
@@ -445,7 +445,7 @@ export default function NewRentalWizardPage() {
           {currentStep === 2 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-base font-bold text-slate-900">Tenant Personal Details</h3>
+                <h3 className="text-base font-bold text-slate-900">Buyer Personal Details</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Legal identity information for contract agreement
                 </p>
@@ -542,7 +542,7 @@ export default function NewRentalWizardPage() {
                 />
 
                 <FileUpload
-                  label="Tenant Photo"
+                  label="Buyer Photo"
                   docType="tenant_photo_path"
                   currentPath={formData.tenant_photo_path}
                   onUploaded={(path) => updateField('tenant_photo_path', path)}
@@ -665,7 +665,6 @@ export default function NewRentalWizardPage() {
                   type="number"
                   value={formData.booking_amount}
                   onChange={(e) => updateField('booking_amount', e.target.value)}
-                  required
                 />
 
                 <Input
@@ -673,7 +672,6 @@ export default function NewRentalWizardPage() {
                   type="number"
                   value={formData.downpayment_paid}
                   onChange={(e) => updateField('downpayment_paid', e.target.value)}
-                  required
                 />
 
                 <Select
@@ -681,7 +679,6 @@ export default function NewRentalWizardPage() {
                   value={formData.downpayment_mode}
                   onChange={(e) => updateField('downpayment_mode', e.target.value)}
                   options={DOWNPAYMENT_MODES}
-                  required
                 />
               </div>
 
@@ -833,7 +830,6 @@ export default function NewRentalWizardPage() {
                   value={formData.installment_frequency}
                   onChange={(e) => updateField('installment_frequency', e.target.value)}
                   options={INSTALLMENT_FREQUENCIES}
-                  required
                 />
 
                 <Input
@@ -841,7 +837,6 @@ export default function NewRentalWizardPage() {
                   type="number"
                   value={formData.total_months}
                   onChange={(e) => updateField('total_months', e.target.value)}
-                  required
                 />
               </div>
 

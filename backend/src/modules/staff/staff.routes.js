@@ -12,18 +12,29 @@ router.use(requireAuth);
 router.use(requireAdmin);
 
 // Validation Schemas
+const passwordSchema = z.string()
+  .min(6, 'Password must be at least 6 characters')
+  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+  .regex(/[0-9]/, 'Password must contain at least one number')
+  .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character');
+
+const emailSchema = z.string()
+  .email()
+  .optional()
+  .or(z.literal(''));
+
 const createStaffSchema = z.object({
   name: z.string().min(1),
   phone: z.string().min(10),
-  email: z.string().email().optional().or(z.literal('')),
-  password: z.string().min(6),
+  email: emailSchema,
+  password: passwordSchema,
   role: z.enum(['admin', 'staff']),
 });
 
 const updateStaffSchema = z.object({
   name: z.string().min(1).optional(),
   phone: z.string().min(10).optional(),
-  email: z.string().email().optional().or(z.literal('')),
+  email: emailSchema,
   role: z.enum(['admin', 'staff']).optional(),
 });
 
@@ -143,7 +154,7 @@ router.patch(
  */
 router.patch(
   '/:id/password', 
-  validateBody(z.object({ password: z.string().min(6) })), 
+  validateBody(z.object({ password: passwordSchema })), 
   requestLogger('users', 'CHANGE_PASSWORD'), 
   staffController.changePassword.bind(staffController)
 );

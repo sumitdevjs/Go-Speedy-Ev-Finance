@@ -12,15 +12,40 @@ const createRentalSchema = z.object({
   name: z.string().min(1),
   phone: z.string().min(10),
   gender: z.enum(['male', 'female']),
-  address: z.string().optional(),
-  booking_amount: z.number().min(0).optional(),
-  downpayment_paid: z.number().min(0).default(0),
-  installment_daily_rate: z.number().min(0).default(250),
-  installment_frequency: z.enum(['daily', 'weekly', 'monthly']).default('daily'),
-  start_date: z.string().optional(),
-  total_months: z.number().default(24),
-  // Additional fields can be added here (hardware details, references, etc.)
-}).passthrough(); // Allow other DB fields to pass through
+  address: z.string().min(1),
+  chassis_no: z.string().min(1),
+  motor_ctrl_no: z.string().min(1),
+  battery_no: z.string().min(1),
+  rto_type: z.string().min(1),
+  hp_financer: z.string().min(1),
+  date_of_purchase: z.string().min(1),
+  date_of_delivery: z.string().min(1),
+  booking_amount: z.number().min(0),
+  downpayment_paid: z.number().min(0),
+  downpayment_mode: z.string().min(1),
+  installment_daily_rate: z.number().min(0),
+  installment_frequency: z.enum(['daily', 'weekly', 'monthly']),
+  start_date: z.string().min(1),
+  total_months: z.number().min(1),
+  references: z.array(z.object({
+    category: z.string().min(1),
+    name: z.string().min(1),
+    area: z.string().min(1),
+    phone: z.string().min(10)
+  })).min(1),
+  guarantors: z.array(z.object({
+    gender: z.string().min(1),
+    name: z.string().min(1),
+    address: z.string().min(1),
+    phone: z.string().min(10)
+  })).min(2),
+  aadhar_path: z.string().optional(),
+  pan_path: z.string().optional(),
+  cheque_path: z.string().optional(),
+  electricity_bill_path: z.string().optional(),
+  tenant_photo_path: z.string().optional(),
+  scooty_photo_path: z.string().optional(),
+}).passthrough();
 
 const updateRentalSchema = z.object({}).passthrough();
 

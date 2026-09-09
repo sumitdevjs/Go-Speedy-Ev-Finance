@@ -126,7 +126,7 @@ export default function PurchasesPage() {
         title="Completed Purchases & Ownerships"
         subtitle="Ledger of all vehicles fully paid and transferred to tenants"
         action={
-          <Link href="/rentals/new?mode=direct_purchase">
+          <Link href="/purchases/new">
             <Button variant="primary" size="sm" icon={ShoppingBag}>
               Purchase EV
             </Button>
