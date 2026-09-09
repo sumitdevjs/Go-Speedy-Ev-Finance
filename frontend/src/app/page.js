@@ -22,6 +22,19 @@ export default function RootPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [showVideo, setShowVideo] = useState(true);
+
+  useEffect(() => {
+    const hasPlayed = sessionStorage.getItem('introVideoPlayed');
+    if (hasPlayed) {
+      setShowVideo(false);
+    }
+  }, []);
+
+  const handleVideoEnd = () => {
+    setShowVideo(false);
+    sessionStorage.setItem('introVideoPlayed', 'true');
+  };
 
   useEffect(() => {
     checkAuth().then((u) => { setUser(u); setIsChecking(false); });
@@ -49,6 +62,28 @@ export default function RootPage() {
     if (type === 'admin') { setIdentifier('9999999999'); setPassword('Admin@123'); }
     else { setIdentifier('8888888888'); setPassword('Staff@123'); }
   };
+
+  if (showVideo) {
+    return (
+      <div className="fixed inset-0 bg-black z-50 flex items-center justify-center overflow-hidden">
+        <video 
+          src="/generate_a_video_in_which_the (1).mp4" 
+          autoPlay 
+          muted
+          playsInline 
+          onEnded={handleVideoEnd}
+          className="w-full h-full object-cover"
+        />
+        <button 
+          onClick={handleVideoEnd}
+          className="absolute top-6 right-6 z-50 text-white/70 hover:text-white px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 transition-all font-medium text-sm"
+          style={{ fontFamily: "'Inter', sans-serif" }}
+        >
+          Skip Intro
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen text-white flex flex-col" style={{ fontFamily: "'Inter', sans-serif" }}>
