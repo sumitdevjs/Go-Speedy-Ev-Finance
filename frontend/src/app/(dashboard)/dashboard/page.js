@@ -121,7 +121,7 @@ function AdminDashboard() {
         subtitle="Delhi Fleet & Finance Monitoring"
       />
 
-      <div className="p-4 md:p-8 space-y-6 md:space-y-8 max-w-7xl mx-auto pb-28 md:pb-32">
+      <div className="p-4 md:p-8 space-y-6 md:space-y-8 max-w-7xl mx-auto pb-6 lg:pb-32">
         {/* KPI Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* Available Stock */}

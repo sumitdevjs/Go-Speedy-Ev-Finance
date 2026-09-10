@@ -24,7 +24,7 @@ export default function SustainabilityBanner() {
   }, []);
 
   return (
-    <div className="fixed bottom-0 left-0 lg:left-64 right-0 z-30 px-4 sm:px-6 lg:px-8 pb-4 pointer-events-none">
+    <div className="relative w-full mt-6 px-0 pointer-events-auto lg:fixed lg:bottom-0 lg:left-64 lg:right-0 lg:z-30 lg:px-8 lg:pb-4 lg:pointer-events-none lg:mt-0">
       <div
         ref={bannerRef}
         className="pointer-events-auto w-full max-w-7xl mx-auto overflow-hidden rounded-2xl bg-gradient-to-r from-white/95 via-blue-50/80 to-emerald-50/60 dark:from-[#081220]/95 dark:via-[#0c1a2f]/95 dark:to-[#071325]/95 backdrop-blur-xl border border-slate-200/90 dark:border-white/10 shadow-lg dark:shadow-[0_8px_30px_rgb(0,0,0,0.55)] text-slate-900 dark:text-white select-none transition-colors duration-300"
@@ -133,34 +133,34 @@ export default function SustainabilityBanner() {
       </div>
 
       {/* ── Content Container: Generous Padding, Proper Alignments for Both Themes ── */}
-      <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-6 py-4 md:px-8 md:py-5">
+      <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 px-4 py-3.5 sm:px-6 md:px-8 sm:py-4 md:py-5">
         {/* Left Side: Leaf Icon + Heading & Subtitle */}
-        <div className="flex items-center gap-3.5 min-w-0">
-          <div className="h-10 w-10 shrink-0 rounded-xl bg-emerald-100/90 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-xs transition-colors">
-            <Leaf className="h-5 w-5 fill-emerald-600/20 dark:fill-emerald-400/20" />
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-xl bg-emerald-100/90 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-xs transition-colors">
+            <Leaf className="h-4.5 w-4.5 sm:h-5 sm:w-5 fill-emerald-600/20 dark:fill-emerald-400/20" />
           </div>
           <div className="min-w-0">
-            <h4 className="text-sm md:text-[15px] font-bold text-slate-900 dark:text-white tracking-tight leading-snug">
+            <h4 className="text-xs sm:text-sm md:text-[15px] font-bold text-slate-900 dark:text-white tracking-tight leading-snug">
               Driving a Cleaner Tomorrow
             </h4>
-            <p className="text-[11px] md:text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-normal">
+            <p className="text-[10px] sm:text-[11px] md:text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-normal truncate sm:whitespace-normal">
               Track. Manage. Accelerate. For a sustainable future.
             </p>
           </div>
         </div>
 
         {/* Right Side: Clean Mobility + Subtitle + Small Arrow */}
-        <div className="flex items-center gap-3 self-end sm:self-center shrink-0 group">
-          <div className="text-right">
-            <p className="text-xs md:text-[13px] font-bold text-slate-900 dark:text-white tracking-tight leading-none">
+        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 group pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 dark:border-white/5">
+          <div className="text-left sm:text-right">
+            <p className="text-[11px] sm:text-xs md:text-[13px] font-bold text-slate-900 dark:text-white tracking-tight leading-none">
               Clean Mobility
             </p>
-            <p className="text-[10px] md:text-[11px] text-slate-400 dark:text-slate-500 mt-1 leading-none">
+            <p className="text-[9px] sm:text-[10px] md:text-[11px] text-slate-400 dark:text-slate-500 mt-1 leading-none">
               Brighter Futures
             </p>
           </div>
-          <div className="h-7 w-7 rounded-lg bg-slate-100/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-500/20 group-hover:border-emerald-300 dark:group-hover:border-emerald-500/30 transition-smooth shrink-0">
-            <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+          <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-lg bg-slate-100/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-500/20 group-hover:border-emerald-300 dark:group-hover:border-emerald-500/30 transition-smooth shrink-0">
+            <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 group-hover:translate-x-0.5 transition-transform" />
           </div>
         </div>
       </div>
