@@ -84,6 +84,19 @@ class AuthController {
     }
   }
 
+  syncSession(req, res) {
+    try {
+      const { accessToken, refreshToken, userId } = req.body;
+      if (!accessToken || !userId) {
+        return errorResponse(res, 400, 'Invalid session tokens');
+      }
+      this._setCookies(res, accessToken, refreshToken, userId);
+      return successResponse(res, 200, null, 'Session synced');
+    } catch (error) {
+      return errorResponse(res, 500, error.message);
+    }
+  }
+
   _setCookies(res, accessToken, refreshToken, userId) {
     const isProduction = process.env.NODE_ENV === 'production';
     
@@ -91,7 +104,7 @@ class AuthController {
     res.cookie('access_token', accessToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 15 * 60 * 1000, 
     });
 
@@ -99,7 +112,7 @@ class AuthController {
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -107,7 +120,7 @@ class AuthController {
     res.cookie('user_id', userId, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
   }

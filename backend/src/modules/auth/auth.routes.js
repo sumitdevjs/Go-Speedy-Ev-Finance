@@ -217,6 +217,15 @@ router.get(
 
 /**
  * @openapi
+ * /api/auth/sync-session:
+ *   post:
+ *     summary: Sync session cookies to current origin
+ *     tags: [Auth]
+ */
+router.post('/sync-session', (req, res) => authController.syncSession(req, res));
+
+/**
+ * @openapi
  * /api/auth/google/callback:
  *   get:
  *     summary: Google OAuth callback
@@ -229,20 +238,21 @@ router.get(
   '/google/callback',
   (req, res, next) => {
     // Resolve destination frontend origin from OAuth state or env fallback
-    const targetOrigin =
+    const rawTarget =
       req.query.state ||
       (env.FRONTEND_URL && env.FRONTEND_URL !== '*' ? env.FRONTEND_URL : 'http://localhost:3000');
+    const cleanOrigin = String(rawTarget).replace(/\/+$/, '');
 
     passport.authenticate('google', { session: false }, async (err, result) => {
       if (err || !result) {
         console.error('Google OAuth error:', err);
         if (err?.code === 'NOT_REGISTERED' || err?.message?.includes('not registered')) {
-          return res.redirect(`${targetOrigin}/?error=not_registered`);
+          return res.redirect(`${cleanOrigin}/?error=not_registered`);
         }
         if (err?.code === 'ACCOUNT_DEACTIVATED' || err?.message?.includes('deactivated')) {
-          return res.redirect(`${targetOrigin}/?error=account_deactivated`);
+          return res.redirect(`${cleanOrigin}/?error=account_deactivated`);
         }
-        return res.redirect(`${targetOrigin}/?error=oauth_failed`);
+        return res.redirect(`${cleanOrigin}/?error=oauth_failed`);
       }
 
       try {
@@ -254,10 +264,12 @@ router.get(
         res.cookie('refresh_token', refreshToken, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
         res.cookie('user_id', user.id, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 * 1000 });
 
-        return res.redirect(`${targetOrigin}/oauth-callback`);
+        return res.redirect(
+          `${cleanOrigin}/oauth-callback?token=${encodeURIComponent(accessToken)}&refreshToken=${encodeURIComponent(refreshToken)}&userId=${encodeURIComponent(user.id)}`
+        );
       } catch (error) {
         console.error('Cookie/redirect error:', error);
-        return res.redirect(`${targetOrigin}/?error=oauth_failed`);
+        return res.redirect(`${cleanOrigin}/?error=oauth_failed`);
       }
     })(req, res, next);
   }

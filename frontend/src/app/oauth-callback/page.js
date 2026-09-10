@@ -3,14 +3,15 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../store/authStore';
+import api from '../../lib/api';
 import { Zap } from 'lucide-react';
 
 /**
  * /oauth-callback
  * 
  * The Google OAuth flow lands here after the backend sets auth cookies.
- * This page calls /api/auth/me (cookies already set) to populate the
- * auth store, then redirects to the dashboard.
+ * This page syncs session cookies onto the frontend domain if needed,
+ * calls /api/auth/me to populate the auth store, then redirects to the dashboard.
  */
 export default function OAuthCallbackPage() {
   const router = useRouter();
@@ -41,9 +42,27 @@ export default function OAuthCallbackPage() {
       return;
     }
 
-    // Verify session via cookies set by backend
+    // Verify session via cookies or synced tokens
     const verify = async () => {
       try {
+        const token = params.get('token');
+        const refreshToken = params.get('refreshToken');
+        const userId = params.get('userId');
+
+        if (token && userId) {
+          try {
+            await api.post('/api/auth/sync-session', {
+              accessToken: token,
+              refreshToken,
+              userId,
+            });
+            // Clean tokens from URL query for security
+            window.history.replaceState({}, document.title, window.location.pathname);
+          } catch (syncErr) {
+            console.warn('Session sync error:', syncErr);
+          }
+        }
+
         const user = await checkAuth();
         if (user) {
           setStatus('Welcome, ' + (user.name || 'User') + '! Redirecting…');
