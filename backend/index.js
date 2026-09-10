@@ -12,6 +12,9 @@ const passport = require('./src/config/passport');
 
 const app = express();
 
+// Trust reverse proxy (required for secure cookies & HTTPS detection on Vercel, Render, Railway, etc.)
+app.set('trust proxy', 1);
+
 // Security and utility middleware
 app.use(helmet({
   contentSecurityPolicy: false, // Disabled to allow Swagger UI scripts from unpkg CDN

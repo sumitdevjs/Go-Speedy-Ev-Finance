@@ -15,6 +15,10 @@ if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
       ? `${env.BACKEND_URL.replace(/\/$/, '')}/api/auth/google/callback`
       : `http://localhost:${env.PORT || 5000}/api/auth/google/callback`);
 
+  if (env.NODE_ENV === 'production' && !env.GOOGLE_CALLBACK_URL && !env.BACKEND_URL) {
+    console.warn(' [OAuth Warning]: In production, ensure BACKEND_URL or GOOGLE_CALLBACK_URL is set in environment variables to prevent redirect_uri_mismatch errors.');
+  }
+
   passport.use(
     new GoogleStrategy(
       {

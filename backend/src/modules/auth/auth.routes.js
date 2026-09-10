@@ -200,8 +200,8 @@ router.get(
     }
 
     // Capture frontend origin so callback redirects to the exact port/host the user initiated from
-    let clientOrigin = env.FRONTEND_URL && env.FRONTEND_URL !== '*' ? env.FRONTEND_URL : '';
-    if (req.headers.referer) {
+    let clientOrigin = req.query.origin || (env.FRONTEND_URL && env.FRONTEND_URL !== '*' ? env.FRONTEND_URL : '');
+    if (!clientOrigin && req.headers.referer) {
       try {
         clientOrigin = new URL(req.headers.referer).origin;
       } catch (_) {}
@@ -210,7 +210,7 @@ router.get(
     passport.authenticate('google', {
       scope: ['profile', 'email'],
       session: false,
-      state: clientOrigin || 'http://localhost:3000',
+      state: clientOrigin || (env.FRONTEND_URL && env.FRONTEND_URL !== '*' ? env.FRONTEND_URL : 'http://localhost:3000'),
     })(req, res, next);
   }
 );
