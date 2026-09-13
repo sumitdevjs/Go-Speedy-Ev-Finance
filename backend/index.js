@@ -21,6 +21,17 @@ app.use(helmet({
 }));
 app.use(cors);
 app.use(express.json());
+
+// Next.js proxy rewrites convert PATCH requests to PUT (stripping the body).
+// The frontend intercepts PATCH calls and sends them as PUT with this header.
+// We revert the method back to PATCH here so all PATCH routes work normally.
+app.use((req, res, next) => {
+  if (req.method === 'PUT' && req.headers['x-http-method-override'] === 'PATCH') {
+    req.method = 'PATCH';
+  }
+  next();
+});
+
 app.use(cookieParser());
 
 // Session — used briefly during OAuth redirect (not for general auth)

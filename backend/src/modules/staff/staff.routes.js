@@ -62,7 +62,7 @@ router.get('/', staffController.getAll.bind(staffController));
  * @openapi
  * /api/staff:
  *   post:
- *     summary: Create new staff
+ *     summary: Create new staff or admin account
  *     tags: [Staff]
  *     security:
  *       - cookieAuth: []
@@ -74,14 +74,38 @@ router.get('/', staffController.getAll.bind(staffController));
  *             type: object
  *             required: [name, phone, password, role]
  *             properties:
- *               name: { type: string }
- *               phone: { type: string }
- *               email: { type: string }
- *               password: { type: string, description: "Must be >= 6 chars, contain an uppercase letter, a number, and a special character" }
- *               role: { type: string, enum: [admin, staff] }
+ *               name:
+ *                 type: string
+ *                 example: Ravi Kumar
+ *               phone:
+ *                 type: string
+ *                 minLength: 10
+ *                 example: "9876543210"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: ravi@gospeedy.in
+ *               password:
+ *                 type: string
+ *                 description: "Min 6 chars, must include an uppercase letter, a number, and a special character"
+ *                 example: Secure@123
+ *               role:
+ *                 type: string
+ *                 enum: [admin, staff]
+ *                 example: staff
+ *               ward_area:
+ *                 type: string
+ *                 description: Hub or ward assignment for this staff member
+ *                 example: Okhla Depot
  *     responses:
  *       201:
- *         description: Created
+ *         description: Staff account created successfully
+ *       400:
+ *         description: Validation error (password strength, duplicate phone, etc.)
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden — admin only
  */
 router.post(
   '/',
@@ -93,7 +117,7 @@ router.post(
  * @openapi
  * /api/staff/{id}:
  *   patch:
- *     summary: Update staff details
+ *     summary: Update staff profile details
  *     tags: [Staff]
  *     security:
  *       - cookieAuth: []
@@ -103,6 +127,7 @@ router.post(
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
  *     requestBody:
  *       required: true
  *       content:
@@ -110,13 +135,33 @@ router.post(
  *           schema:
  *             type: object
  *             properties:
- *               name: { type: string }
- *               phone: { type: string }
- *               email: { type: string }
- *               role: { type: string, enum: [admin, staff] }
+ *               name:
+ *                 type: string
+ *                 example: Ravi Kumar
+ *               phone:
+ *                 type: string
+ *                 example: "9876543210"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: ravi@gospeedy.in
+ *               role:
+ *                 type: string
+ *                 enum: [admin, staff]
+ *               ward_area:
+ *                 type: string
+ *                 example: Okhla Depot
  *     responses:
  *       200:
- *         description: Updated
+ *         description: Staff profile updated
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden — admin only
+ *       404:
+ *         description: Staff member not found
  */
 router.patch(
   '/:id',
