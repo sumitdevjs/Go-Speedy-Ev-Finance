@@ -58,7 +58,6 @@ export default function ModelViewPage({ params }) {
         setFormData({
           name: data.name || '',
           company: data.company || '',
-          ward: data.ward || '',
           total_price: data.total_price?.toString() || '',
           stock_count: data.stock_count?.toString() || ''
         });
@@ -81,7 +80,6 @@ export default function ModelViewPage({ params }) {
       await api.patch(`/api/models/${id}`, {
         name: formData.name,
         company: formData.company,
-        ward: formData.ward,
         total_price: Number(formData.total_price)
       });
       toast.success('Model details updated successfully');
@@ -352,20 +350,6 @@ export default function ModelViewPage({ params }) {
               )}
             </div>
 
-            <div>
-              {isEditMode ? (
-                <Input
-                  label="Ward / Area"
-                  value={formData.ward}
-                  onChange={(e) => setFormData({ ...formData, ward: e.target.value })}
-                />
-              ) : (
-                <>
-                  <p className="font-bold text-slate-400 uppercase text-[10px] flex items-center gap-1"><MapPin className="w-3 h-3"/> Ward / Hub</p>
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{model.ward}</p>
-                </>
-              )}
-            </div>
 
             <div>
               {isEditMode ? (

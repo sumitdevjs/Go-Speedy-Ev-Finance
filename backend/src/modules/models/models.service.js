@@ -47,7 +47,7 @@ class ModelsService {
   }
 
   async createModel(modelData, createdBy) {
-    const { initial_stock_date, ...restData } = modelData;
+    const { initial_stock_date, ward, ...restData } = modelData;
     
     let initialLogs = [];
     if (restData.stock_count > 0 && initial_stock_date) {
@@ -55,7 +55,7 @@ class ModelsService {
         id: crypto.randomUUID(),
         date: initial_stock_date,
         stock_added: restData.stock_count,
-        ward_area: restData.ward,
+        ward_area: ward || 'Delhi Central',
       }];
     }
 

@@ -202,11 +202,7 @@ export default function ModelsPage() {
         </div>
       ),
     },
-    {
-      header: 'Operational Ward',
-      key: 'ward',
-      render: (row) => <span className="font-medium text-slate-700 dark:text-slate-300">{row.ward}</span>,
-    },
+
     {
       header: 'Sticker Price',
       key: 'total_price',
@@ -368,13 +364,7 @@ export default function ModelsPage() {
             required
           />
 
-          <Input
-            label="Ward / Hub Location"
-            placeholder="e.g. Okhla Depot / Karol Bagh Hub"
-            value={ward}
-            onChange={(e) => setWard(e.target.value)}
-            required
-          />
+
 
           <div className="grid grid-cols-2 gap-4">
             <Input
@@ -398,13 +388,22 @@ export default function ModelsPage() {
           </div>
 
           {!editingModelId && Number(stockCount) > 0 && (
-            <Input
-              label="Initial Stock Date"
-              type="date"
-              value={initialStockDate}
-              onChange={(e) => setInitialStockDate(e.target.value)}
-              required
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Initial Stock Date"
+                type="date"
+                value={initialStockDate}
+                onChange={(e) => setInitialStockDate(e.target.value)}
+                required
+              />
+              <Input
+                label="Ward / Hub Location"
+                placeholder="e.g. Okhla Depot"
+                value={ward}
+                onChange={(e) => setWard(e.target.value)}
+                required
+              />
+            </div>
           )}
 
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
@@ -451,13 +450,7 @@ export default function ModelsPage() {
             onChange={(e) => setStockAdded(e.target.value)}
             required
           />
-          <Input
-            label="Ward / Area"
-            placeholder="e.g. Okhla Depot"
-            value={stockWard}
-            onChange={(e) => setStockWard(e.target.value)}
-            required
-          />
+
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
             <Button
               variant="outline"

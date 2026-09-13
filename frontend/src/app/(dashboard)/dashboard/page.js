@@ -125,7 +125,7 @@ function AdminDashboard() {
         {/* KPI Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* Available Stock */}
-          <div className="gsap-admin-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all">
+          <div className="gsap-admin-kpi group rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all cursor-default relative">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Available EV Stock
@@ -133,10 +133,61 @@ function AdminDashboard() {
               <h3 id="gsap-admin-stock" className="text-2xl font-black text-slate-900 dark:text-white mt-1">
                 {loading ? <Spinner size="sm" /> : `${stats.totalStock} units`}
               </h3>
-              <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium mt-1">Ready for deployment</p>
+              
+              {/* Default Subtitle */}
+              <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium mt-1 absolute transition-all duration-300 group-hover:opacity-0 group-hover:-translate-y-2">
+                Ready for deployment
+              </p>
+              
+              {/* Hover Stats */}
+              <div className="absolute text-[11px] font-medium mt-1 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none flex items-center gap-1.5">
+                <span className="text-blue-600 dark:text-blue-400">{stats.totalStock} Free</span>
+                <span className="text-slate-300">•</span>
+                <span className="text-emerald-500">{stats.activeRentals} Rented</span>
+              </div>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-              <Bike className="h-6 w-6" />
+            
+            <div className="relative h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 overflow-hidden">
+              {/* Default Icon */}
+              <Bike className="h-6 w-6 absolute transition-all duration-300 group-hover:scale-50 group-hover:opacity-0" />
+              
+              {/* Circle Analytics - Appears on hover */}
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transform scale-50 group-hover:scale-100 transition-all duration-300">
+                <svg className="w-10 h-10 transform -rotate-90">
+                  <circle
+                    cx="20"
+                    cy="20"
+                    r="16"
+                    stroke="currentColor"
+                    strokeWidth="3.5"
+                    fill="transparent"
+                    className="text-blue-200/50 dark:text-blue-900/30"
+                  />
+                  <circle
+                    cx="20"
+                    cy="20"
+                    r="16"
+                    stroke="currentColor"
+                    strokeWidth="3.5"
+                    fill="transparent"
+                    strokeDasharray={2 * Math.PI * 16}
+                    strokeDashoffset={
+                      stats.totalStock + stats.activeRentals > 0 
+                      ? (2 * Math.PI * 16) - ((stats.totalStock / (stats.totalStock + stats.activeRentals)) * 100 / 100) * (2 * Math.PI * 16)
+                      : (2 * Math.PI * 16)
+                    }
+                    strokeLinecap="round"
+                    className="text-blue-500 transition-all duration-1000 ease-out delay-100"
+                  />
+                </svg>
+                <div className="absolute flex flex-col items-center justify-center">
+                  <span className="text-[9px] font-black text-slate-700 dark:text-slate-200">
+                    {stats.totalStock + stats.activeRentals > 0 
+                      ? Math.round((stats.totalStock / (stats.totalStock + stats.activeRentals)) * 100) 
+                      : 0}%
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
