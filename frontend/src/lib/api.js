@@ -12,6 +12,15 @@ const api = axios.create({
 let isRefreshing = false;
 let failedQueue = [];
 
+// Workaround for Next.js dropping body on PATCH requests in rewrites
+api.interceptors.request.use((config) => {
+  if (config.method && config.method.toLowerCase() === 'patch') {
+    config.method = 'put';
+    config.headers['X-HTTP-Method-Override'] = 'PATCH';
+  }
+  return config;
+});
+
 const processQueue = (error, token = null) => {
   failedQueue.forEach((prom) => {
     if (error) {
