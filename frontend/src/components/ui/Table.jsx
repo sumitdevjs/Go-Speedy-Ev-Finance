@@ -82,7 +82,7 @@ export default function Table({
                     key={col.key || colIdx}
                     className={`px-3 md:px-4 py-3 md:py-4 text-left align-middle ${col.cellClassName || ''}`}
                   >
-                    {col.render ? col.render(row) : row[col.key]}
+                    {col.render ? col.render(row, rowIdx) : row[col.key]}
                   </td>
                 ))}
               </tr>

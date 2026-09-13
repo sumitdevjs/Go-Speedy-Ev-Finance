@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS ev_models (
   ward         TEXT NOT NULL,
   total_price  NUMERIC(12,2) NOT NULL CHECK (total_price > 0),
   stock_count  INTEGER NOT NULL DEFAULT 0 CHECK (stock_count >= 0),
+  stock_logs   JSONB NOT NULL DEFAULT '[]',
   is_active    BOOLEAN NOT NULL DEFAULT true,
   created_by   UUID REFERENCES users(id),
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),

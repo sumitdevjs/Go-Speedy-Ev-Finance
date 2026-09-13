@@ -113,6 +113,10 @@ class RentalsService {
       }
     });
 
+    // Remove fields not in DB schema to prevent PostgREST errors
+    delete tenantData.include_gst;
+    delete tenantData.gst_percent;
+
     const requiredFields = [
       'vehicle_number',
       'scooty_insurance_amount', 'scooty_insurance_idv', 'scooty_insurance_start',

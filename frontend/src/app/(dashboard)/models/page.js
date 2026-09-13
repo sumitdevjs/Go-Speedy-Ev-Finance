@@ -252,7 +252,7 @@ export default function ModelsPage() {
             variant="ghost"
             size="sm"
             icon={Eye}
-            title="View Model"
+            title="View/Edit"
             onClick={() => handleEditClick(row)}
             className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           />

@@ -40,6 +40,17 @@ class BookingsService {
   }
 
   async convertBooking(id, tenantData, createdBy) {
+    // Sanitize empty strings to undefined so they are not inserted as "" into numeric/date DB columns
+    Object.keys(tenantData).forEach(key => {
+      if (tenantData[key] === '') {
+        delete tenantData[key];
+      }
+    });
+
+    // Remove fields not in DB schema to prevent PostgREST errors
+    delete tenantData.include_gst;
+    delete tenantData.gst_percent;
+
     // 1. Fetch Booking
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
