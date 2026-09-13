@@ -10,7 +10,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE TABLE IF NOT EXISTS users (
   id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name                     TEXT NOT NULL,
-  phone                    TEXT UNIQUE,                  -- NULL for OAuth users until updated
+  phone                    VARCHAR(10) UNIQUE CHECK (phone IS NULL OR phone ~ '^[0-9]{10}$'),                  -- NULL for OAuth users until updated
   email                    TEXT UNIQUE,
   password_hash            TEXT,                         -- NULL for OAuth users
   oauth_provider           TEXT,                         -- 'google', etc.
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS tenants (
 
   -- Personal
   name           TEXT NOT NULL,
-  phone          TEXT NOT NULL,
+  phone          VARCHAR(10) UNIQUE CHECK (phone IS NULL OR phone ~ '^[0-9]{10}$'),
   gender         TEXT NOT NULL CHECK (gender IN ('male','female')),
   address        TEXT,
   has_pending_docs BOOLEAN NOT NULL DEFAULT false,
@@ -188,7 +188,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   ev_model_id     UUID REFERENCES ev_models(id),
   model_name_raw  TEXT,                           -- if model not yet in ev_models
   name            TEXT NOT NULL,
-  phone           TEXT NOT NULL,
+  phone           VARCHAR(10) UNIQUE CHECK (phone IS NULL OR phone ~ '^[0-9]{10}$'),
   aadhar_path     TEXT,
   booking_amount  NUMERIC(10,2) CHECK (booking_amount >= 0),
   booking_date    DATE NOT NULL DEFAULT CURRENT_DATE,
