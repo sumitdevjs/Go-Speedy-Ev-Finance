@@ -108,6 +108,7 @@ export default function TenantDetailPage() {
           hp_financer: t.hp_financer ? (isStandardFinancer ? t.hp_financer : 'other') : '',
           hp_financer_other: isStandardFinancer ? '' : (t.hp_financer === 'other' ? '' : (t.hp_financer || '')),
           start_date: t.start_date ? t.start_date.split('T')[0] : '',
+          total_months: t.total_months || 24,
           installment_daily_rate: t.installment_daily_rate || '',
           installment_frequency: t.installment_frequency || '',
           include_gst: t.include_gst || false,
@@ -220,6 +221,18 @@ export default function TenantDetailPage() {
   };
 
   const handleSaveChanges = async () => {
+    if (editData.phone && !/^\d{10}$/.test(editData.phone.trim())) {
+      toast.error('Phone number must be exactly 10 digits');
+      return;
+    }
+    if (editData.references?.some(r => r.phone && !/^\d{10}$/.test(r.phone.trim()))) {
+      toast.error('All reference phone numbers must be exactly 10 digits');
+      return;
+    }
+    if (editData.guarantors?.some(g => g.phone && !/^\d{10}$/.test(g.phone.trim()))) {
+      toast.error('All guarantor phone numbers must be exactly 10 digits');
+      return;
+    }
     try {
       setIsSaving(true);
       const { hp_financer_other, ...restEditData } = editData;
@@ -447,8 +460,11 @@ export default function TenantDetailPage() {
                   />
                   <Input
                     label="Phone Number"
+                    placeholder="10-digit mobile number"
                     value={editData.phone}
-                    onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                    onChange={(e) => setEditData({ ...editData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                    maxLength={10}
+                    inputMode="numeric"
                   />
                   <div className="sm:col-span-2">
                     <Input
@@ -863,17 +879,38 @@ export default function TenantDetailPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                   <div>
                     {isEditMode ? (
-                      <Input
-                        type="date"
-                        label="Start Date"
-                        value={editData.start_date}
-                        onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
-                      />
+                      <div className="space-y-3">
+                        <Input
+                          type="date"
+                          label="Start Date"
+                          value={editData.start_date}
+                          onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
+                        />
+                        <Input
+                          type="number"
+                          label="Contract Horizon (Months)"
+                          value={editData.total_months}
+                          onChange={(e) => setEditData({ ...editData, total_months: e.target.value })}
+                        />
+                        <Input
+                          type="date"
+                          label="Expected Completion (Last Date)"
+                          value={(() => {
+                            if (!editData.start_date) return '';
+                            const d = new Date(editData.start_date);
+                            if (isNaN(d.getTime())) return '';
+                            d.setMonth(d.getMonth() + (Number(editData.total_months) || 24));
+                            return d.toISOString().split('T')[0];
+                          })()}
+                          disabled
+                          helperText={`Computed: Start Date + ${editData.total_months || 24} months`}
+                        />
+                      </div>
                     ) : (
                       <>
                         <p className="font-bold text-slate-400 uppercase text-[10px]">Agreement Dates</p>
                         <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
-                          Start: {formatDate(tenant.start_date)} • End: {formatDate(tenant.expected_end_date)}
+                          Start: {formatDate(tenant.start_date)} • End: {formatDate(tenant.expected_end_date)} ({tenant.total_months || 24} months)
                         </p>
                       </>
                     )}
@@ -989,9 +1026,11 @@ export default function TenantDetailPage() {
                           />
                           <div className="grid grid-cols-2 gap-2">
                              <Input
-                              placeholder="Phone"
+                              placeholder="10-digit phone"
                               value={r.phone || ''}
-                              onChange={(e) => updateReference(i, 'phone', e.target.value)}
+                              onChange={(e) => updateReference(i, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                              maxLength={10}
+                              inputMode="numeric"
                             />
                             <Select
                               value={r.category || ''}
@@ -1037,9 +1076,11 @@ export default function TenantDetailPage() {
                           />
                            <div className="grid grid-cols-2 gap-2">
                              <Input
-                              placeholder="Phone"
+                              placeholder="10-digit phone"
                               value={g.phone || ''}
-                              onChange={(e) => updateGuarantor(i, 'phone', e.target.value)}
+                              onChange={(e) => updateGuarantor(i, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                              maxLength={10}
+                              inputMode="numeric"
                             />
                             <Select
                               value={g.gender || ''}

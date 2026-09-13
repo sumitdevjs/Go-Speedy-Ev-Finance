@@ -1,7 +1,7 @@
 const supabase = require('../../config/db');
 const { calcBalance } = require('../../utils/balanceCalc');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
-const { buildSearchFilter } = require('../../utils/searchFilter');
+const { buildSearchFilter, buildEqOrFilter } = require('../../utils/searchFilter');
 
 class RentalsService {
   async getRentals(query = {}) {
@@ -165,7 +165,7 @@ class RentalsService {
 
     // 3. Compute dates
     const startDate = tenantData.start_date ? new Date(tenantData.start_date) : new Date();
-    const totalMonths = tenantData.total_months || 24;
+    const totalMonths = Number(tenantData.total_months) || 24;
     const expectedEndDate = new Date(startDate);
     expectedEndDate.setMonth(expectedEndDate.getMonth() + totalMonths);
 
@@ -205,7 +205,10 @@ class RentalsService {
         .update({ stock_count: model.stock_count })
         .eq('id', tenantData.ev_model_id);
       
-      if (error.code === '23505') throw new Error(`Unique constraint violation: ${error.details || error.message}`);
+      if (error.code === '23505') {
+        console.error('[createRental] Unique constraint violation:', error);
+        throw new Error('Unique constraint violation: a record with this value already exists.');
+      }
       throw error;
     }
   }
@@ -223,7 +226,7 @@ class RentalsService {
       const { data: existing, error: err } = await supabase.from('tenants').select('start_date, total_months').eq('id', id).single();
       if (!err && existing) {
         const startDate = new Date(updates.start_date || existing.start_date);
-        const totalMonths = updates.total_months || existing.total_months;
+        const totalMonths = Number(updates.total_months || existing.total_months) || 24;
         const expectedEndDate = new Date(startDate);
         expectedEndDate.setMonth(expectedEndDate.getMonth() + totalMonths);
         updates.expected_end_date = expectedEndDate.toISOString().split('T')[0];
@@ -238,7 +241,10 @@ class RentalsService {
       .single();
 
     if (error) {
-      if (error.code === '23505') throw new Error(`Unique constraint violation: ${error.details || error.message}`);
+      if (error.code === '23505') {
+        console.error('[updateRental] Unique constraint violation:', error);
+        throw new Error('Unique constraint violation: a record with this value already exists.');
+      }
       throw error;
     }
     return data;
@@ -308,24 +314,21 @@ class RentalsService {
 
   async checkUniqueHardwareOrPolicy(fields) {
     const { chassis_no, motor_ctrl_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number } = fields;
-    
-    // We only need to check fields that were actually provided
-    const orConditions = [];
-    if (chassis_no) orConditions.push(`chassis_no.eq.${chassis_no}`);
-    if (motor_ctrl_no) orConditions.push(`motor_ctrl_no.eq.${motor_ctrl_no}`);
-    if (battery_no) orConditions.push(`battery_no.eq.${battery_no}`);
-    if (vehicle_number) orConditions.push(`vehicle_number.eq.${vehicle_number}`);
-    if (scooty_policy_number) orConditions.push(`scooty_policy_number.eq.${scooty_policy_number}`);
-    if (rider_policy_number) orConditions.push(`rider_policy_number.eq.${rider_policy_number}`);
 
-    if (orConditions.length === 0) {
+    // buildEqOrFilter escapes values so a comma/parenthesis can't inject
+    // extra filter clauses into the query.
+    const orFilter = buildEqOrFilter({
+      chassis_no, motor_ctrl_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number,
+    });
+
+    if (!orFilter) {
       return { exists: false };
     }
 
     const { data, error } = await supabase
       .from('tenants')
       .select('chassis_no, motor_ctrl_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number')
-      .or(orConditions.join(','));
+      .or(orFilter);
 
     if (error) throw error;
 

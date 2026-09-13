@@ -1,13 +1,14 @@
 const cors = require('cors');
-const env = require('./env');
+const { isAllowedOrigin } = require('./allowedOrigins');
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Dynamically allow whatever origin made the request to completely bypass CORS 
-    // configuration headaches (like trailing slashes or preview branch URLs)
-    callback(null, origin || true);
+    // Reflecting every origin while allowing credentials would let any
+    // website make authenticated requests using a logged-in user's cookies.
+    if (!origin || isAllowedOrigin(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
   },
-  credentials: true, // Allow cookies to be sent
+  credentials: true,
   optionsSuccessStatus: 200,
 };
 

@@ -33,12 +33,12 @@ class AuthController {
 
       return successResponse(res, 200, { user: result.user }, 'Token refreshed');
     } catch (error) {
-      console.error('Refresh Token Error:', error.message);
+      console.error('Refresh Token Error:', error);
       // Clear cookies on fail
       res.clearCookie('access_token');
       res.clearCookie('refresh_token');
       res.clearCookie('user_id');
-      return errorResponse(res, 401, `Session expired or invalid: ${error.message}`);
+      return errorResponse(res, 401, 'Session expired or invalid. Please log in again.');
     }
   }
 
@@ -82,19 +82,6 @@ class AuthController {
       return successResponse(res, 200, null, result.message);
     } catch (error) {
       return errorResponse(res, 400, error.message);
-    }
-  }
-
-  syncSession(req, res) {
-    try {
-      const { accessToken, refreshToken, userId } = req.body;
-      if (!accessToken || !userId) {
-        return errorResponse(res, 400, 'Invalid session tokens');
-      }
-      this._setCookies(res, accessToken, refreshToken, userId);
-      return successResponse(res, 200, null, 'Session synced');
-    } catch (error) {
-      return errorResponse(res, 500, error.message);
     }
   }
 

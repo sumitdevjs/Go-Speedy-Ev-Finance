@@ -13,4 +13,16 @@ const buildSearchFilter = (columns, term) => {
   return columns.map((col) => `${col}.ilike.${value}`).join(',');
 };
 
-module.exports = { buildSearchFilter };
+// Same escaping as buildSearchFilter, exposed for other operators (`.eq.`).
+const escapeFilterValue = (value) => `"${String(value).replace(/"/g, '\\"')}"`;
+
+// Build a PostgREST `.or()` filter that equality-matches distinct values
+// against distinct columns, e.g. buildEqOrFilter({chassis_no: 'ABC123'})
+// -> 'chassis_no.eq."ABC123"'. Skips null/undefined/empty values.
+const buildEqOrFilter = (fieldValues) =>
+  Object.entries(fieldValues)
+    .filter(([, value]) => value !== null && value !== undefined && value !== '')
+    .map(([field, value]) => `${field}.eq.${escapeFilterValue(value)}`)
+    .join(',');
+
+module.exports = { buildSearchFilter, escapeFilterValue, buildEqOrFilter };

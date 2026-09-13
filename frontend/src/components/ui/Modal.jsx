@@ -27,6 +27,9 @@ export default function Modal({
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      if (typeof window !== 'undefined' && window.__lenis) {
+        window.__lenis.stop();
+      }
       if (modalRef.current) {
         animateModalIn(modalRef.current);
       }
@@ -35,9 +38,15 @@ export default function Modal({
       }
     } else {
       document.body.style.overflow = '';
+      if (typeof window !== 'undefined' && window.__lenis) {
+        window.__lenis.start();
+      }
     }
     return () => {
       document.body.style.overflow = '';
+      if (typeof window !== 'undefined' && window.__lenis) {
+        window.__lenis.start();
+      }
     };
   }, [isOpen]);
 
@@ -86,7 +95,7 @@ export default function Modal({
         </div>
 
         {/* Scrollable Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1">{children}</div>
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1" data-lenis-prevent>{children}</div>
       </div>
     </div>
   );

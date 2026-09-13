@@ -22,9 +22,11 @@ const emailSchema = z.string()
   .optional()
   .or(z.literal(''));
 
+const phoneSchema = z.string().regex(/^\d{10}$/, 'Phone number must be exactly 10 digits');
+
 const createStaffSchema = z.object({
   name: z.string().min(1),
-  phone: z.string().min(10),
+  phone: phoneSchema,
   email: emailSchema,
   password: passwordSchema,
   role: z.enum(['admin', 'staff']),
@@ -33,7 +35,7 @@ const createStaffSchema = z.object({
 
 const updateStaffSchema = z.object({
   name: z.string().min(1).optional(),
-  phone: z.string().min(10).optional(),
+  phone: phoneSchema.optional(),
   email: emailSchema,
   role: z.enum(['admin', 'staff']).optional(),
   ward_area: z.string().optional(),

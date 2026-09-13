@@ -182,6 +182,10 @@ const authService = require('./auth.service');
 const { errorResponse, successResponse } = require('../../utils/response');
 const env = require('../../config/env');
 const crypto = require('crypto');
+const { allowedOrigins, isAllowedOrigin } = require('../../config/allowedOrigins');
+
+// Fallback when a requested redirect target isn't on the allow-list.
+const DEFAULT_FRONTEND_ORIGIN = allowedOrigins[0] || 'http://localhost:3000';
 
 // ─── One-time OAuth exchange store ────────────────────────────────────────────
 // Maps a short-lived random code → { accessToken, refreshToken, userId }
@@ -212,30 +216,23 @@ router.get(
       return res.status(503).json({ success: false, message: 'Google OAuth is not configured on this server.' });
     }
 
-    // Capture frontend origin so callback redirects to the exact port/host the user initiated from
-    let clientOrigin = req.query.origin || (env.FRONTEND_URL && env.FRONTEND_URL !== '*' ? env.FRONTEND_URL : '');
-    if (!clientOrigin && req.headers.referer) {
+    // Only trust an origin on our allow-list — letting client input pick the
+    // redirect target is an open-redirect straight to account takeover.
+    let clientOrigin = req.query.origin;
+    if (!isAllowedOrigin(clientOrigin) && req.headers.referer) {
       try {
         clientOrigin = new URL(req.headers.referer).origin;
       } catch (_) {}
     }
+    if (!isAllowedOrigin(clientOrigin)) clientOrigin = DEFAULT_FRONTEND_ORIGIN;
 
     passport.authenticate('google', {
       scope: ['profile', 'email'],
       session: false,
-      state: clientOrigin || (env.FRONTEND_URL && env.FRONTEND_URL !== '*' ? env.FRONTEND_URL : 'http://localhost:3000'),
+      state: clientOrigin,
     })(req, res, next);
   }
 );
-
-/**
- * @openapi
- * /api/auth/sync-session:
- *   post:
- *     summary: Sync session cookies to current origin
- *     tags: [Auth]
- */
-router.post('/sync-session', (req, res) => authController.syncSession(req, res));
 
 /**
  * @openapi
@@ -250,10 +247,10 @@ router.post('/sync-session', (req, res) => authController.syncSession(req, res))
 router.get(
   '/google/callback',
   (req, res, next) => {
-    const rawTarget =
-      req.query.state ||
-      (env.FRONTEND_URL && env.FRONTEND_URL !== '*' ? env.FRONTEND_URL : 'http://localhost:3000');
-    const cleanOrigin = String(rawTarget).replace(/\/+$/, '');
+    // `state` is client-controlled on the wire — validate again, don't trust it.
+    const cleanOrigin = isAllowedOrigin(req.query.state)
+      ? String(req.query.state).replace(/\/+$/, '')
+      : DEFAULT_FRONTEND_ORIGIN;
 
     passport.authenticate('google', { session: false }, async (err, result) => {
       if (err || !result) {

@@ -32,7 +32,7 @@ class BookingsController {
         return errorResponse(res, 400, error.message);
       }
       console.error(error);
-      return errorResponse(res, 500, error.message);
+      return errorResponse(res, 500, 'Internal Server Error');
     }
   }
 

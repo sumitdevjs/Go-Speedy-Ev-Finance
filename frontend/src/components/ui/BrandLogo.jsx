@@ -29,9 +29,9 @@ export default function BrandLogo({
       pvtColor: 'text-[#16a34a] dark:text-[#4ade80]',
     },
     sidebar: {
-      imgH: 'h-8 sm:h-9',
-      text: 'text-xl sm:text-2xl',
-      titleColor: 'text-[#0f2b6e] dark:text-[#38bdf8]',
+      imgH: 'h-8 sm:h-[34px]',
+      text: 'text-xl sm:text-[22px]',
+      titleColor: 'text-[#0284c7] dark:text-[#38bdf8]',
       pvtColor: 'text-[#16a34a] dark:text-[#4ade80]',
     },
     compact: {
@@ -48,7 +48,7 @@ export default function BrandLogo({
   };
 
   return (
-    <div className={`inline-flex flex-col items-center justify-center select-none ${className}`}>
+    <div className={`inline-flex flex-col items-center justify-center select-none py-1 ${className}`}>
       {/* Exact User Uploaded Logo Image */}
       <img
         src="/logo-user-transparent.png"
@@ -59,13 +59,13 @@ export default function BrandLogo({
       {/* Subtitle Text in Tangerine Font */}
       {showText && (
         <div
-          className="tangerine-bold mt-0.5 flex items-center justify-center gap-1.5 leading-none text-center whitespace-nowrap"
+          className="tangerine-bold mt-1 flex items-center justify-center gap-1.5 leading-none text-center whitespace-nowrap px-1 pb-0.5"
           style={{ fontFamily: '"Tangerine", cursive', fontWeight: 700, fontStyle: 'normal' }}
         >
-          <span className={`${styles.text} ${styles.titleColor} drop-shadow-sm`}>
+          <span className={`${styles.text} ${styles.titleColor} drop-shadow-xs tracking-wide`}>
             Go Speedy EV
           </span>
-          <span className={`${styles.text} ${styles.pvtColor} drop-shadow-sm`}>
+          <span className={`${styles.text} ${styles.pvtColor} drop-shadow-xs tracking-wide`}>
             Pvt. Ltd.
           </span>
         </div>
