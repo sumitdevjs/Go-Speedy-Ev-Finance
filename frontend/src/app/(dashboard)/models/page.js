@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Bike, Plus, AlertCircle, Edit2, XCircle, CheckCircle } from 'lucide-react';
+import { Bike, Plus, AlertCircle, Edit2, XCircle, CheckCircle, Eye, PackagePlus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
 import Button from '../../../components/ui/Button';
@@ -30,6 +31,15 @@ export default function ModelsPage() {
   const [editingModelId, setEditingModelId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const router = useRouter();
+
+  // Add Stock state
+  const [isAddStockOpen, setIsAddStockOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(null);
+  const [stockDate, setStockDate] = useState(new Date().toISOString().split('T')[0]);
+  const [stockAdded, setStockAdded] = useState('');
+  const [stockWard, setStockWard] = useState('Delhi Central');
+  const [isStockSubmitting, setIsStockSubmitting] = useState(false);
 
   // Form fields
   const [name, setName] = useState('');
@@ -37,6 +47,7 @@ export default function ModelsPage() {
   const [ward, setWard] = useState('Delhi Central');
   const [totalPrice, setTotalPrice] = useState('80000');
   const [stockCount, setStockCount] = useState('5');
+  const [initialStockDate, setInitialStockDate] = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     fetchModels();
@@ -68,13 +79,42 @@ export default function ModelsPage() {
   };
 
   const handleEditClick = (model) => {
-    setEditingModelId(model.id);
-    setName(model.name);
-    setCompany(model.company);
-    setWard(model.ward);
-    setTotalPrice(model.total_price.toString());
-    setStockCount(model.stock_count.toString());
-    setIsAddModalOpen(true);
+    router.push(`/models/${model.id}`);
+  };
+
+  const handleOpenAddStock = (model) => {
+    setSelectedModel(model);
+    setStockDate(new Date().toISOString().split('T')[0]);
+    setStockAdded('');
+    setStockWard(model.ward || 'Delhi Central');
+    setIsAddStockOpen(true);
+  };
+
+  const handleStockSubmit = async (e) => {
+    e.preventDefault();
+    if (!stockAdded || Number(stockAdded) <= 0) {
+      toast.error('Please enter a valid stock quantity');
+      return;
+    }
+    if (!stockWard.trim()) {
+      toast.error('Ward/Area is required');
+      return;
+    }
+    try {
+      setIsStockSubmitting(true);
+      await api.post(`/api/models/${selectedModel.id}/stock`, {
+        date: stockDate,
+        stock_added: Number(stockAdded),
+        ward_area: stockWard.trim(),
+      });
+      toast.success(`Successfully added ${stockAdded} stock to ${selectedModel.name}`);
+      setIsAddStockOpen(false);
+      fetchModels();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to add stock');
+    } finally {
+      setIsStockSubmitting(false);
+    }
   };
 
   const handleOpenAddModal = () => {
@@ -84,6 +124,7 @@ export default function ModelsPage() {
     setWard('Delhi Central');
     setTotalPrice('80000');
     setStockCount('5');
+    setInitialStockDate(new Date().toISOString().split('T')[0]);
     setIsAddModalOpen(true);
   };
 
@@ -110,6 +151,7 @@ export default function ModelsPage() {
       if (editingModelId) {
         res = await api.patch(`/api/models/${editingModelId}`, payload);
       } else {
+        payload.initial_stock_date = initialStockDate;
         res = await api.post('/api/models', payload);
       }
 
@@ -201,7 +243,16 @@ export default function ModelsPage() {
           <Button
             variant="ghost"
             size="sm"
-            icon={Edit2}
+            icon={PackagePlus}
+            title="Add Stock"
+            onClick={() => handleOpenAddStock(row)}
+            className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={Eye}
+            title="View Model"
             onClick={() => handleEditClick(row)}
             className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           />
@@ -209,6 +260,7 @@ export default function ModelsPage() {
             variant="ghost"
             size="sm"
             icon={row.is_active ? XCircle : CheckCircle}
+            title={row.is_active ? "Cancel Model" : "Reactivate Model"}
             onClick={() => handleToggleDeactivate(row)}
             className={row.is_active ? "text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300" : "text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"}
           />
@@ -345,6 +397,16 @@ export default function ModelsPage() {
             />
           </div>
 
+          {!editingModelId && Number(stockCount) > 0 && (
+            <Input
+              label="Initial Stock Date"
+              type="date"
+              value={initialStockDate}
+              onChange={(e) => setInitialStockDate(e.target.value)}
+              required
+            />
+          )}
+
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
             <Button
               variant="outline"
@@ -360,6 +422,58 @@ export default function ModelsPage() {
               loading={isSubmitting}
             >
               {editingModelId ? 'Update Model' : 'Save Model'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add Stock Modal */}
+      <Modal
+        isOpen={isAddStockOpen}
+        onClose={() => setIsAddStockOpen(false)}
+        title={`Add Stock to ${selectedModel?.name}`}
+        subtitle="Log new incoming stock for this EV model"
+      >
+        <form onSubmit={handleStockSubmit} className="space-y-4">
+          <Input
+            label="Date Received"
+            type="date"
+            value={stockDate}
+            onChange={(e) => setStockDate(e.target.value)}
+            required
+          />
+          <Input
+            label="Quantity Added"
+            type="number"
+            min={1}
+            placeholder="e.g. 5"
+            value={stockAdded}
+            onChange={(e) => setStockAdded(e.target.value)}
+            required
+          />
+          <Input
+            label="Ward / Area"
+            placeholder="e.g. Okhla Depot"
+            value={stockWard}
+            onChange={(e) => setStockWard(e.target.value)}
+            required
+          />
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button
+              variant="outline"
+              size="md"
+              type="button"
+              onClick={() => setIsAddStockOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              loading={isStockSubmitting}
+            >
+              Confirm Stock
             </Button>
           </div>
         </form>

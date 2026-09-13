@@ -1,4 +1,5 @@
 const supabase = require('../../config/db');
+const crypto = require('crypto');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
 const { buildSearchFilter } = require('../../utils/searchFilter');
 
@@ -46,10 +47,23 @@ class ModelsService {
   }
 
   async createModel(modelData, createdBy) {
+    const { initial_stock_date, ...restData } = modelData;
+    
+    let initialLogs = [];
+    if (restData.stock_count > 0 && initial_stock_date) {
+      initialLogs = [{
+        id: crypto.randomUUID(),
+        date: initial_stock_date,
+        stock_added: restData.stock_count,
+        ward_area: restData.ward,
+      }];
+    }
+
     const { data, error } = await supabase
       .from('ev_models')
       .insert([{
-        ...modelData,
+        ...restData,
+        stock_logs: initialLogs,
         created_by: createdBy
       }])
       .select('*')
@@ -83,6 +97,54 @@ class ModelsService {
     const { data, error } = await supabase
       .from('ev_models')
       .update(updates)
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async getModelById(id) {
+    const { data, error } = await supabase
+      .from('ev_models')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    if (!data) throw new Error('Model not found');
+    return data;
+  }
+
+  async addStock(id, payload) {
+    const { date, stock_added, ward_area } = payload;
+    
+    const { data: model, error: fetchError } = await supabase
+      .from('ev_models')
+      .select('stock_count, stock_logs')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) throw fetchError;
+    if (!model) throw new Error('Model not found');
+
+    const newLog = {
+      id: crypto.randomUUID(),
+      date,
+      stock_added,
+      ward_area,
+    };
+    
+    const updatedLogs = [...(model.stock_logs || []), newLog];
+    const newCount = (model.stock_count || 0) + stock_added;
+
+    const { data, error } = await supabase
+      .from('ev_models')
+      .update({ 
+        stock_count: newCount,
+        stock_logs: updatedLogs
+      })
       .eq('id', id)
       .select('*')
       .single();

@@ -14,6 +14,20 @@ const createModelSchema = z.object({
   ward: z.string().min(1),
   total_price: z.number().positive(),
   stock_count: z.number().min(0).default(0),
+  initial_stock_date: z.string().optional(),
+});
+
+const stockLogSchema = z.object({
+  id: z.string().uuid(),
+  date: z.string(),
+  stock_added: z.number(),
+  ward_area: z.string()
+});
+
+const addStockSchema = z.object({
+  date: z.string(),
+  stock_added: z.number().int().positive(),
+  ward_area: z.string().min(1)
 });
 
 const updateModelSchema = z.object({
@@ -23,6 +37,7 @@ const updateModelSchema = z.object({
   total_price: z.number().positive().optional(),
   stock_count: z.number().min(0).optional(),
   is_active: z.boolean().optional(),
+  stock_logs: z.array(stockLogSchema).optional(),
 });
 
 const validateBody = (schema) => (req, res, next) => {
@@ -64,6 +79,26 @@ router.get('/dropdown', modelsController.getAllForDropdown.bind(modelsController
  *         description: Paginated list of models
  */
 router.get('/', modelsController.getAll.bind(modelsController));
+
+/**
+ * @openapi
+ * /api/models/{id}:
+ *   get:
+ *     summary: Get single EV model
+ *     tags: [Models]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Model details
+ */
+router.get('/:id', modelsController.getById.bind(modelsController));
 
 
 /**
@@ -136,6 +171,42 @@ router.patch(
   validateBody(updateModelSchema), 
   requestLogger('ev_models', 'UPDATE_MODEL'), 
   modelsController.update.bind(modelsController)
+);
+
+/**
+ * @openapi
+ * /api/models/{id}/stock:
+ *   post:
+ *     summary: Add stock to EV model
+ *     tags: [Models]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [date, stock_added, ward_area]
+ *             properties:
+ *               date: { type: string }
+ *               stock_added: { type: integer }
+ *               ward_area: { type: string }
+ *     responses:
+ *       200:
+ *         description: Stock added
+ */
+router.post(
+  '/:id/stock',
+  validateBody(addStockSchema),
+  requestLogger('ev_models', 'ADD_STOCK'),
+  modelsController.addStock.bind(modelsController)
 );
 
 module.exports = router;
