@@ -432,7 +432,7 @@ export default function NewPurchaseWizardPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {models.map((m) => {
+                {models.filter(m => m.is_active || formData.ev_model_id === m.id).map((m) => {
                   const selected = formData.ev_model_id === m.id;
                   const inStock = (m.stock_count || 0) > 0;
 

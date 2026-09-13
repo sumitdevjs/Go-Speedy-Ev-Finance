@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Bike, Plus, AlertCircle, Edit2 } from 'lucide-react';
+import { Bike, Plus, AlertCircle, Edit2, XCircle, CheckCircle } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
 import Button from '../../../components/ui/Button';
@@ -14,12 +14,15 @@ import SearchBar from '../../../components/ui/SearchBar';
 import api from '../../../lib/api';
 import { formatCurrency, formatDate } from '../../../lib/constants';
 import { staggerFadeIn } from '../../../lib/gsap';
+import { toast } from '../../../lib/toast';
+import { confirmDialog } from '../../../lib/confirmDialog';
 
 export default function ModelsPage() {
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [stockStatus, setStockStatus] = useState('');
+  const [activeFilter, setActiveFilter] = useState('true');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -37,7 +40,7 @@ export default function ModelsPage() {
 
   useEffect(() => {
     fetchModels();
-  }, [search, stockStatus, page]);
+  }, [search, stockStatus, activeFilter, page]);
 
   // One-time entrance animation for the filter bar
   useEffect(() => {
@@ -50,6 +53,7 @@ export default function ModelsPage() {
       let query = `/api/models?page=${page}&limit=15`;
       if (search) query += `&search=${encodeURIComponent(search)}`;
       if (stockStatus) query += `&stockStatus=${encodeURIComponent(stockStatus)}`;
+      if (activeFilter !== '') query += `&is_active=${activeFilter}`;
       const res = await api.get(query);
       if (res.data?.success) {
         setModels(res.data.data || []);
@@ -123,6 +127,28 @@ export default function ModelsPage() {
     }
   };
 
+  const handleToggleDeactivate = async (model) => {
+    const action = model.is_active ? 'cancel/deactivate' : 'reactivate';
+    const ok = await confirmDialog({
+      title: `${action === 'cancel/deactivate' ? 'Cancel' : 'Reactivate'} Model: ${model.name}?`,
+      message:
+        action === 'cancel/deactivate'
+          ? 'This will prevent new rentals for this EV model. Existing rentals are unaffected.'
+          : 'This will allow new rentals for this EV model.',
+      tone: action === 'cancel/deactivate' ? 'danger' : 'default',
+      confirmLabel: action === 'cancel/deactivate' ? 'Cancel Model' : 'Reactivate',
+    });
+    if (!ok) return;
+
+    try {
+      await api.patch(`/api/models/${model.id}`, { is_active: !model.is_active });
+      toast.success(`${model.name} successfully ${action === 'cancel/deactivate' ? 'cancelled' : 'reactivated'}.`);
+      fetchModels();
+    } catch (err) {
+      toast.error(err.response?.data?.message || `Failed to ${action} model`);
+    }
+  };
+
   const columns = [
     {
       header: 'Model Name',
@@ -171,13 +197,22 @@ export default function ModelsPage() {
       header: 'Actions',
       key: 'actions',
       render: (row) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={Edit2}
-          onClick={() => handleEditClick(row)}
-          className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-        />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={Edit2}
+            onClick={() => handleEditClick(row)}
+            className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={row.is_active ? XCircle : CheckCircle}
+            onClick={() => handleToggleDeactivate(row)}
+            className={row.is_active ? "text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300" : "text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"}
+          />
+        </div>
       ),
     },
   ];
@@ -219,6 +254,16 @@ export default function ModelsPage() {
                 { value: '', label: 'All Stock Status' },
                 { value: 'in_stock', label: 'In Stock' },
                 { value: 'out_of_stock', label: 'Out of Stock' },
+              ]}
+              className="w-full sm:w-48"
+            />
+            <Select
+              value={activeFilter}
+              onChange={(e) => { setActiveFilter(e.target.value); setPage(1); }}
+              options={[
+                { value: 'true', label: 'Active Models' },
+                { value: 'false', label: 'Cancelled Models' },
+                { value: '', label: 'All Models' },
               ]}
               className="w-full sm:w-48"
             />

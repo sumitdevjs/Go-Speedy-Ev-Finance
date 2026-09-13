@@ -362,7 +362,7 @@ export default function BookingsPage() {
             value={modelId}
             onChange={(e) => setModelId(e.target.value)}
             options={[
-              ...models.map((m) => ({
+              ...models.filter(m => m.is_active).map((m) => ({
                 value: m.id,
                 label: `${m.name} (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
               })),
@@ -441,7 +441,7 @@ export default function BookingsPage() {
             value={editData.modelId}
             onChange={(e) => setEditData({ ...editData, modelId: e.target.value })}
             options={[
-              ...models.map((m) => ({
+              ...models.filter(m => m.is_active || editData.modelId === m.id).map((m) => ({
                 value: m.id,
                 label: `${m.name} (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
               })),

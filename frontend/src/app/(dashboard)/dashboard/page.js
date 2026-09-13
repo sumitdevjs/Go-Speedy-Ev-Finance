@@ -58,7 +58,7 @@ function AdminDashboard() {
       // Fetch Models for stock
       const modelsRes = await api.get('/api/models/dropdown');
       const models = modelsRes.data?.data || [];
-      const totalStock = models.reduce((sum, m) => sum + (m.stock_count || 0), 0);
+      const totalStock = models.filter(m => m.is_active).reduce((sum, m) => sum + (m.stock_count || 0), 0);
 
       // Fetch Rentals (Active/Cancelled)
       const rentalsRes = await api.get('/api/rentals?limit=10000');

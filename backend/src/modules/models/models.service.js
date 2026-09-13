@@ -21,6 +21,10 @@ class ModelsService {
       queryBuilder = queryBuilder.eq('stock_count', 0);
     }
 
+    if (query.is_active !== undefined) {
+      queryBuilder = queryBuilder.eq('is_active', query.is_active === 'true');
+    }
+
     const { data, count, error } = await queryBuilder
       .range(offset, offset + limit - 1);
 
@@ -34,7 +38,7 @@ class ModelsService {
   async getAllModelsForDropdown() {
     const { data, error } = await supabase
       .from('ev_models')
-      .select('id, name, company, total_price, stock_count')
+      .select('id, name, company, total_price, stock_count, is_active')
       .order('name', { ascending: true });
 
     if (error) throw error;
