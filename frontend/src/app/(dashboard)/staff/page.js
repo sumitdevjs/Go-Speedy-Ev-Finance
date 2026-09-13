@@ -200,9 +200,9 @@ export default function StaffPage() {
 
     try {
       if (staffMember.is_active) {
-        await api.patch(`/api/staff/${staffMember.id}/deactivate`);
+        await api.patch(`/api/staff/${staffMember.id}/deactivate`, { is_active: false });
       } else {
-        await api.patch(`/api/staff/${staffMember.id}`, { is_active: true });
+        await api.patch(`/api/staff/${staffMember.id}/deactivate`, { is_active: true });
       }
       toast.success(`${staffMember.name} ${action === 'deactivate' ? 'deactivated' : 'activated'}.`);
       fetchStaff();
