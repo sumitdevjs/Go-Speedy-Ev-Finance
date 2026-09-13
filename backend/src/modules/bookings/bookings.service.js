@@ -40,6 +40,17 @@ class BookingsService {
   }
 
   async convertBooking(id, tenantData, createdBy) {
+    // Sanitize empty strings to undefined so they are not inserted as "" into numeric/date DB columns
+    Object.keys(tenantData).forEach(key => {
+      if (tenantData[key] === '') {
+        delete tenantData[key];
+      }
+    });
+
+    // Remove fields not in DB schema to prevent PostgREST errors
+    delete tenantData.include_gst;
+    delete tenantData.gst_percent;
+
     // 1. Fetch Booking
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
@@ -81,7 +92,7 @@ class BookingsService {
     try {
       // 4. Create Rental
       const startDate = tenantData.start_date ? new Date(tenantData.start_date) : new Date();
-      const totalMonths = tenantData.total_months || 24;
+      const totalMonths = Number(tenantData.total_months) || 24;
       const expectedEndDate = new Date(startDate);
       expectedEndDate.setMonth(expectedEndDate.getMonth() + totalMonths);
 
@@ -105,7 +116,7 @@ class BookingsService {
       // 5. Update Booking Status
       await supabase
         .from('bookings')
-        .update({ status: 'converted', converted_to: tenant.id })
+        .update({ status: 'converted', converted_to: tenant.id, converted_type: tenantData.status === 'direct_purchase' ? 'direct_purchase' : 'rental' })
         .eq('id', id);
 
       return tenant;
@@ -116,7 +127,10 @@ class BookingsService {
         .update({ stock_count: model.stock_count })
         .eq('id', tenantData.ev_model_id);
         
-      if (error.code === '23505') throw new Error(`Unique constraint violation: ${error.details || error.message}`);
+      if (error.code === '23505') {
+        console.error('[convertBooking] Unique constraint violation:', error);
+        throw new Error('Unique constraint violation: a record with this value already exists.');
+      }
       throw error;
     }
   }

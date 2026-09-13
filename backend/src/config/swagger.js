@@ -44,8 +44,8 @@ const options = {
     ],
   },
   apis: [
-    path.join(__dirname, '../modules/**/*.routes.js'),
-    path.join(__dirname, '../modules/**/*.controller.js')
+    path.join(__dirname, '../modules/**/*.routes.js').replace(/\\/g, '/'),
+    path.join(__dirname, '../modules/**/*.controller.js').replace(/\\/g, '/')
   ],
 };
 

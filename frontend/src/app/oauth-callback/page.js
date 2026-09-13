@@ -4,24 +4,32 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../lib/api';
+import BrandLogo from '../../components/ui/BrandLogo';
 import { Zap } from 'lucide-react';
+
+// Module-level so it survives React StrictMode's dev-only mount/unmount/
+// remount, which would otherwise POST the same one-time OAuth code twice.
+const exchangedCodes = new Set();
 
 /**
  * /oauth-callback
- * 
- * The Google OAuth flow lands here after the backend sets auth cookies.
- * This page syncs session cookies onto the frontend domain if needed,
- * calls /api/auth/me to populate the auth store, then redirects to the dashboard.
+ *
+ * After Google OAuth completes, the backend redirects here with a short-lived
+ * one-time ?code= parameter. This page exchanges that code by POSTing to
+ * /api/auth/oauth/exchange (through the Next.js proxy). Because this is a
+ * same-origin AJAX call, the browser accepts the Set-Cookie headers from the
+ * backend — solving the cross-domain cookie problem in production.
  */
 export default function OAuthCallbackPage() {
   const router = useRouter();
-  const { checkAuth } = useAuthStore();
+  const { checkAuth, setUser } = useAuthStore();
   const [status, setStatus] = useState('Completing sign-in…');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Check for error param in URL (e.g. user denied consent or deactivated)
     const params = new URLSearchParams(window.location.search);
+
+    // Handle error redirects from the backend
     const errCode = params.get('error');
     if (errCode === 'not_registered') {
       setStatus('');
@@ -42,27 +50,21 @@ export default function OAuthCallbackPage() {
       return;
     }
 
-    // Verify session via cookies or synced tokens
+    const code = params.get('code');
+
     const verify = async () => {
       try {
-        const token = params.get('token');
-        const refreshToken = params.get('refreshToken');
-        const userId = params.get('userId');
-
-        if (token && userId) {
-          try {
-            await api.post('/api/auth/sync-session', {
-              accessToken: token,
-              refreshToken,
-              userId,
-            });
-            // Clean tokens from URL query for security
-            window.history.replaceState({}, document.title, window.location.pathname);
-          } catch (syncErr) {
-            console.warn('Session sync error:', syncErr);
-          }
+        if (code && !exchangedCodes.has(code)) {
+          exchangedCodes.add(code);
+          // Exchange the one-time code for auth cookies.
+          // This AJAX call goes through the Next.js proxy (/api → backend),
+          // so cookies are set on the frontend's domain — not the backend's.
+          await api.post('/api/auth/oauth/exchange', { code });
+          // Clean the code from the URL bar
+          window.history.replaceState({}, document.title, window.location.pathname);
         }
 
+        // Now call /api/auth/me to populate the auth store (cookies are set)
         const user = await checkAuth();
         if (user) {
           setStatus('Welcome, ' + (user.name || 'User') + '! Redirecting…');
@@ -70,11 +72,17 @@ export default function OAuthCallbackPage() {
             window.location.href = '/dashboard';
           }, 600);
         } else {
-          throw new Error('No user session found');
+          throw new Error('No user session found after exchange');
         }
-      } catch {
+      } catch (err) {
+        console.error('OAuth exchange failed:', err);
         setStatus('');
-        setError('Authentication failed. Redirecting to login…');
+        const msg = err?.response?.data?.message || '';
+        if (msg.includes('expired') || msg.includes('Invalid')) {
+          setError('Sign-in link expired. Please try signing in again.');
+        } else {
+          setError('Authentication failed. Redirecting to login…');
+        }
         setTimeout(() => router.replace('/'), 2500);
       }
     };
@@ -85,18 +93,8 @@ export default function OAuthCallbackPage() {
   return (
     <div className="fixed inset-0 bg-[#070c18] flex flex-col items-center justify-center text-white select-none">
       {/* Logo */}
-      <div className="flex items-center gap-3 mb-10">
-        <div className="w-12 h-12 flex items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 shadow-lg shadow-emerald-500/30">
-          <Zap className="h-6 w-6 fill-white text-white" />
-        </div>
-        <div className="flex flex-col">
-          <span className="text-2xl font-black tracking-tight uppercase leading-none">
-            Go<span className="text-emerald-400">Speedy</span>
-          </span>
-          <span className="text-[9px] font-bold text-slate-400 tracking-[0.22em] uppercase mt-0.5">
-            EV Fleet Finance
-          </span>
-        </div>
+      <div className="flex items-center justify-center mb-10">
+        <BrandLogo size="lg" theme="dark" showText={true} />
       </div>
 
       {/* Spinner */}

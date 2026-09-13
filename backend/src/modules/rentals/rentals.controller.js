@@ -77,6 +77,16 @@ class RentalsController {
       return errorResponse(res, 500, 'Internal Server Error');
     }
   }
+
+  async checkUniqueness(req, res) {
+    try {
+      const data = await rentalsService.checkUniqueHardwareOrPolicy(req.query);
+      return successResponse(res, 200, data, 'Uniqueness check completed');
+    } catch (error) {
+      console.error(error);
+      return errorResponse(res, 500, 'Internal Server Error');
+    }
+  }
 }
 
 module.exports = new RentalsController();

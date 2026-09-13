@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   oauth_id                 TEXT,                         -- Google profile ID
   role                     TEXT NOT NULL
                              CHECK (role IN ('admin', 'staff')),
+  ward_area                TEXT,
   is_active                BOOLEAN NOT NULL DEFAULT true,
   refresh_token_hash       TEXT,                         -- bcrypt hash; NULL = logged out
   refresh_token_expires_at TIMESTAMPTZ,
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS ev_models (
   ward         TEXT NOT NULL,
   total_price  NUMERIC(12,2) NOT NULL CHECK (total_price > 0),
   stock_count  INTEGER NOT NULL DEFAULT 0 CHECK (stock_count >= 0),
+  stock_logs   JSONB NOT NULL DEFAULT '[]',
   is_active    BOOLEAN NOT NULL DEFAULT true,
   created_by   UUID REFERENCES users(id),
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -67,14 +69,17 @@ CREATE TABLE IF NOT EXISTS tenants (
   electricity_bill_path TEXT,
   tenant_photo_path     TEXT,
   scooty_photo_path     TEXT,
+  rent_agreement_path   TEXT,
+  scooty_insurance_path TEXT,
+  rider_insurance_path  TEXT,
+  rider_license_path    TEXT,
 
   -- Scooty hardware
   chassis_no    TEXT,
   motor_ctrl_no TEXT,
   battery_no    TEXT,
   rto_type      TEXT CHECK (rto_type IS NULL OR rto_type IN ('rto','non_rto')),
-  hp_financer   TEXT CHECK (hp_financer IS NULL OR
-                            hp_financer IN ('go_speedy','swastik_finance')),
+  hp_financer   TEXT,
   date_of_purchase DATE,
   date_of_delivery DATE,
 
@@ -109,6 +114,35 @@ CREATE TABLE IF NOT EXISTS tenants (
   created_by   UUID REFERENCES users(id),
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  notes        TEXT,
+
+  -- Hardware
+  vehicle_number           TEXT,
+
+  -- Insurance
+  scooty_insurance_company TEXT,
+  scooty_policy_number     TEXT,
+  scooty_policy_expiry     DATE,
+  scooty_insurance_amount  NUMERIC(12,2),
+  scooty_insurance_idv     NUMERIC(12,2),
+  scooty_insurance_start   DATE,
+  rider_insurance_company  TEXT,
+  rider_policy_number      TEXT,
+  rider_policy_expiry      DATE,
+  rider_insurance_amount   NUMERIC(12,2),
+  rider_insurance_idv      NUMERIC(12,2),
+  rider_insurance_start    DATE,
+
+  -- AMC (Annual Maintenance Contract)
+  amc_amount               NUMERIC(12,2),
+  amc_start_date           DATE,
+  amc_expire_date          DATE,
+  amc_service_log          JSONB NOT NULL DEFAULT '[]',
+  -- Each entry: { date, what_change, old_serial_no, new_serial_no, cost }
+  amc_doc_path             TEXT,
+
+  -- Buyback / Early Exit
+  buyback_amount           NUMERIC(12,2),
 
   -- Financial sanity checks
   CONSTRAINT chk_booking_lte_price
@@ -162,6 +196,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   status          TEXT NOT NULL DEFAULT 'pending'
                     CHECK (status IN ('pending','converted','cancelled')),
   converted_to    UUID REFERENCES tenants(id),
+  converted_type  TEXT CHECK (converted_type IS NULL OR converted_type IN ('rental', 'direct_purchase')),
   created_by      UUID NOT NULL REFERENCES users(id),
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()

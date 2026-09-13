@@ -25,13 +25,14 @@ export default function RentalsListPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [showCancelled, setShowCancelled] = useState(false);
   const [overdueFilter, setOverdueFilter] = useState(searchParams.get('overdue_days') || '');
+  const [insuranceFilter, setInsuranceFilter] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
 
   useEffect(() => {
     fetchRentals();
-  }, [search, statusFilter, overdueFilter, page, showCancelled]);
+  }, [search, statusFilter, overdueFilter, insuranceFilter, page, showCancelled]);
 
   // One-time entrance for the header/filter chrome when the page first mounts.
   useEffect(() => {
@@ -41,14 +42,18 @@ export default function RentalsListPage() {
   const fetchRentals = async () => {
     try {
       setLoading(true);
-      let query = `/api/rentals?page=${page}&limit=15`;
+      let query = `/api/rentals?page=${page}&limit=15&_t=${Date.now()}`;
       if (search) query += `&search=${encodeURIComponent(search)}`;
       if (showCancelled) {
         query += `&status=cancelled`;
-      } else if (statusFilter) {
-        query += `&status=${statusFilter}`;
+      }
+      if (statusFilter === 'pending_docs') {
+        query += `&has_pending_docs=true`;
+      } else if (statusFilter === 'completed_docs') {
+        query += `&has_pending_docs=false`;
       }
       if (overdueFilter) query += `&overdue_days=${overdueFilter}`;
+      if (insuranceFilter) query += `&insurance_status=${insuranceFilter}`;
 
       const res = await api.get(query);
       if (res.data?.success) {
@@ -166,7 +171,7 @@ export default function RentalsListPage() {
       render: (row) => (
         <Link href={`/rentals/${row.id}`}>
           <Button variant="outline" size="sm">
-            View / Pay <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            {row.status === 'cancelled' ? 'View' : 'View / Pay'} <ArrowRight className="w-3.5 h-3.5 ml-1" />
           </Button>
         </Link>
       ),
@@ -213,19 +218,33 @@ export default function RentalsListPage() {
               {showCancelled ? 'Show Active Rentals' : 'Show Cancelled'}
             </Button>
 
-            {!showCancelled && (
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full md:w-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
-              >
-                <option value="" className="dark:bg-slate-900">All Active Statuses</option>
-                <option value="rented" className="dark:bg-slate-900">Active Rented</option>
-              </select>
-            )}
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              className="w-full md:w-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
+            >
+              <option value="" className="dark:bg-slate-900">All Document Statuses</option>
+              <option value="pending_docs" className="dark:bg-slate-900">Pending Documents</option>
+              <option value="completed_docs" className="dark:bg-slate-900">Completed Documents</option>
+            </select>
+
+            <select
+              value={insuranceFilter}
+              onChange={(e) => {
+                setInsuranceFilter(e.target.value);
+                setPage(1);
+              }}
+              className="w-full md:w-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
+            >
+              <option value="" className="dark:bg-slate-900">All Insurance</option>
+              <option value="scooty_expired" className="dark:bg-slate-900">Scooty Ins. Expired</option>
+              <option value="scooty_not_expired" className="dark:bg-slate-900">Scooty Ins. Not Expired</option>
+              <option value="rider_expired" className="dark:bg-slate-900">Rider Ins. Expired</option>
+              <option value="rider_not_expired" className="dark:bg-slate-900">Rider Ins. Not Expired</option>
+            </select>
 
             <select
               value={overdueFilter}

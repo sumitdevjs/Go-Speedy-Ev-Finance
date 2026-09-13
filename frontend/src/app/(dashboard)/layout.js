@@ -24,7 +24,7 @@ export default function DashboardLayout({ children }) {
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
           />
-          <div className="lg:pl-64 flex flex-col min-h-screen min-w-0">
+          <div className="lg:pl-64 flex flex-col min-h-screen min-w-0 overflow-x-hidden">
             <main className="flex-1 flex flex-col min-w-0 w-full">
               {children}
             </main>

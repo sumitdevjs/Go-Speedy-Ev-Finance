@@ -1,5 +1,6 @@
 const supabase = require('../../config/db');
 const crypto = require('crypto');
+const { detectFileType } = require('../../utils/fileSignature');
 
 const BUCKET_NAME = 'ev-documents';
 const SIGNED_URL_EXPIRY = 900; // 15 minutes
@@ -8,7 +9,7 @@ class DocumentsService {
   async getDocumentsForTenant(tenantId) {
     const { data: tenant, error: fetchError } = await supabase
       .from('tenants')
-      .select('aadhar_path, pan_path, cheque_path, electricity_bill_path, tenant_photo_path, scooty_photo_path')
+      .select('aadhar_path, pan_path, cheque_path, electricity_bill_path, tenant_photo_path, scooty_photo_path, rent_agreement_path, scooty_insurance_path, rider_insurance_path, rider_license_path, invoice_doc_path, amc_doc_path')
       .eq('id', tenantId)
       .single();
 
@@ -33,11 +34,17 @@ class DocumentsService {
   }
 
   async uploadDocument(tenantId, docType, fileBuffer, fileMimetype) {
-    // Determine extension based on mimetype
+    // Content-Type is client-supplied and can't be trusted — verify by magic
+    // bytes instead, and derive the extension/content-type from that.
+    const verifiedType = detectFileType(fileBuffer);
+    if (!verifiedType) {
+      throw new Error('File content does not match an allowed format (JPEG, PNG, WEBP, or PDF).');
+    }
+
     let ext = 'webp';
-    if (fileMimetype.includes('jpeg') || fileMimetype.includes('jpg')) ext = 'jpg';
-    else if (fileMimetype.includes('png')) ext = 'png';
-    else if (fileMimetype.includes('pdf')) ext = 'pdf'; // if allowed
+    if (verifiedType === 'image/jpeg') ext = 'jpg';
+    else if (verifiedType === 'image/png') ext = 'png';
+    else if (verifiedType === 'application/pdf') ext = 'pdf';
 
     const filename = `${crypto.randomUUID()}.${ext}`;
 
@@ -59,11 +66,14 @@ class DocumentsService {
       .storage
       .from(BUCKET_NAME)
       .upload(filename, fileBuffer, {
-        contentType: fileMimetype,
+        contentType: verifiedType,
         upsert: true
       });
 
-    if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+    if (uploadError) {
+      console.error('[documents] Upload failed:', uploadError);
+      throw new Error('Upload failed. Please try again.');
+    }
 
     const newPath = uploadData.path;
 

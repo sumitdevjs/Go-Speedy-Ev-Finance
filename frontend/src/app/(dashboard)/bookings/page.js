@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { CalendarCheck, Plus, ArrowRight, XCircle, AlertCircle, Edit } from 'lucide-react';
+import { CalendarCheck, Plus, ArrowRight, XCircle, AlertCircle, Edit, Phone, ChevronDown, Home, ShoppingBag } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
 import Button from '../../../components/ui/Button';
@@ -44,6 +44,7 @@ export default function BookingsPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editData, setEditData] = useState({ id: '', name: '', phone: '', booking_amount: '', notes: '', modelId: '', customModel: '' });
   const [isEditing, setIsEditing] = useState(false);
+  const [showConvertMenu, setShowConvertMenu] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -62,7 +63,7 @@ export default function BookingsPage() {
 
       const [bookingsRes, modelsRes] = await Promise.all([
         api.get(bookingsQuery),
-        api.get('/api/models'),
+        api.get('/api/models/dropdown'),
       ]);
 
       if (bookingsRes.data?.success) {
@@ -86,6 +87,11 @@ export default function BookingsPage() {
 
     if (!name.trim() || !phone.trim()) {
       setError('Name and phone number are required');
+      return;
+    }
+
+    if (!/^\d{10}$/.test(phone.trim())) {
+      setError('Phone number must be exactly 10 digits');
       return;
     }
 
@@ -134,6 +140,14 @@ export default function BookingsPage() {
 
   const handleEditBooking = async (e) => {
     e.preventDefault();
+    if (!editData.name?.trim() || !editData.phone?.trim()) {
+      toast.error('Name and phone number are required');
+      return;
+    }
+    if (!/^\d{10}$/.test(editData.phone.trim())) {
+      toast.error('Phone number must be exactly 10 digits');
+      return;
+    }
     try {
       setIsEditing(true);
       const res = await api.patch(`/api/bookings/${editData.id}`, {
@@ -163,7 +177,9 @@ export default function BookingsPage() {
       render: (row) => (
         <div>
           <p className="font-bold text-slate-900 dark:text-white">{row.name}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{row.phone}</p>
+          <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+            <Phone className="h-3 w-3" /> {row.phone}
+          </span>
         </div>
       ),
     },
@@ -205,17 +221,33 @@ export default function BookingsPage() {
         if (row.status === 'pending') {
           return (
             <div className="flex items-center gap-2">
-              <Link
-                href={`/rentals/new?booking_id=${row.id}&name=${encodeURIComponent(
-                  row.name
-                )}&phone=${encodeURIComponent(row.phone)}&model_id=${row.ev_model_id || ''}&amount=${
-                  row.booking_amount || 0
-                }`}
-              >
-                <Button variant="primary" size="sm">
-                  Convert <ArrowRight className="w-3.5 h-3.5 ml-1" />
+              <div className="relative">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setShowConvertMenu(showConvertMenu === row.id ? null : row.id)}
+                >
+                  Convert <ChevronDown className="w-3.5 h-3.5 ml-1" />
                 </Button>
-              </Link>
+                {showConvertMenu === row.id && (
+                  <div className="absolute right-0 md:left-0 top-full mt-1 w-48 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg py-1 z-10 flex flex-col">
+                    <Link
+                      href={`/rentals/new?booking_id=${row.id}&name=${encodeURIComponent(row.name)}&phone=${encodeURIComponent(row.phone)}&model_id=${row.ev_model_id || ''}&amount=${row.booking_amount || 0}`}
+                      className="px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2 transition-colors"
+                      onClick={() => setShowConvertMenu(null)}
+                    >
+                      <Home className="w-4 h-4 text-blue-600" /> Convert to Rental
+                    </Link>
+                    <Link
+                      href={`/purchases/new?booking_id=${row.id}&name=${encodeURIComponent(row.name)}&phone=${encodeURIComponent(row.phone)}&model_id=${row.ev_model_id || ''}&amount=${row.booking_amount || 0}`}
+                      className="px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2 transition-colors"
+                      onClick={() => setShowConvertMenu(null)}
+                    >
+                      <ShoppingBag className="w-4 h-4 text-emerald-600" /> Direct Purchase
+                    </Link>
+                  </div>
+                )}
+              </div>
               <Button
                 variant="outline"
                 size="sm"
@@ -314,7 +346,7 @@ export default function BookingsPage() {
         title="Record Walk-in Booking"
         subtitle="Collect advance token and reserve an EV model for a customer"
       >
-        <form onSubmit={handleCreateBooking} className="space-y-4">
+        <form onSubmit={handleCreateBooking} className="space-y-4" autoComplete="off">
           {error && (
             <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -334,7 +366,9 @@ export default function BookingsPage() {
             label="Contact Phone Number"
             placeholder="10-digit mobile number"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+            maxLength={10}
+            inputMode="numeric"
             required
           />
 
@@ -343,7 +377,7 @@ export default function BookingsPage() {
             value={modelId}
             onChange={(e) => setModelId(e.target.value)}
             options={[
-              ...models.map((m) => ({
+              ...models.filter(m => m.is_active).map((m) => ({
                 value: m.id,
                 label: `${m.name} (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
               })),
@@ -404,7 +438,7 @@ export default function BookingsPage() {
         onClose={() => setIsEditModalOpen(false)}
         title="Edit Walk-in Booking"
       >
-        <form onSubmit={handleEditBooking} className="space-y-4">
+        <form onSubmit={handleEditBooking} className="space-y-4" autoComplete="off">
           <Input
             label="Customer Full Name"
             value={editData.name}
@@ -413,8 +447,11 @@ export default function BookingsPage() {
           />
           <Input
             label="Contact Phone Number"
+            placeholder="10-digit mobile number"
             value={editData.phone}
-            onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+            onChange={(e) => setEditData({ ...editData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+            maxLength={10}
+            inputMode="numeric"
             required
           />
           <Select
@@ -422,7 +459,7 @@ export default function BookingsPage() {
             value={editData.modelId}
             onChange={(e) => setEditData({ ...editData, modelId: e.target.value })}
             options={[
-              ...models.map((m) => ({
+              ...models.filter(m => m.is_active || editData.modelId === m.id).map((m) => ({
                 value: m.id,
                 label: `${m.name} (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
               })),

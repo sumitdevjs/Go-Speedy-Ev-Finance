@@ -13,7 +13,7 @@ export default function Header({ title, subtitle, action }) {
   const { toggle } = useSidebar();
 
   return (
-    <header className="h-14 md:h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 md:px-8 flex items-center justify-between sticky top-0 z-30 gap-3 transition-colors">
+    <header className="h-[76px] bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 gap-3 transition-colors">
       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
         {/* Hamburger Menu Toggle — only on mobile */}
         <button

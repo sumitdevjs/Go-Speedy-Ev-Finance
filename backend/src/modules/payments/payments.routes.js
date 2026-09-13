@@ -12,7 +12,8 @@ const recordPaymentSchema = z.object({
   amount: z.number().positive(),
   payment_date: z.string(), // YYYY-MM-DD
   mode: z.enum(['cash', 'online']),
-  notes: z.string().nullable().optional()
+  notes: z.string().nullable().optional(),
+  gst_amount: z.number().min(0).optional()
 });
 
 const validateBody = (schema) => (req, res, next) => {

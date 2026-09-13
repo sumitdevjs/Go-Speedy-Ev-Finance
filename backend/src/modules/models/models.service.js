@@ -1,21 +1,69 @@
 const supabase = require('../../config/db');
+const crypto = require('crypto');
+const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
+const { buildSearchFilter } = require('../../utils/searchFilter');
 
 class ModelsService {
-  async getAllModels() {
+  async getAllModels(query = {}) {
+    const { page, limit, offset } = getPaginationOptions(query);
+
+    let queryBuilder = supabase
+      .from('ev_models')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false });
+
+    if (query.search) {
+      queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'company', 'ward'], query.search));
+    }
+
+    if (query.stockStatus === 'in_stock') {
+      queryBuilder = queryBuilder.gt('stock_count', 0);
+    } else if (query.stockStatus === 'out_of_stock') {
+      queryBuilder = queryBuilder.eq('stock_count', 0);
+    }
+
+    if (query.is_active !== undefined) {
+      queryBuilder = queryBuilder.eq('is_active', query.is_active === 'true');
+    }
+
+    const { data, count, error } = await queryBuilder
+      .range(offset, offset + limit - 1);
+
+    if (error) throw error;
+
+    const meta = getPaginationMeta(count, page, limit);
+    return { data, meta };
+  }
+
+  // Lightweight list for dropdowns — returns all models without pagination
+  async getAllModelsForDropdown() {
     const { data, error } = await supabase
       .from('ev_models')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('id, name, company, total_price, stock_count, is_active')
+      .order('name', { ascending: true });
 
     if (error) throw error;
     return data;
   }
 
   async createModel(modelData, createdBy) {
+    const { initial_stock_date, ward, ...restData } = modelData;
+    
+    let initialLogs = [];
+    if (restData.stock_count > 0 && initial_stock_date) {
+      initialLogs = [{
+        id: crypto.randomUUID(),
+        date: initial_stock_date,
+        stock_added: restData.stock_count,
+        ward_area: ward || 'Delhi Central',
+      }];
+    }
+
     const { data, error } = await supabase
       .from('ev_models')
       .insert([{
-        ...modelData,
+        ...restData,
+        stock_logs: initialLogs,
         created_by: createdBy
       }])
       .select('*')
@@ -49,6 +97,54 @@ class ModelsService {
     const { data, error } = await supabase
       .from('ev_models')
       .update(updates)
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async getModelById(id) {
+    const { data, error } = await supabase
+      .from('ev_models')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    if (!data) throw new Error('Model not found');
+    return data;
+  }
+
+  async addStock(id, payload) {
+    const { date, stock_added, ward_area } = payload;
+    
+    const { data: model, error: fetchError } = await supabase
+      .from('ev_models')
+      .select('stock_count, stock_logs')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) throw fetchError;
+    if (!model) throw new Error('Model not found');
+
+    const newLog = {
+      id: crypto.randomUUID(),
+      date,
+      stock_added,
+      ward_area,
+    };
+    
+    const updatedLogs = [...(model.stock_logs || []), newLog];
+    const newCount = (model.stock_count || 0) + stock_added;
+
+    const { data, error } = await supabase
+      .from('ev_models')
+      .update({ 
+        stock_count: newCount,
+        stock_logs: updatedLogs
+      })
       .eq('id', id)
       .select('*')
       .single();

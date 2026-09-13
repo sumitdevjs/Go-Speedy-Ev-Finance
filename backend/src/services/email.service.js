@@ -8,22 +8,26 @@ class EmailService {
   }
 
   _initTransporter() {
-    if (env.SMTP_PASS) {
+    // EMAIL_FROM is required separately from SMTP_USER — for relays like
+    // Brevo, SMTP_USER is just the login credential, not a real sender
+    // identity, and using it as the From address gets spam-filtered.
+    if (env.SMTP_HOST && env.SMTP_PORT && env.SMTP_USER && env.SMTP_PASS && env.EMAIL_FROM) {
+      const port = parseInt(env.SMTP_PORT, 10);
       this.transporter = nodemailer.createTransport({
-        host: env.SMTP_HOST || 'smtp.gmail.com',
-        port: parseInt(env.SMTP_PORT || '465', 10),
-        secure: parseInt(env.SMTP_PORT || '465', 10) === 465,
+        host: env.SMTP_HOST,
+        port,
+        secure: port === 465,
         auth: {
-          user: env.SMTP_USER || 'gospeedy.admin@gmail.com',
+          user: env.SMTP_USER,
           pass: env.SMTP_PASS,
         },
         tls: {
           rejectUnauthorized: false,
         },
       });
-      console.log(`📧 EmailService initialized with sender: ${env.SMTP_USER || 'gospeedy.admin@gmail.com'}`);
+      console.log(`EmailService initialized — sending as: ${env.EMAIL_FROM}`);
     } else {
-      console.warn('⚠️  EmailService: SMTP_PASS not set in .env. Emails will be logged to console in Dev Mock mode.');
+      console.warn('EmailService: SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/EMAIL_FROM not fully set in .env. Emails will be logged to console in Dev Mock mode.');
     }
   }
 
@@ -34,7 +38,7 @@ class EmailService {
    * @param {string} userName - Name of the user
    */
   async sendOtpEmail(toEmail, otp, userName = 'User') {
-    const sender = process.env.EMAIL_FROM || `"GoSpeedy EV Fleet" <gospeedy.admin@gmail.com>`;
+    const sender = env.EMAIL_FROM ? `"GoSpeedy EV Fleet" <${env.EMAIL_FROM}>` : undefined;
     const subject = `${otp} is your GoSpeedy password reset code`;
 
     const htmlContent = `
@@ -113,7 +117,7 @@ class EmailService {
                 This is an automated notification from GoSpeedy EV Fleet Management Portal.
               </p>
               <p style="margin: 4px 0 0 0; font-size: 11px; color: #475569;">
-                Sent from: ${env.SMTP_USER || 'gospeedy.admin@gmail.com'}
+                Sent from: ${env.EMAIL_FROM || 'our support team'}
               </p>
             </td>
           </tr>
@@ -135,18 +139,17 @@ class EmailService {
           subject,
           html: htmlContent,
         });
-        console.log(`✅ [EmailService] OTP email delivered to ${toEmail} (MessageId: ${info.messageId})`);
+        console.log(`[EmailService] OTP email delivered to ${toEmail} (MessageId: ${info.messageId})`);
         return { success: true, messageId: info.messageId };
       } catch (err) {
-        console.error(`❌ [EmailService Error] Failed to send email to ${toEmail}:`, err.message);
-        throw new Error(`Email delivery failed: ${err.message}`);
+        console.error(`[EmailService Error] Failed to send email to ${toEmail}:`, err);
+        throw new Error('Failed to send verification email. Please try again later.');
       }
     } else {
-      // Dev mock fallback
       console.log(`\n=============================================================`);
-      console.log(`📨 [DEV MOCK EMAIL] To: ${toEmail}`);
-      console.log(`🔐 [RESET OTP CODE]: >>> ${otp} <<< (Valid for 10 minutes)`);
-      console.log(`💡 Configure SMTP_PASS in backend/.env to send real Gmail emails!`);
+      console.log(`[DEV MOCK EMAIL] To: ${toEmail}`);
+      console.log(`[RESET OTP CODE]: >>> ${otp} <<< (Valid for 10 minutes)`);
+      console.log(`Configure SMTP_PASS in backend/.env to send real emails.`);
       console.log(`=============================================================\n`);
       return { success: true, mock: true };
     }

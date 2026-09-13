@@ -21,7 +21,8 @@ import {
   CheckCircle,
   Eye,
   Save,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 import Header from '../../../../components/layout/Header';
 import Card from '../../../../components/ui/Card';
@@ -39,6 +40,9 @@ import {
   formatCurrency,
   formatDate,
   PAYMENT_MODES,
+  REFERENCE_CATEGORIES,
+  HP_FINANCERS,
+  RTO_TYPES,
 } from '../../../../lib/constants';
 
 export default function TenantDetailPage() {
@@ -90,6 +94,7 @@ export default function TenantDetailPage() {
 
       if (tenantRes.data?.success) {
         const t = tenantRes.data.data;
+        const isStandardFinancer = HP_FINANCERS.some(f => f.value === t.hp_financer && f.value !== 'other');
         setTenant(t);
         setEditData({
           name: t.name || '',
@@ -100,12 +105,35 @@ export default function TenantDetailPage() {
           battery_no: t.battery_no || '',
           date_of_purchase: t.date_of_purchase ? t.date_of_purchase.split('T')[0] : '',
           rto_type: t.rto_type || '',
-          hp_financer: t.hp_financer || '',
+          hp_financer: t.hp_financer ? (isStandardFinancer ? t.hp_financer : 'other') : '',
+          hp_financer_other: isStandardFinancer ? '' : (t.hp_financer === 'other' ? '' : (t.hp_financer || '')),
           start_date: t.start_date ? t.start_date.split('T')[0] : '',
+          total_months: t.total_months || 24,
           installment_daily_rate: t.installment_daily_rate || '',
           installment_frequency: t.installment_frequency || '',
+          include_gst: t.include_gst || false,
+          gst_percent: t.gst_percent || 0,
           references: Array.isArray(t.references) ? t.references : [],
           guarantors: Array.isArray(t.guarantors) ? t.guarantors : [],
+          notes: t.notes || '',
+          scooty_insurance_company: t.scooty_insurance_company || '',
+          scooty_policy_number: t.scooty_policy_number || '',
+          scooty_policy_expiry: t.scooty_policy_expiry ? t.scooty_policy_expiry.split('T')[0] : '',
+          rider_insurance_company: t.rider_insurance_company || '',
+          rider_policy_number: t.rider_policy_number || '',
+          rider_policy_expiry: t.rider_policy_expiry ? t.rider_policy_expiry.split('T')[0] : '',
+          vehicle_number: t.vehicle_number || '',
+          scooty_insurance_amount: t.scooty_insurance_amount || '',
+          scooty_insurance_idv: t.scooty_insurance_idv || '',
+          scooty_insurance_start: t.scooty_insurance_start ? t.scooty_insurance_start.split('T')[0] : '',
+          rider_insurance_amount: t.rider_insurance_amount || '',
+          rider_insurance_idv: t.rider_insurance_idv || '',
+          rider_insurance_start: t.rider_insurance_start ? t.rider_insurance_start.split('T')[0] : '',
+          amc_amount: t.amc_amount || '',
+          amc_start_date: t.amc_start_date ? t.amc_start_date.split('T')[0] : '',
+          amc_expire_date: t.amc_expire_date ? t.amc_expire_date.split('T')[0] : '',
+          buyback_amount: t.buyback_amount || '',
+          amc_service_log: Array.isArray(t.amc_service_log) ? t.amc_service_log : [],
         });
       }
       if (paymentsRes.data?.success) {
@@ -136,6 +164,7 @@ export default function TenantDetailPage() {
         payment_date: paymentDate,
         mode: paymentMode,
         notes: paymentNotes || null,
+        gst_amount: tenant.include_gst ? ((Number(paymentAmount) || 0) * (tenant.gst_percent || 0)) / 100 : 0,
       });
 
       if (res.data?.success) {
@@ -192,9 +221,30 @@ export default function TenantDetailPage() {
   };
 
   const handleSaveChanges = async () => {
+    if (editData.phone && !/^\d{10}$/.test(editData.phone.trim())) {
+      toast.error('Phone number must be exactly 10 digits');
+      return;
+    }
+    if (editData.references?.some(r => r.phone && !/^\d{10}$/.test(r.phone.trim()))) {
+      toast.error('All reference phone numbers must be exactly 10 digits');
+      return;
+    }
+    if (editData.guarantors?.some(g => g.phone && !/^\d{10}$/.test(g.phone.trim()))) {
+      toast.error('All guarantor phone numbers must be exactly 10 digits');
+      return;
+    }
     try {
       setIsSaving(true);
-      const res = await api.patch(`/api/rentals/${tenantId}`, editData);
+      const { hp_financer_other, ...restEditData } = editData;
+      const payload = {
+        ...restEditData,
+        hp_financer: editData.hp_financer === 'other' ? (hp_financer_other || 'Other') : editData.hp_financer,
+        references: (editData.references || []).map(({ customCategory, ...r }) => ({
+          ...r,
+          category: r.category === 'other' ? (customCategory || 'Other') : r.category,
+        })),
+      };
+      const res = await api.patch(`/api/rentals/${tenantId}`, payload);
       if (res.data?.success) {
         setIsEditMode(false);
         toast.success('Changes saved.');
@@ -272,14 +322,16 @@ export default function TenantDetailPage() {
               </>
             ) : (
               <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  icon={Edit}
-                  onClick={() => setIsEditMode(true)}
-                >
-                  Edit Details
-                </Button>
+                {tenant.status !== 'cancelled' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    icon={Edit}
+                    onClick={() => setIsEditMode(true)}
+                  >
+                    Edit Details
+                  </Button>
+                )}
                 {isRented && (
                   <>
                     <Button
@@ -347,17 +399,17 @@ export default function TenantDetailPage() {
             <Card className="text-center p-4">
               <span className="text-[11px] font-bold text-slate-400 uppercase">Sticker Price</span>
               <h4 className="text-xl font-black text-slate-900 dark:text-white mt-1">
-                {formatCurrency(tenant.total_price)}
+                {formatCurrency(tenant.status === 'direct_purchase' ? 0 : tenant.total_price)}
               </h4>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                Total Upfront: {formatCurrency(Number(tenant.downpayment_paid) + Number(tenant.booking_amount || 0))}
+                Total Upfront: {formatCurrency(tenant.status === 'direct_purchase' ? 0 : (Number(tenant.downpayment_paid) + Number(tenant.booking_amount || 0)))}
               </p>
             </Card>
 
             <Card className="text-center p-4">
               <span className="text-[11px] font-bold text-slate-400 uppercase">Installment Total</span>
               <h4 className="text-xl font-black text-blue-600 mt-1">
-                {formatCurrency(balance.installmentTotal)}
+                {formatCurrency(tenant.status === 'direct_purchase' ? 0 : balance.installmentTotal)}
               </h4>
               <p className="text-[11px] text-slate-500 mt-0.5">To pay in installments</p>
             </Card>
@@ -365,7 +417,7 @@ export default function TenantDetailPage() {
             <Card className="text-center p-4">
               <span className="text-[11px] font-bold text-slate-400 uppercase">Total Collected</span>
               <h4 className="text-xl font-black text-emerald-600 mt-1">
-                {formatCurrency(tenant.total_paid || 0)}
+                {formatCurrency(tenant.status === 'direct_purchase' ? 0 : (tenant.total_paid || 0))}
               </h4>
               <p className="text-[11px] text-slate-500 mt-0.5">{payments.length} payment(s) recorded</p>
             </Card>
@@ -373,10 +425,10 @@ export default function TenantDetailPage() {
             <Card className="text-center p-4">
               <span className="text-[11px] font-bold text-slate-400 uppercase">Remaining Balance</span>
               <h4 className="text-xl font-black text-slate-900 dark:text-white mt-1">
-                {formatCurrency(balance.outstanding)}
+                {formatCurrency(tenant.status === 'direct_purchase' ? 0 : balance.outstanding)}
               </h4>
               <div className="mt-1">
-                {balance.outstanding === 0 ? (
+                {tenant.status === 'direct_purchase' || balance.outstanding === 0 ? (
                   <Badge status="Fully Paid" variant="emerald" size="sm" />
                 ) : balance.daysOverdue > 0 ? (
                   <Badge status={`${balance.daysOverdue} days overdue`} variant="rose" size="sm" />
@@ -408,8 +460,11 @@ export default function TenantDetailPage() {
                   />
                   <Input
                     label="Phone Number"
+                    placeholder="10-digit mobile number"
                     value={editData.phone}
-                    onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                    onChange={(e) => setEditData({ ...editData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                    maxLength={10}
+                    inputMode="numeric"
                   />
                   <div className="sm:col-span-2">
                     <Input
@@ -425,6 +480,21 @@ export default function TenantDetailPage() {
 
             <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Vehicle Details</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Vehicle Reg. Number"
+                    value={editData.vehicle_number}
+                    onChange={(e) => setEditData({ ...editData, vehicle_number: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Vehicle Reg. Number</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.vehicle_number || '—'}</p>
+                  </>
+                )}
+              </div>
+
               <div>
                 <p className="font-bold text-slate-400 uppercase text-[10px]">EV Model</p>
                 <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
@@ -479,10 +549,11 @@ export default function TenantDetailPage() {
 
               <div>
                 {isEditMode ? (
-                  <Input
+                  <Select
                     label="RTO Classification"
                     value={editData.rto_type}
                     onChange={(e) => setEditData({ ...editData, rto_type: e.target.value })}
+                    options={RTO_TYPES}
                   />
                 ) : (
                   <>
@@ -494,11 +565,24 @@ export default function TenantDetailPage() {
 
               <div>
                 {isEditMode ? (
-                  <Input
-                    label="HP Financer"
-                    value={editData.hp_financer}
-                    onChange={(e) => setEditData({ ...editData, hp_financer: e.target.value })}
-                  />
+                  <>
+                    <Select
+                      label="HP Financer"
+                      value={editData.hp_financer}
+                      onChange={(e) => setEditData({ ...editData, hp_financer: e.target.value })}
+                      options={HP_FINANCERS}
+                    />
+                    {editData.hp_financer === 'other' && (
+                      <div className="mt-4">
+                        <Input
+                          label="Custom Financer"
+                          placeholder="Enter custom financer name"
+                          value={editData.hp_financer_other || ''}
+                          onChange={(e) => setEditData({ ...editData, hp_financer_other: e.target.value })}
+                        />
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <>
                     <p className="font-bold text-slate-400 uppercase text-[10px]">HP Financer</p>
@@ -506,25 +590,19 @@ export default function TenantDetailPage() {
                   </>
                 )}
               </div>
-            </div>
 
-            <hr className="my-6 border-slate-100" />
-            <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Contract & Financials</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              {/* Scooty Insurance */}
               <div>
                 {isEditMode ? (
                   <Input
-                    type="date"
-                    label="Start Date"
-                    value={editData.start_date}
-                    onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
+                    label="Scooty Ins. Company"
+                    value={editData.scooty_insurance_company}
+                    onChange={(e) => setEditData({ ...editData, scooty_insurance_company: e.target.value })}
                   />
                 ) : (
                   <>
-                    <p className="font-bold text-slate-400 uppercase text-[10px]">Agreement Dates</p>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
-                      Start: {formatDate(tenant.start_date)} • End: {formatDate(tenant.expected_end_date)}
-                    </p>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Scooty Ins. Company</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.scooty_insurance_company || '—'}</p>
                   </>
                 )}
               </div>
@@ -532,128 +610,599 @@ export default function TenantDetailPage() {
               <div>
                 {isEditMode ? (
                   <Input
-                    type="number"
-                    label="Installment Rate (₹)"
-                    value={editData.installment_daily_rate}
-                    onChange={(e) => setEditData({ ...editData, installment_daily_rate: e.target.value })}
+                    label="Scooty Policy #"
+                    value={editData.scooty_policy_number}
+                    onChange={(e) => setEditData({ ...editData, scooty_policy_number: e.target.value })}
                   />
                 ) : (
                   <>
-                    <p className="font-bold text-slate-400 uppercase text-[10px]">Installment Terms</p>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
-                      ₹{tenant.installment_daily_rate}/day ({tenant.installment_frequency})
-                    </p>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Scooty Policy #</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.scooty_policy_number || '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Scooty Policy Expiry"
+                    type="date"
+                    value={editData.scooty_policy_expiry}
+                    onChange={(e) => setEditData({ ...editData, scooty_policy_expiry: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Scooty Policy Expiry</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.scooty_policy_expiry ? formatDate(tenant.scooty_policy_expiry) : '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Scooty Ins. Amount (₹)"
+                    type="number"
+                    value={editData.scooty_insurance_amount}
+                    onChange={(e) => setEditData({ ...editData, scooty_insurance_amount: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Scooty Ins. Amount (₹)</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.scooty_insurance_amount ? formatCurrency(tenant.scooty_insurance_amount) : '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Scooty Ins. IDV (₹)"
+                    type="number"
+                    value={editData.scooty_insurance_idv}
+                    onChange={(e) => setEditData({ ...editData, scooty_insurance_idv: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Scooty Ins. IDV (₹)</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.scooty_insurance_idv ? formatCurrency(tenant.scooty_insurance_idv) : '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Scooty Ins. Start Date"
+                    type="date"
+                    value={editData.scooty_insurance_start}
+                    onChange={(e) => setEditData({ ...editData, scooty_insurance_start: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Scooty Ins. Start Date</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.scooty_insurance_start ? formatDate(tenant.scooty_insurance_start) : '—'}</p>
                   </>
                 )}
               </div>
               
-              {isEditMode && (
-                <div>
-                  <Select
-                    label="Frequency"
-                    value={editData.installment_frequency}
-                    onChange={(e) => setEditData({ ...editData, installment_frequency: e.target.value })}
-                    options={[
-                      { value: 'daily', label: 'Daily' },
-                      { value: 'weekly', label: 'Weekly' },
-                      { value: 'monthly', label: 'Monthly' },
-                    ]}
+              {/* Rider Insurance */}
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Rider Ins. Company"
+                    value={editData.rider_insurance_company}
+                    onChange={(e) => setEditData({ ...editData, rider_insurance_company: e.target.value })}
                   />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Rider Ins. Company</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.rider_insurance_company || '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Rider Policy #"
+                    value={editData.rider_policy_number}
+                    onChange={(e) => setEditData({ ...editData, rider_policy_number: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Rider Policy #</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.rider_policy_number || '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Rider Policy Expiry"
+                    type="date"
+                    value={editData.rider_policy_expiry}
+                    onChange={(e) => setEditData({ ...editData, rider_policy_expiry: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Rider Policy Expiry</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.rider_policy_expiry ? formatDate(tenant.rider_policy_expiry) : '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Rider Ins. Amount (₹)"
+                    type="number"
+                    value={editData.rider_insurance_amount}
+                    onChange={(e) => setEditData({ ...editData, rider_insurance_amount: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Rider Ins. Amount (₹)</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.rider_insurance_amount ? formatCurrency(tenant.rider_insurance_amount) : '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Rider Ins. IDV (₹)"
+                    type="number"
+                    value={editData.rider_insurance_idv}
+                    onChange={(e) => setEditData({ ...editData, rider_insurance_idv: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Rider Ins. IDV (₹)</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.rider_insurance_idv ? formatCurrency(tenant.rider_insurance_idv) : '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Rider Ins. Start Date"
+                    type="date"
+                    value={editData.rider_insurance_start}
+                    onChange={(e) => setEditData({ ...editData, rider_insurance_start: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Rider Ins. Start Date</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.rider_insurance_start ? formatDate(tenant.rider_insurance_start) : '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div className="sm:col-span-2">
+                {isEditMode ? (
+                  <div className="pt-2">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Additional Notes
+                    </label>
+                    <textarea
+                      className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-smooth"
+                      placeholder="Add a note (e.g., How many times the battery or controller or charger got replaced, and how often they came to us for repairs)"
+                      rows={3}
+                      value={editData.notes || ''}
+                      onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Additional Notes</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.notes || '—'}</p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <hr className="my-6 border-slate-100" />
+            <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">AMC & Extra Financials</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="AMC Amount (₹)"
+                    type="number"
+                    value={editData.amc_amount}
+                    onChange={(e) => setEditData({ ...editData, amc_amount: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">AMC Amount (₹)</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.amc_amount ? formatCurrency(tenant.amc_amount) : '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Buyback / Early Exit Fee (₹)"
+                    type="number"
+                    value={editData.buyback_amount}
+                    onChange={(e) => setEditData({ ...editData, buyback_amount: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Buyback / Early Exit Fee (₹)</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.buyback_amount ? formatCurrency(tenant.buyback_amount) : '—'}</p>
+                  </>
+                )}
+              </div>
+              
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="AMC Start Date"
+                    type="date"
+                    value={editData.amc_start_date}
+                    onChange={(e) => setEditData({ ...editData, amc_start_date: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">AMC Start Date</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.amc_start_date ? formatDate(tenant.amc_start_date) : '—'}</p>
+                  </>
+                )}
+              </div>
+              
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="AMC Expire Date"
+                    type="date"
+                    value={editData.amc_expire_date}
+                    onChange={(e) => setEditData({ ...editData, amc_expire_date: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">AMC Expire Date</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.amc_expire_date ? formatDate(tenant.amc_expire_date) : '—'}</p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {tenant.status !== 'direct_purchase' && (
+              <>
+                <hr className="my-6 border-slate-100" />
+                <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Contract & Financials</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    {isEditMode ? (
+                      <div className="space-y-3">
+                        <Input
+                          type="date"
+                          label="Start Date"
+                          value={editData.start_date}
+                          onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
+                        />
+                        <Input
+                          type="number"
+                          label="Contract Horizon (Months)"
+                          value={editData.total_months}
+                          onChange={(e) => setEditData({ ...editData, total_months: e.target.value })}
+                        />
+                        <Input
+                          type="date"
+                          label="Expected Completion (Last Date)"
+                          value={(() => {
+                            if (!editData.start_date) return '';
+                            const d = new Date(editData.start_date);
+                            if (isNaN(d.getTime())) return '';
+                            d.setMonth(d.getMonth() + (Number(editData.total_months) || 24));
+                            return d.toISOString().split('T')[0];
+                          })()}
+                          disabled
+                          helperText={`Computed: Start Date + ${editData.total_months || 24} months`}
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <p className="font-bold text-slate-400 uppercase text-[10px]">Agreement Dates</p>
+                        <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
+                          Start: {formatDate(tenant.start_date)} • End: {formatDate(tenant.expected_end_date)} ({tenant.total_months || 24} months)
+                        </p>
+                      </>
+                    )}
+                  </div>
+
+                  <div>
+                    {isEditMode ? (
+                      <Input
+                        type="number"
+                        label="Installment Rate (₹)"
+                        value={editData.installment_daily_rate}
+                        onChange={(e) => setEditData({ ...editData, installment_daily_rate: e.target.value })}
+                      />
+                    ) : (
+                      <>
+                        <p className="font-bold text-slate-400 uppercase text-[10px]">Installment Terms</p>
+                        <p className="text-xs text-slate-700 dark:text-slate-300 mt-0.5">
+                          ₹{tenant.installment_daily_rate}/day ({tenant.installment_frequency})
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  
+                  {isEditMode && (
+                    <div>
+                      <Select
+                        label="Frequency"
+                        value={editData.installment_frequency}
+                        onChange={(e) => setEditData({ ...editData, installment_frequency: e.target.value })}
+                        options={[
+                          { value: 'daily', label: `Daily (${formatCurrency(editData.installment_daily_rate)}/day)` },
+                          { value: 'weekly', label: `Weekly (${formatCurrency(editData.installment_daily_rate * 7)}/wk)` },
+                          { value: 'monthly', label: `Monthly (${formatCurrency(editData.installment_daily_rate * 30)}/mo)` },
+                        ]}
+                      />
+                    </div>
+                  )}
+
+                  <div className="sm:col-span-2 mt-4 pt-4 border-t border-slate-100">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        {isEditMode ? (
+                          <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editData.include_gst}
+                              onChange={(e) => {
+                                setEditData({ ...editData, include_gst: e.target.checked, gst_percent: e.target.checked ? editData.gst_percent : 0 });
+                              }}
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span>Include GST</span>
+                          </label>
+                        ) : (
+                          <>
+                            <p className="font-bold text-slate-400 uppercase text-[10px]">GST Included</p>
+                            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5">
+                              {tenant.include_gst ? 'Yes' : 'No'}
+                            </p>
+                          </>
+                        )}
+                      </div>
+
+                      {(isEditMode ? editData.include_gst : tenant.include_gst) && (
+                        <div>
+                          {isEditMode ? (
+                            <div className="flex gap-4">
+                              <Input
+                                type="number"
+                                label="Tax Percent (%)"
+                                min="0"
+                                value={editData.gst_percent}
+                                onChange={(e) => setEditData({ ...editData, gst_percent: parseFloat(e.target.value) || 0 })}
+                              />
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                                  GST Amount
+                                </span>
+                                <div className="flex items-center h-10 px-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                  ₹{((editData.installment_daily_rate * (editData.gst_percent || 0)) / 100).toFixed(2)}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="font-bold text-slate-400 uppercase text-[10px]">GST Details</p>
+                              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5">
+                                {tenant.gst_percent}% (₹{((tenant.installment_daily_rate * (tenant.gst_percent || 0)) / 100).toFixed(2)} per installment)
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
+              </>
+            )}
 
-            {/* References & Guarantors summary */}
-            <div className="mt-6 pt-5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div>
-                <p className="font-bold text-slate-500 uppercase text-[10px] mb-2">References Listed</p>
-                {isEditMode ? (
-                  <div className="space-y-3">
-                    {editData.references.map((r, i) => (
-                      <div key={i} className="p-2 border border-slate-100 bg-slate-50 rounded-lg space-y-2">
-                        <Input
-                          placeholder="Reference Name"
-                          value={r.name || ''}
-                          onChange={(e) => updateReference(i, 'name', e.target.value)}
-                        />
-                        <div className="grid grid-cols-2 gap-2">
-                           <Input
-                            placeholder="Phone"
-                            value={r.phone || ''}
-                            onChange={(e) => updateReference(i, 'phone', e.target.value)}
+            {/* Reference & Guarantors summary */}
+            {tenant.status !== 'direct_purchase' && (
+              <div className="mt-6 pt-5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <p className="font-bold text-slate-500 uppercase text-[10px] mb-2">Reference Listed</p>
+                  {isEditMode ? (
+                    <div className="space-y-3">
+                      {editData.references.map((r, i) => (
+                        <div key={i} className="space-y-2 mb-4">
+                          <Input
+                            placeholder="Reference Name"
+                            value={r.name || ''}
+                            onChange={(e) => updateReference(i, 'name', e.target.value)}
                           />
-                          <Select
-                            value={r.category || ''}
-                            onChange={(e) => updateReference(i, 'category', e.target.value)}
-                            options={[
-                              { value: 'relative', label: 'Relative' },
-                              { value: 'friend', label: 'Friend' },
-                              { value: 'colleague', label: 'Colleague' }
-                            ]}
-                          />
+                          <div className="grid grid-cols-2 gap-2">
+                             <Input
+                              placeholder="10-digit phone"
+                              value={r.phone || ''}
+                              onChange={(e) => updateReference(i, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                              maxLength={10}
+                              inputMode="numeric"
+                            />
+                            <Select
+                              value={r.category || ''}
+                              onChange={(e) => updateReference(i, 'category', e.target.value)}
+                              options={REFERENCE_CATEGORIES}
+                            />
+                            {r.category === 'other' && (
+                              <Input
+                                placeholder="Please specify category"
+                                value={r.customCategory || ''}
+                                onChange={(e) => updateReference(i, 'customCategory', e.target.value)}
+                              />
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  Array.isArray(tenant.references) && tenant.references.length > 0 ? (
-                    <ul className="space-y-1 text-slate-700 dark:text-slate-300">
-                      {tenant.references.map((r, i) => (
-                        <li key={i}>
-                          <span className="font-semibold">{r.name}</span> ({r.category}) — {r.phone}
-                        </li>
                       ))}
-                    </ul>
+                    </div>
                   ) : (
-                    <p className="text-slate-400">None provided</p>
-                  )
-                )}
-              </div>
+                    Array.isArray(tenant.references) && tenant.references.length > 0 ? (
+                      <ul className="space-y-1 text-slate-700 dark:text-slate-300">
+                        {tenant.references.map((r, i) => (
+                          <li key={i}>
+                            <span className="font-semibold">{r.name}</span> ({r.category}) — {r.phone}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-slate-400">None provided</p>
+                    )
+                  )}
+                </div>
 
-              <div>
-                <p className="font-bold text-slate-500 uppercase text-[10px] mb-2">Guarantors</p>
-                {isEditMode ? (
-                  <div className="space-y-3">
-                    {editData.guarantors.map((g, i) => (
-                      <div key={i} className="p-2 border border-slate-100 bg-slate-50 rounded-lg space-y-2">
-                        <Input
-                          placeholder="Guarantor Name"
-                          value={g.name || ''}
-                          onChange={(e) => updateGuarantor(i, 'name', e.target.value)}
-                        />
-                         <div className="grid grid-cols-2 gap-2">
-                           <Input
-                            placeholder="Phone"
-                            value={g.phone || ''}
-                            onChange={(e) => updateGuarantor(i, 'phone', e.target.value)}
+                <div>
+                  <p className="font-bold text-slate-500 uppercase text-[10px] mb-2">Guarantors</p>
+                  {isEditMode ? (
+                    <div className="space-y-3">
+                      {editData.guarantors.map((g, i) => (
+                        <div key={i} className="space-y-2 mb-4">
+                          <Input
+                            placeholder="Guarantor Name"
+                            value={g.name || ''}
+                            onChange={(e) => updateGuarantor(i, 'name', e.target.value)}
                           />
-                          <Select
-                            value={g.gender || ''}
-                            onChange={(e) => updateGuarantor(i, 'gender', e.target.value)}
-                            options={[
-                              { value: 'male', label: 'Male' },
-                              { value: 'female', label: 'Female' }
-                            ]}
-                          />
+                           <div className="grid grid-cols-2 gap-2">
+                             <Input
+                              placeholder="10-digit phone"
+                              value={g.phone || ''}
+                              onChange={(e) => updateGuarantor(i, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                              maxLength={10}
+                              inputMode="numeric"
+                            />
+                            <Select
+                              value={g.gender || ''}
+                              onChange={(e) => updateGuarantor(i, 'gender', e.target.value)}
+                              options={[
+                                { value: 'male', label: 'Male' },
+                                { value: 'female', label: 'Female' }
+                              ]}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  Array.isArray(tenant.guarantors) && tenant.guarantors.length > 0 ? (
-                    <ul className="space-y-1 text-slate-700 dark:text-slate-300">
-                      {tenant.guarantors.map((g, i) => (
-                        <li key={i}>
-                          <span className="font-semibold">{g.name}</span> ({g.gender}) — {g.phone}
-                        </li>
                       ))}
-                    </ul>
+                    </div>
                   ) : (
-                    <p className="text-slate-400">None provided</p>
-                  )
-                )}
+                    Array.isArray(tenant.guarantors) && tenant.guarantors.length > 0 ? (
+                      <ul className="space-y-1 text-slate-700 dark:text-slate-300">
+                        {tenant.guarantors.map((g, i) => (
+                          <li key={i}>
+                            <span className="font-semibold">{g.name}</span> ({g.gender}) — {g.phone}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-slate-400">None provided</p>
+                    )
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+
+            <div className="mt-6 pt-5 border-t border-slate-100 dark:border-white/5">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-bold text-slate-500 uppercase text-[10px]">AMC Service Logs</p>
+                    {isEditMode && (
+                      <button
+                        type="button"
+                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800"
+                        onClick={() => {
+                          const logs = [...(editData.amc_service_log || [])];
+                          logs.push({ date: new Date().toISOString().split('T')[0], what_change: '', old_serial_no: '', new_serial_no: '', cost: '' });
+                          setEditData({ ...editData, amc_service_log: logs });
+                        }}
+                      >
+                        + Add Log
+                      </button>
+                    )}
+                  </div>
+                  
+                  {isEditMode ? (
+                    editData.amc_service_log && editData.amc_service_log.length > 0 ? (
+                      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10">
+                        <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+                          <thead className="bg-slate-50 dark:bg-slate-800/80 uppercase font-semibold text-[10px] text-slate-500">
+                            <tr>
+                              <th className="px-3 py-2">Date</th>
+                              <th className="px-3 py-2">What Changed</th>
+                              <th className="px-3 py-2">Old Serial #</th>
+                              <th className="px-3 py-2">New Serial #</th>
+                              <th className="px-3 py-2">Cost (₹)</th>
+                              <th className="px-3 py-2 text-right">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                            {editData.amc_service_log.map((log, i) => (
+                              <tr key={i} className="bg-white dark:bg-slate-900/40 hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                                <td className="px-3 py-2">
+                                  <input type="date" className="w-full bg-transparent border border-slate-200 dark:border-white/10 rounded px-2 py-1 focus:outline-none focus:border-blue-500" value={log.date || ''} onChange={(e) => { const logs = [...editData.amc_service_log]; logs[i].date = e.target.value; setEditData({ ...editData, amc_service_log: logs }); }} />
+                                </td>
+                                <td className="px-3 py-2">
+                                  <input type="text" className="w-full bg-transparent border border-slate-200 dark:border-white/10 rounded px-2 py-1 focus:outline-none focus:border-blue-500" value={log.what_change || ''} onChange={(e) => { const logs = [...editData.amc_service_log]; logs[i].what_change = e.target.value; setEditData({ ...editData, amc_service_log: logs }); }} placeholder="e.g. Battery" />
+                                </td>
+                                <td className="px-3 py-2">
+                                  <input type="text" className="w-full bg-transparent border border-slate-200 dark:border-white/10 rounded px-2 py-1 focus:outline-none focus:border-blue-500" value={log.old_serial_no || ''} onChange={(e) => { const logs = [...editData.amc_service_log]; logs[i].old_serial_no = e.target.value; setEditData({ ...editData, amc_service_log: logs }); }} />
+                                </td>
+                                <td className="px-3 py-2">
+                                  <input type="text" className="w-full bg-transparent border border-slate-200 dark:border-white/10 rounded px-2 py-1 focus:outline-none focus:border-blue-500" value={log.new_serial_no || ''} onChange={(e) => { const logs = [...editData.amc_service_log]; logs[i].new_serial_no = e.target.value; setEditData({ ...editData, amc_service_log: logs }); }} />
+                                </td>
+                                <td className="px-3 py-2">
+                                  <input type="number" className="w-full bg-transparent border border-slate-200 dark:border-white/10 rounded px-2 py-1 focus:outline-none focus:border-blue-500" value={log.cost || ''} onChange={(e) => { const logs = [...editData.amc_service_log]; logs[i].cost = e.target.value; setEditData({ ...editData, amc_service_log: logs }); }} />
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  <button type="button" className="text-red-500 hover:text-red-700 p-1" onClick={() => { const logs = [...editData.amc_service_log]; logs.splice(i, 1); setEditData({ ...editData, amc_service_log: logs }); }}><Trash2 className="w-3.5 h-3.5 mx-auto" /></button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-white/10 text-center">Currently empty. Click "+ Add Log" to add an AMC service record.</p>
+                    )
+                  ) : (
+                    Array.isArray(tenant.amc_service_log) && tenant.amc_service_log.length > 0 ? (
+                      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10">
+                        <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
+                          <thead className="bg-slate-50 dark:bg-slate-800/80 uppercase font-semibold text-[10px] text-slate-500">
+                            <tr>
+                              <th className="px-3 py-2">Date</th>
+                              <th className="px-3 py-2">What Changed</th>
+                              <th className="px-3 py-2">Old Serial #</th>
+                              <th className="px-3 py-2">New Serial #</th>
+                              <th className="px-3 py-2 text-right">Cost (₹)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                            {tenant.amc_service_log.map((log, i) => (
+                              <tr key={i} className="bg-white dark:bg-slate-900/40 hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                                <td className="px-3 py-2">{log.date || '—'}</td>
+                                <td className="px-3 py-2 font-medium text-slate-900 dark:text-white">{log.what_change || '—'}</td>
+                                <td className="px-3 py-2">{log.old_serial_no || '—'}</td>
+                                <td className="px-3 py-2">{log.new_serial_no || '—'}</td>
+                                <td className="px-3 py-2 text-right font-medium text-emerald-600 dark:text-emerald-400">{log.cost ? formatCurrency(log.cost) : '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-white/10 text-center">Currently empty.</p>
+                    )
+                  )}
+                </div>
           </Card>
 
           {/* Documents Vault */}
@@ -664,8 +1213,15 @@ export default function TenantDetailPage() {
                 { label: 'PAN Card', url: signedDocs.pan_url, path: tenant.pan_path, docType: 'pan_path' },
                 { label: 'Cheque', url: signedDocs.cheque_url, path: tenant.cheque_path, docType: 'cheque_path' },
                 { label: 'Electricity Bill', url: signedDocs.electricity_bill_url, path: tenant.electricity_bill_path, docType: 'electricity_bill_path' },
-                { label: 'Tenant Photo', url: signedDocs.tenant_photo_url, path: tenant.tenant_photo_path, docType: 'tenant_photo_path' },
+                { label: tenant.status === 'direct_purchase' ? 'Buyer Photo' : 'Tenant Photo', url: signedDocs.tenant_photo_url, path: tenant.tenant_photo_path, docType: 'tenant_photo_path' },
                 { label: 'Scooty Photo', url: signedDocs.scooty_photo_url, path: tenant.scooty_photo_path, docType: 'scooty_photo_path' },
+                tenant.status === 'direct_purchase'
+                  ? { label: 'Invoice Document', url: signedDocs.invoice_doc_url, path: tenant.invoice_doc_path, docType: 'invoice_doc_path' }
+                  : { label: 'Rent Agreement', url: signedDocs.rent_agreement_url, path: tenant.rent_agreement_path, docType: 'rent_agreement_path' },
+                { label: 'Scooty Insurance', url: signedDocs.scooty_insurance_url, path: tenant.scooty_insurance_path, docType: 'scooty_insurance_path' },
+                { label: 'Rider Insurance', url: signedDocs.rider_insurance_url, path: tenant.rider_insurance_path, docType: 'rider_insurance_path' },
+                { label: 'Rider License', url: signedDocs.rider_license_url, path: tenant.rider_license_path, docType: 'rider_license_path' },
+                { label: 'AMC Document', url: signedDocs.amc_doc_url, path: tenant.amc_doc_path, docType: 'amc_doc_path' },
               ].map((item, idx) => (
                 isEditMode ? (
                   <div key={idx} className="mb-4">
@@ -737,6 +1293,7 @@ export default function TenantDetailPage() {
                     <tr>
                       <th className="px-4 py-3">Date</th>
                       <th className="px-4 py-3">Amount</th>
+                      <th className="px-4 py-3">GST</th>
                       <th className="px-4 py-3">Mode</th>
                       <th className="px-4 py-3">Collected By</th>
                       <th className="px-4 py-3">Notes</th>
@@ -750,6 +1307,9 @@ export default function TenantDetailPage() {
                         </td>
                         <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">
                           {formatCurrency(p.amount)}
+                        </td>
+                        <td className="px-4 py-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          {p.gst_amount && Number(p.gst_amount) > 0 ? formatCurrency(p.gst_amount) : '—'}
                         </td>
                         <td className="px-4 py-3">
                           <Badge status={p.mode} size="sm" />
@@ -775,7 +1335,7 @@ export default function TenantDetailPage() {
         title="Record Installment Collection"
         subtitle={`Tenant: ${tenant.name} • Remaining: ${formatCurrency(balance.outstanding)}`}
       >
-        <form onSubmit={handleRecordPayment} className="space-y-4">
+        <form onSubmit={handleRecordPayment} className="space-y-4" autoComplete="off">
           {paymentError && (
             <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -783,14 +1343,26 @@ export default function TenantDetailPage() {
             </div>
           )}
 
-          <Input
-            label="Amount Collected (₹)"
-            type="number"
-            placeholder="250"
-            value={paymentAmount}
-            onChange={(e) => setPaymentAmount(e.target.value)}
-            required
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Principal Amount Collected (₹)"
+              type="number"
+              placeholder="250"
+              value={paymentAmount}
+              onChange={(e) => setPaymentAmount(e.target.value)}
+              required
+            />
+            {tenant?.include_gst && (
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                  GST Amount (+{tenant.gst_percent}%)
+                </span>
+                <div className="flex items-center h-10 px-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  ₹{(((Number(paymentAmount) || 0) * (tenant.gst_percent || 0)) / 100).toFixed(2)}
+                </div>
+              </div>
+            )}
+          </div>
 
           <Input
             label="Payment Date"
@@ -834,16 +1406,16 @@ export default function TenantDetailPage() {
         </form>
       </Modal>
 
-      {/* Cancel Rental Confirmation Modal */}
+      {/* Cancel Rental/Purchase Confirmation Modal */}
       <Modal
         isOpen={isCancelModalOpen}
         onClose={() => setIsCancelModalOpen(false)}
-        title="Confirm Rental Cancellation"
-        subtitle="This action restores vehicle stock and closes the active contract"
+        title={tenant.status === 'direct_purchase' ? "Cancel Direct Purchase" : "Confirm Rental Cancellation"}
+        subtitle="This action restores vehicle stock and closes the contract"
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-700 dark:text-slate-300">
-            Are you sure you want to cancel the contract for <span className="font-bold">{tenant.name}</span>?
+            Are you sure you want to cancel the {tenant.status === 'direct_purchase' ? 'purchase' : 'rental'} contract for <span className="font-bold">{tenant.name}</span>?
             The EV model stock will automatically increase by 1 in the inventory.
           </p>
 
@@ -866,6 +1438,7 @@ export default function TenantDetailPage() {
           </div>
         </div>
       </Modal>
+
 
       {/* View Document Modal */}
       <Modal

@@ -24,6 +24,7 @@ import {
   X,
 } from 'lucide-react';
 import ThemeToggle from '../components/ui/ThemeToggle';
+import BrandLogo from '../components/ui/BrandLogo';
 import { useAuthStore } from '../store/authStore';
 import { gsap } from '../lib/gsap';
 import api from '../lib/api';
@@ -35,42 +36,14 @@ const FEATURES = [
 ];
 
 
-/* Brand lock-up: "GoSpeedy" + "EV FLEET FINANCE". `nav` scales up on the desktop split layout.
-   `nav` always sits over the (theme-invariant) hero photo, so it stays white. `lg` sits inside the
-   login card instead, which now follows the page theme, so it needs light/dark text of its own. */
+/* Brand lock-up using BrandLogo */
 function Brand({ size = 'nav' }) {
-  const s =
-    size === 'lg'
-      ? {
-          box: 'w-14 h-14 rounded-2xl',
-          bolt: 'h-6 w-6',
-          name: 'text-[30px]',
-          sub: 'text-[11px] tracking-[0.2em] mt-1',
-          nameColor: 'text-slate-900 dark:text-white',
-          subColor: 'text-slate-500 dark:text-slate-400',
-        }
-      : {
-          box: 'w-9 h-9 rounded-xl desk:w-14 desk:h-14 desk:rounded-2xl',
-          bolt: 'h-[18px] w-[18px] desk:h-6 desk:w-6',
-          name: 'text-[22px] desk:text-[30px]',
-          sub: 'text-[8px] tracking-[0.2em] mt-0.5 desk:text-[11px] desk:mt-1',
-          nameColor: 'text-white',
-          subColor: 'text-slate-400',
-        };
   return (
-    <div className="flex items-center gap-2.5 desk:gap-3">
-      <div
-        className={`${s.box} flex items-center justify-center bg-gradient-to-br from-emerald-400 to-teal-600 shadow-md shadow-emerald-500/25`}
-      >
-        <Zap className={`${s.bolt} fill-white text-white`} />
-      </div>
-      <div className="flex flex-col leading-none">
-        <span className={`${s.name} font-extrabold tracking-tight ${s.nameColor} leading-none`}>
-          Go<span className="text-emerald-400">Speedy</span>
-        </span>
-        <span className={`${s.sub} font-bold ${s.subColor} uppercase`}>EV Fleet Finance</span>
-      </div>
-    </div>
+    <BrandLogo
+      size={size}
+      theme={size === 'nav' ? 'dark' : 'auto'}
+      showText={true}
+    />
   );
 }
 
@@ -84,7 +57,7 @@ export default function RootPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [showVideo, setShowVideo] = useState(true);
+  const [showVideo, setShowVideo] = useState(false);
 
   // Forgot Password modal state
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
@@ -173,11 +146,6 @@ export default function RootPage() {
   };
 
   useEffect(() => {
-    const hasPlayed = sessionStorage.getItem('introVideoPlayed');
-    if (hasPlayed) {
-      setShowVideo(false);
-    }
-
     // Check for OAuth error query params (e.g. ?error=account_deactivated)
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -195,10 +163,7 @@ export default function RootPage() {
     }
   }, []);
 
-  const handleVideoEnd = () => {
-    setShowVideo(false);
-    sessionStorage.setItem('introVideoPlayed', 'true');
-  };
+
 
   useEffect(() => {
     checkAuth().then((u) => {
@@ -250,7 +215,8 @@ export default function RootPage() {
       setSubmitting(true);
       const res = await login(identifier.trim(), password);
       if (res && res.success) {
-        router.push('/dashboard');
+        await checkAuth();
+        window.location.href = '/dashboard';
       } else {
         setError(res?.error || 'Wrong password! Please check your password and try again.');
       }
@@ -263,26 +229,7 @@ export default function RootPage() {
   };
 
 
-  if (showVideo) {
-    return (
-      <div className="fixed inset-0 bg-black z-50 flex items-center justify-center overflow-hidden">
-        <video
-          src="/generate_a_video_in_which_the (1).mp4"
-          autoPlay
-          muted
-          playsInline
-          onEnded={handleVideoEnd}
-          className="w-full h-full object-cover"
-        />
-        <button
-          onClick={handleVideoEnd}
-          className="absolute top-6 right-6 z-50 text-white/70 hover:text-white px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 transition-all font-medium text-sm cursor-pointer"
-        >
-          Skip Intro
-        </button>
-      </div>
-    );
-  }
+
 
   return (
     <div className="relative min-h-screen bg-[#070c18] text-white flex flex-col overflow-x-hidden select-none">
@@ -431,7 +378,7 @@ export default function RootPage() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4 desk:space-y-5 [@media(max-height:720px)]:desk:!space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4 desk:space-y-5 [@media(max-height:720px)]:desk:!space-y-4" autoComplete="off">
                 <div>
                   <label className="block text-[10px] desk:text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5 desk:mb-2" htmlFor="identifier">
                     Phone Number or Email
@@ -569,11 +516,16 @@ export default function RootPage() {
 
       {/* ── FOOTER ── */}
       <footer className="relative z-10 pt-2 pb-5 desk:py-5 px-5 sm:px-8 desk:px-16 w-full max-w-[1720px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 text-xs text-slate-400 text-center sm:text-left">
-        <div className="leading-relaxed">
-          <span>© {new Date().getFullYear()} Go Speedy</span>
-          <span className="hidden sm:inline"> • </span>
-          <br className="sm:hidden" />
-          <span>Electric Mobility Rental &amp; Finance</span>
+        <div className="leading-relaxed space-y-0.5">
+          <div>
+            <span>© {new Date().getFullYear()} Go Speedy</span>
+            <span className="hidden sm:inline"> • </span>
+            <br className="sm:hidden" />
+            <span>Electric Mobility Rental &amp; Finance</span>
+          </div>
+          <div className="text-[11px] text-slate-600">
+            Developed by Yana Malhotra, Harsh Raj Singh, Sumit Tripathi &amp; Sanchit Aggarwal
+          </div>
         </div>
         <div className="flex items-center gap-2 text-slate-400 hover:text-white cursor-pointer transition-colors">
           <span>Need Help?</span>
@@ -620,7 +572,7 @@ export default function RootPage() {
                   </div>
                 )}
 
-                <form onSubmit={handleRequestOtp} className="space-y-4">
+                <form onSubmit={handleRequestOtp} className="space-y-4" autoComplete="off">
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
                       Registered Email Address
@@ -694,7 +646,7 @@ export default function RootPage() {
                   </div>
                 )}
 
-                <form onSubmit={handleResetPassword} className="space-y-4">
+                <form onSubmit={handleResetPassword} className="space-y-4" autoComplete="off">
                   {/* OTP Input */}
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">

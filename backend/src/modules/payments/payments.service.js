@@ -16,7 +16,7 @@ class PaymentsService {
   }
 
   async recordPayment(paymentData, collectedBy) {
-    const { tenant_id, amount, payment_date, mode, notes } = paymentData;
+    const { tenant_id, amount, payment_date, mode, notes, gst_amount } = paymentData;
 
     // 1. Check if tenant exists and is active
     const { data: tenant, error: tenantError } = await supabase
@@ -37,6 +37,7 @@ class PaymentsService {
         payment_date,
         mode,
         notes,
+        gst_amount: gst_amount || 0,
         collected_by: collectedBy
       }])
       .select('*')

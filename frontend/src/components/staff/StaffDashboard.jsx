@@ -66,7 +66,7 @@ export default function StaffDashboard() {
       setLoading(true);
 
       // 1. Fetch EV Models
-      const modelsRes = await api.get('/api/models');
+      const modelsRes = await api.get('/api/models/dropdown');
       const models = modelsRes.data?.data || [];
       const totalAvailable = models.reduce((sum, m) => sum + (m.stock_count || 0), 0);
       setEvModels(models);
@@ -166,7 +166,7 @@ export default function StaffDashboard() {
         }
       />
 
-      <div className="p-4 md:p-8 space-y-6 md:space-y-8 max-w-7xl mx-auto">
+      <div className="p-4 md:p-4 space-y-6 md:space-y-8 max-w-7xl mx-auto">
         {/* Welcome & Shift Status Banner */}
         <div className="rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-[#0d1527] dark:via-[#111e38] dark:to-[#0d1527] border border-slate-700/50 dark:border-white/10 p-5 md:p-6 text-white shadow-lg relative overflow-hidden">
           <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -219,7 +219,7 @@ export default function StaffDashboard() {
               </div>
               <div className="mt-3">
                 <h4 className="text-base font-bold text-white leading-tight">Issue New Rental</h4>
-                <p className="text-xs text-blue-100 mt-0.5">8-step fast onboarding wizard</p>
+                <p className="text-xs text-blue-100 mt-0.5">9-step fast onboarding wizard</p>
               </div>
             </Link>
 

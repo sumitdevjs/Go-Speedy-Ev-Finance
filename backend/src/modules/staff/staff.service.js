@@ -1,19 +1,37 @@
 const supabase = require('../../config/db');
 const bcrypt = require('bcryptjs');
 const { buildDiff } = require('../../utils/auditLog');
+const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
+const { buildSearchFilter } = require('../../utils/searchFilter');
 
 class StaffService {
-  async getAllStaff() {
-    const { data, error } = await supabase
+  async getAllStaff(query = {}) {
+    const { page, limit, offset } = getPaginationOptions(query);
+
+    let queryBuilder = supabase
       .from('users')
-      .select('id, name, phone, email, role, is_active, created_at, updated_at')
+      .select('id, name, phone, email, role, ward_area, is_active, created_at, updated_at', { count: 'exact' })
       .order('created_at', { ascending: false });
 
+    if (query.search) {
+      queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'phone', 'email'], query.search));
+    }
+
+    // Filter by active status: 'true' or 'false'
+    if (query.is_active !== undefined && query.is_active !== '') {
+      queryBuilder = queryBuilder.eq('is_active', query.is_active === 'true');
+    }
+
+    const { data, count, error } = await queryBuilder
+      .range(offset, offset + limit - 1);
+
     if (error) throw error;
-    return data;
+
+    const meta = getPaginationMeta(count, page, limit);
+    return { data, meta };
   }
 
-  async createStaff({ name, phone, email, password, role }, createdBy) {
+  async createStaff({ name, phone, email, password, role, ward_area }, createdBy) {
     const password_hash = await bcrypt.hash(password, 10);
     
     const { data, error } = await supabase
@@ -24,10 +42,11 @@ class StaffService {
         email: email || null,
         password_hash,
         role,
+        ward_area,
         is_active: true,
         created_by: createdBy
       }])
-      .select('id, name, phone, email, role, is_active, created_at')
+      .select('id, name, phone, email, role, ward_area, is_active, created_at')
       .single();
 
     if (error) {
@@ -50,7 +69,7 @@ class StaffService {
     // diff instead of just dumping the new request body.
     const { data: before, error: fetchError } = await supabase
       .from('users')
-      .select('name, phone, email, role, is_active')
+      .select('name, phone, email, role, ward_area, is_active')
       .eq('id', id)
       .single();
     if (fetchError) throw fetchError;
@@ -59,7 +78,7 @@ class StaffService {
       .from('users')
       .update(updates)
       .eq('id', id)
-      .select('id, name, phone, email, role, is_active')
+      .select('id, name, phone, email, role, ward_area, is_active')
       .single();
 
     if (error) {

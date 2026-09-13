@@ -1,5 +1,6 @@
 const { errorResponse } = require('../utils/response');
 const { ZodError } = require('zod');
+const env = require('../config/env');
 
 const errorHandler = (err, req, res, next) => {
   // Catch Zod validation errors
@@ -19,9 +20,9 @@ const errorHandler = (err, req, res, next) => {
 
   // Handle specific Supabase or Postgres errors if needed here
   
-  // Default fallback
+  // Default fallback — never send a stack trace to the client outside dev.
   console.error('[Error handler]', err);
-  const isDev = true; // Temporary debug override to see exact 500 errors in production
+  const isDev = env.NODE_ENV !== 'production';
   return errorResponse(
     res,
     err.status || 500,

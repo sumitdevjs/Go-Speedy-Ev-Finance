@@ -21,7 +21,7 @@ export const useAuthStore = create((set, get) => ({
   checkAuth: async () => {
     try {
       set({ isLoading: true });
-      const res = await api.get('/api/auth/me');
+      const res = await api.get(`/api/auth/me?t=${Date.now()}`);
       if (res.data?.success && res.data?.data?.user) {
         set({
           user: res.data.data.user,

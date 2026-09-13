@@ -7,11 +7,13 @@ const requestLogger = require('../../middleware/requestLogger');
 const router = express.Router();
 router.use(requireAuth);
 
+const phoneSchema = z.string().regex(/^\d{10}$/, 'Phone number must be exactly 10 digits');
+
 const createBookingSchema = z.object({
   ev_model_id: z.string().uuid().optional().nullable(),
   model_name_raw: z.string().optional().nullable(),
   name: z.string().min(1),
-  phone: z.string().min(10),
+  phone: phoneSchema,
   booking_amount: z.number().min(0).optional(),
   booking_date: z.string().optional(),
   notes: z.string().nullable().optional(),
@@ -19,7 +21,7 @@ const createBookingSchema = z.object({
 
 const updateBookingSchema = z.object({
   name: z.string().min(1).optional(),
-  phone: z.string().min(10).optional(),
+  phone: phoneSchema.optional(),
   ev_model_id: z.string().uuid().optional().nullable(),
   model_name_raw: z.string().optional().nullable(),
   booking_amount: z.number().min(0).optional(),

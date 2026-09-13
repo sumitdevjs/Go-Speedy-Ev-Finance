@@ -127,7 +127,6 @@ export default function FileUpload({
             <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
               Upload <span className="text-blue-600 dark:text-blue-400">file / image</span>
             </p>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Auto-compressed to WebP ≤ 300KB</p>
           </div>
         )}
       </div>

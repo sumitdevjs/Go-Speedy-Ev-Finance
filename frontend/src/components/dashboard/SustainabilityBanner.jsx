@@ -24,11 +24,12 @@ export default function SustainabilityBanner() {
   }, []);
 
   return (
-    <div className="relative w-full mt-6 px-0 pointer-events-auto lg:fixed lg:bottom-0 lg:left-64 lg:right-0 lg:z-30 lg:px-8 lg:pb-4 lg:pointer-events-none lg:mt-0">
-      <div
-        ref={bannerRef}
-        className="pointer-events-auto w-full max-w-7xl mx-auto overflow-hidden rounded-2xl bg-gradient-to-r from-white/95 via-blue-50/80 to-emerald-50/60 dark:from-[#081220]/95 dark:via-[#0c1a2f]/95 dark:to-[#071325]/95 backdrop-blur-xl border border-slate-200/90 dark:border-white/10 shadow-lg dark:shadow-[0_8px_30px_rgb(0,0,0,0.55)] text-slate-900 dark:text-white select-none transition-colors duration-300"
-      >
+    <div className="relative w-full mt-8 px-0">
+      <div className="w-full mx-auto">
+        <div
+          ref={bannerRef}
+          className="pointer-events-auto w-full overflow-hidden rounded-2xl bg-gradient-to-r from-white/95 via-blue-50/80 to-emerald-50/60 dark:from-[#081220]/95 dark:via-[#0c1a2f]/95 dark:to-[#071325]/95 backdrop-blur-xl border border-slate-200/90 dark:border-white/10 shadow-lg dark:shadow-[0_8px_30px_rgb(0,0,0,0.55)] text-slate-900 dark:text-white select-none transition-colors duration-300"
+        >
       {/* ── Background Illustration: Integrated City Skyline, Trees & EV Scooter Silhouette ── */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-end justify-center">
         <svg
@@ -150,20 +151,18 @@ export default function SustainabilityBanner() {
         </div>
 
         {/* Right Side: Clean Mobility + Subtitle + Small Arrow */}
-        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto shrink-0 group pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 dark:border-white/5">
-          <div className="text-left sm:text-right">
-            <p className="text-[11px] sm:text-xs md:text-[13px] font-bold text-slate-900 dark:text-white tracking-tight leading-none">
+        <div className="flex items-center gap-3 self-end sm:self-center shrink-0">
+          <div className="text-right">
+            <p className="text-xs md:text-[13px] font-bold text-slate-900 dark:text-white tracking-tight leading-none">
               Clean Mobility
             </p>
             <p className="text-[9px] sm:text-[10px] md:text-[11px] text-slate-400 dark:text-slate-500 mt-1 leading-none">
               Brighter Futures
             </p>
           </div>
-          <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-lg bg-slate-100/80 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-500/20 group-hover:border-emerald-300 dark:group-hover:border-emerald-500/30 transition-smooth shrink-0">
-            <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 group-hover:translate-x-0.5 transition-transform" />
-          </div>
         </div>
       </div>
+    </div>
     </div>
   </div>
   );

@@ -1,7 +1,7 @@
 const supabase = require('../../config/db');
 const { calcBalance } = require('../../utils/balanceCalc');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
-const { buildSearchFilter } = require('../../utils/searchFilter');
+const { buildSearchFilter, buildEqOrFilter } = require('../../utils/searchFilter');
 
 class RentalsService {
   async getRentals(query = {}) {
@@ -21,6 +21,24 @@ class RentalsService {
     
     if (query.search) {
       queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'phone'], query.search));
+    }
+
+    if (query.has_pending_docs !== undefined && query.has_pending_docs !== '') {
+      queryBuilder = queryBuilder.eq('has_pending_docs', query.has_pending_docs === 'true');
+    }
+
+    // Insurance status filter
+    if (query.insurance_status) {
+      const today = new Date().toISOString().split('T')[0];
+      if (query.insurance_status === 'scooty_expired') {
+        queryBuilder = queryBuilder.lt('scooty_policy_expiry', today);
+      } else if (query.insurance_status === 'scooty_not_expired') {
+        queryBuilder = queryBuilder.gte('scooty_policy_expiry', today);
+      } else if (query.insurance_status === 'rider_expired') {
+        queryBuilder = queryBuilder.lt('rider_policy_expiry', today);
+      } else if (query.insurance_status === 'rider_not_expired') {
+        queryBuilder = queryBuilder.gte('rider_policy_expiry', today);
+      }
     }
 
     const { data: tenants, count, error } = await queryBuilder
@@ -95,6 +113,22 @@ class RentalsService {
       }
     });
 
+    // Remove fields not in DB schema to prevent PostgREST errors
+    delete tenantData.include_gst;
+    delete tenantData.gst_percent;
+
+    const requiredFields = [
+      'vehicle_number',
+      'scooty_insurance_amount', 'scooty_insurance_idv', 'scooty_insurance_start',
+      'rider_insurance_amount', 'rider_insurance_idv', 'rider_insurance_start',
+      'buyback_amount',
+    ];
+    for (const field of requiredFields) {
+      if (!tenantData[field] && tenantData[field] !== 0) {
+        throw new Error(`Field ${field} is required`);
+      }
+    }
+
     // Prevent new rental if an active one exists for this phone
     if (tenantData.phone) {
       const { data: existingActive } = await supabase
@@ -131,9 +165,20 @@ class RentalsService {
 
     // 3. Compute dates
     const startDate = tenantData.start_date ? new Date(tenantData.start_date) : new Date();
-    const totalMonths = tenantData.total_months || 24;
+    const totalMonths = Number(tenantData.total_months) || 24;
     const expectedEndDate = new Date(startDate);
     expectedEndDate.setMonth(expectedEndDate.getMonth() + totalMonths);
+
+    // Ensure NOT NULL fields are never null for direct_purchase
+    if (tenantData.status === 'direct_purchase') {
+      tenantData.installment_daily_rate = 0;
+      tenantData.installment_frequency = tenantData.installment_frequency || 'daily';
+      tenantData.downpayment_paid = tenantData.downpayment_paid ?? 0;
+      tenantData.booking_amount = tenantData.booking_amount ?? 0;
+    } else {
+      tenantData.installment_daily_rate = tenantData.installment_daily_rate ?? 0;
+      tenantData.installment_frequency = tenantData.installment_frequency || 'daily';
+    }
 
     // 4. Insert Tenant
     try {
@@ -141,6 +186,8 @@ class RentalsService {
         .from('tenants')
         .insert([{
           ...tenantData,
+          references: tenantData.references || [],
+          guarantors: tenantData.guarantors || [],
           total_price: model.total_price, // snapshot price
           start_date: tenantData.status === 'direct_purchase' ? null : startDate.toISOString().split('T')[0],
           expected_end_date: tenantData.status === 'direct_purchase' ? null : expectedEndDate.toISOString().split('T')[0],
@@ -158,7 +205,10 @@ class RentalsService {
         .update({ stock_count: model.stock_count })
         .eq('id', tenantData.ev_model_id);
       
-      if (error.code === '23505') throw new Error(`Unique constraint violation: ${error.details || error.message}`);
+      if (error.code === '23505') {
+        console.error('[createRental] Unique constraint violation:', error);
+        throw new Error('Unique constraint violation: a record with this value already exists.');
+      }
       throw error;
     }
   }
@@ -176,7 +226,7 @@ class RentalsService {
       const { data: existing, error: err } = await supabase.from('tenants').select('start_date, total_months').eq('id', id).single();
       if (!err && existing) {
         const startDate = new Date(updates.start_date || existing.start_date);
-        const totalMonths = updates.total_months || existing.total_months;
+        const totalMonths = Number(updates.total_months || existing.total_months) || 24;
         const expectedEndDate = new Date(startDate);
         expectedEndDate.setMonth(expectedEndDate.getMonth() + totalMonths);
         updates.expected_end_date = expectedEndDate.toISOString().split('T')[0];
@@ -191,7 +241,10 @@ class RentalsService {
       .single();
 
     if (error) {
-      if (error.code === '23505') throw new Error(`Unique constraint violation: ${error.details || error.message}`);
+      if (error.code === '23505') {
+        console.error('[updateRental] Unique constraint violation:', error);
+        throw new Error('Unique constraint violation: a record with this value already exists.');
+      }
       throw error;
     }
     return data;
@@ -205,8 +258,10 @@ class RentalsService {
       .single();
 
     if (fetchError) throw fetchError;
-    if (tenant.status === 'cancelled') throw new Error('Rental is already cancelled');
-    if (tenant.status !== 'rented') throw new Error('Only active rentals can be cancelled');
+    if (tenant.status === 'cancelled') throw new Error('This contract is already cancelled');
+    if (tenant.status !== 'rented' && tenant.status !== 'direct_purchase' && tenant.status !== 'completed') {
+      throw new Error('Only active rentals, direct purchases, or completed purchases can be cancelled');
+    }
 
     // 1. Update status
     const { error: cancelError } = await supabase
@@ -255,6 +310,42 @@ class RentalsService {
 
     if (error) throw error;
     return data;
+  }
+
+  async checkUniqueHardwareOrPolicy(fields) {
+    const { chassis_no, motor_ctrl_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number } = fields;
+
+    // buildEqOrFilter escapes values so a comma/parenthesis can't inject
+    // extra filter clauses into the query.
+    const orFilter = buildEqOrFilter({
+      chassis_no, motor_ctrl_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number,
+    });
+
+    if (!orFilter) {
+      return { exists: false };
+    }
+
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('chassis_no, motor_ctrl_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number')
+      .or(orFilter);
+
+    if (error) throw error;
+
+    if (data && data.length > 0) {
+      // Find which one matched to give a specific error message
+      const conflict = data[0];
+      if (chassis_no && conflict.chassis_no === chassis_no) return { exists: true, message: 'Chassis number already exists in the system.' };
+      if (motor_ctrl_no && conflict.motor_ctrl_no === motor_ctrl_no) return { exists: true, message: 'Motor controller number already exists in the system.' };
+      if (battery_no && conflict.battery_no === battery_no) return { exists: true, message: 'Battery serial number already exists in the system.' };
+      if (vehicle_number && conflict.vehicle_number === vehicle_number) return { exists: true, message: 'Vehicle number already exists in the system.' };
+      if (scooty_policy_number && conflict.scooty_policy_number === scooty_policy_number) return { exists: true, message: 'Scooty policy number already exists in the system.' };
+      if (rider_policy_number && conflict.rider_policy_number === rider_policy_number) return { exists: true, message: 'Rider policy number already exists in the system.' };
+      
+      return { exists: true, message: 'One of the provided unique identifiers already exists in the system.' };
+    }
+
+    return { exists: false };
   }
 }
 

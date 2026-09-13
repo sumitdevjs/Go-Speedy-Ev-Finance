@@ -12,6 +12,17 @@ const api = axios.create({
 let isRefreshing = false;
 let failedQueue = [];
 
+// Next.js proxy rewrites strip the body from PATCH requests.
+// Work around this by sending as PUT with an override header,
+// which the backend middleware converts back to PATCH before routing.
+api.interceptors.request.use((config) => {
+  if (config.method && config.method.toLowerCase() === 'patch') {
+    config.method = 'put';
+    config.headers['X-HTTP-Method-Override'] = 'PATCH';
+  }
+  return config;
+});
+
 const processQueue = (error, token = null) => {
   failedQueue.forEach((prom) => {
     if (error) {

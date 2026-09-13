@@ -33,11 +33,12 @@ class AuthController {
 
       return successResponse(res, 200, { user: result.user }, 'Token refreshed');
     } catch (error) {
+      console.error('Refresh Token Error:', error);
       // Clear cookies on fail
       res.clearCookie('access_token');
       res.clearCookie('refresh_token');
       res.clearCookie('user_id');
-      return errorResponse(res, 401, 'Session expired or invalid');
+      return errorResponse(res, 401, 'Session expired or invalid. Please log in again.');
     }
   }
 
@@ -84,43 +85,30 @@ class AuthController {
     }
   }
 
-  syncSession(req, res) {
-    try {
-      const { accessToken, refreshToken, userId } = req.body;
-      if (!accessToken || !userId) {
-        return errorResponse(res, 400, 'Invalid session tokens');
-      }
-      this._setCookies(res, accessToken, refreshToken, userId);
-      return successResponse(res, 200, null, 'Session synced');
-    } catch (error) {
-      return errorResponse(res, 500, error.message);
-    }
-  }
-
   _setCookies(res, accessToken, refreshToken, userId) {
-    const isProduction = process.env.NODE_ENV === 'production';
+    const env = require('../../config/env');
+    const isProduction = env.NODE_ENV === 'production';
+    const cookieOpts = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+    };
     
     // Access token - 15 mins
     res.cookie('access_token', accessToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
+      ...cookieOpts,
       maxAge: 15 * 60 * 1000, 
     });
 
     // Refresh token - 7 days
     res.cookie('refresh_token', refreshToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
+      ...cookieOpts,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     // User ID (for finding the correct refresh hash later) - 7 days
     res.cookie('user_id', userId, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
+      ...cookieOpts,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
   }

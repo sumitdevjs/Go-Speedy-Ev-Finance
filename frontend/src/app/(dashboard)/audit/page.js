@@ -21,9 +21,12 @@ const ACTION_LABELS = {
   CREATE_RENTAL:     'Created a new rental agreement',
   UPDATE_RENTAL:     'Updated rental details',
   DELETE_RENTAL:     'Deleted a rental agreement',
+  CANCEL_RENTAL:     'Cancelled a rental agreement',
+  COMPLETE_RENTAL:   'Completed a rental agreement',
   CREATE_BOOKING:    'Created a new booking',
   UPDATE_BOOKING:    'Updated booking details',
   DELETE_BOOKING:    'Deleted a booking',
+  CANCEL_BOOKING:    'Cancelled a booking',
   CONVERT_BOOKING:   'Converted booking to a purchase',
   RECORD_PAYMENT:    'Recorded a payment',
   UPDATE_PAYMENT:    'Updated payment details',
@@ -80,6 +83,30 @@ function formatFieldName(key) {
 function formatValue(val, key) {
   if (val === null || val === undefined) return '—';
   if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+  
+  if (Array.isArray(val)) {
+    if (val.length === 0) return 'None';
+    if (typeof val[0] === 'object' && val[0] !== null) {
+      return (
+        <div className="flex flex-col gap-1 mt-1">
+          {val.map((item, idx) => (
+            <div key={idx} className="bg-white/50 dark:bg-slate-900/30 p-1.5 rounded border border-slate-100 dark:border-white/5">
+              {Object.entries(item)
+                .filter(([_, v]) => v !== '' && v !== null && v !== undefined)
+                .map(([k, v]) => (
+                  <span key={k} className="inline-block mr-3">
+                    <span className="text-slate-400 dark:text-slate-500 capitalize">{k}: </span>
+                    <span className="text-slate-800 dark:text-slate-200">{v}</span>
+                  </span>
+                ))}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return val.join(', ');
+  }
+
   if (typeof val === 'object') return JSON.stringify(val);
   // Try to detect ISO date strings
   if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(val)) {
@@ -114,7 +141,7 @@ function ChangeDiff({ changes, isExpanded, onToggle, targetName }) {
       </button>
 
       {isExpanded && (
-        <div className="mt-3 space-y-2 max-w-sm">
+        <div className="mt-3 space-y-2 w-full max-w-lg">
           {keys.map(key => {
             const entry = changes[key];
             const hasFromTo = entry && typeof entry === 'object' && ('from' in entry || 'to' in entry);
@@ -133,21 +160,21 @@ function ChangeDiff({ changes, isExpanded, onToggle, targetName }) {
                   <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${
                     isRoleChange ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'
                   }`}>
-                    {isRoleChange ? '⚠ Role Changed' : formatFieldName(key)}
+                    {isRoleChange ? 'Role Changed' : formatFieldName(key)}
                   </p>
                   <div className="flex items-center gap-2 flex-wrap">
                     {'from' in entry && (
-                      <span className="text-xs bg-red-50 dark:bg-rose-500/15 text-red-600 dark:text-rose-400 border border-red-200 dark:border-rose-500/30 rounded px-2 py-0.5 line-through">
+                      <div className="text-xs bg-red-50 dark:bg-rose-500/15 text-red-600 dark:text-rose-400 border border-red-200 dark:border-rose-500/30 rounded px-2 py-0.5 line-through">
                         {formatValue(entry.from, key)}
-                      </span>
+                      </div>
                     )}
                     {('from' in entry && 'to' in entry) && (
                       <span className="text-slate-400 dark:text-slate-500 text-xs">→</span>
                     )}
                     {'to' in entry && (
-                      <span className="text-xs bg-green-50 dark:bg-emerald-500/15 text-green-700 dark:text-emerald-400 border border-green-200 dark:border-emerald-500/30 rounded px-2 py-0.5 font-semibold">
+                      <div className="text-xs bg-green-50 dark:bg-emerald-500/15 text-green-700 dark:text-emerald-400 border border-green-200 dark:border-emerald-500/30 rounded px-2 py-0.5 font-semibold">
                         {formatValue(entry.to, key)}
-                      </span>
+                      </div>
                     )}
                   </div>
                   {isRoleChange && (
@@ -166,7 +193,7 @@ function ChangeDiff({ changes, isExpanded, onToggle, targetName }) {
                 <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-0.5">
                   {formatFieldName(key)}
                 </p>
-                <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">{formatValue(entry, key)}</p>
+                <div className="text-xs text-slate-700 dark:text-slate-300 font-medium">{formatValue(entry, key)}</div>
               </div>
             );
           })}
@@ -183,11 +210,10 @@ export default function AuditPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
-  // Track only rows the admin has *manually collapsed* — everything else
-  // shows its full change diff open by default, no click required.
-  const [collapsedIds, setCollapsedIds] = useState(() => new Set());
+  // Track only rows the admin has *manually expanded* — everything starts collapsed.
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
   const toggleRow = (id) => {
-    setCollapsedIds(prev => {
+    setExpandedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
@@ -202,8 +228,8 @@ export default function AuditPage() {
       const res = await api.get(`/api/audit?page=${p}&limit=20`);
       if (res.data?.success) {
         setLogs(res.data.data || []);
-        setTotalPages(res.data.meta?.totalPages || 1);
-        setTotalRecords(res.data.meta?.totalRecords || 0);
+        setTotalPages(res.data.pagination?.totalPages || 1);
+        setTotalRecords(res.data.pagination?.totalItems || 0);
       }
     } catch (err) {
       console.error('Failed to load audit logs:', err);
@@ -216,8 +242,9 @@ export default function AuditPage() {
     {
       header: 'When',
       key: 'created_at',
+      className: 'w-[20%] min-w-[140px]',
       render: (row) => (
-        <div className="flex items-start justify-center gap-1.5 text-left">
+        <div className="flex items-start justify-start gap-1.5 text-left">
           <Clock className="h-3.5 w-3.5 text-slate-400 mt-0.5 shrink-0" />
           <div>
             <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
@@ -233,14 +260,22 @@ export default function AuditPage() {
     {
       header: 'Done By',
       key: 'user',
+      className: 'w-[25%] min-w-[180px]',
       render: (row) => (
-        <div className="flex items-center justify-center gap-2 text-left">
+        <div className="flex items-center justify-start gap-2 text-left">
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0">
             <User className="h-3.5 w-3.5 text-white" />
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{row.users?.name || 'System'}</p>
-            <p className="text-[10px] text-slate-400 capitalize">{row.user_role}</p>
+            <p className="text-[10px] text-slate-400 capitalize">
+              {row.user_role}
+              {row.users?.ward_area && (
+                <span className="ml-1 pl-1 border-l border-slate-300 dark:border-slate-600">
+                  {row.users.ward_area}
+                </span>
+              )}
+            </p>
           </div>
         </div>
       ),
@@ -248,6 +283,7 @@ export default function AuditPage() {
     {
       header: 'What Happened',
       key: 'action',
+      className: 'w-[45%] min-w-[350px]',
       render: (row) => {
         // Skip the " — name" suffix when the actor acted on themselves (e.g. a
         // self-service forgot-password reset) — "Done By" already shows that name,
@@ -265,7 +301,7 @@ export default function AuditPage() {
             </span>
             <ChangeDiff
               changes={row.changes}
-              isExpanded={!collapsedIds.has(row.id)}
+              isExpanded={expandedIds.has(row.id)}
               onToggle={() => toggleRow(row.id)}
               targetName={targetName}
             />
@@ -276,6 +312,7 @@ export default function AuditPage() {
     {
       header: 'Section',
       key: 'entity_type',
+      className: 'w-[10%] min-w-[100px]',
       render: (row) => (
         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300">
           {ENTITY_LABELS[row.entity_type] || row.entity_type?.replace(/_/g, ' ')}

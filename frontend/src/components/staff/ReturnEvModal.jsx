@@ -119,7 +119,7 @@ export default function ReturnEvModal({
           </p>
         </div>
       ) : (
-        <form onSubmit={handleProcessReturn} className="space-y-4">
+        <form onSubmit={handleProcessReturn} className="space-y-4" autoComplete="off">
           {error && (
             <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />

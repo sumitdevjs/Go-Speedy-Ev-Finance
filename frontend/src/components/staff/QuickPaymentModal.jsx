@@ -97,6 +97,7 @@ export default function QuickPaymentModal({
         payment_date: paymentDate,
         mode: paymentMode,
         notes: paymentNotes || undefined,
+        gst_amount: selectedTenant.include_gst ? ((numAmount * (selectedTenant.gst_percent || 0)) / 100) : 0,
       });
 
       setSuccessNotice(true);
@@ -138,7 +139,7 @@ export default function QuickPaymentModal({
           </p>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
           {error && (
             <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -219,14 +220,26 @@ export default function QuickPaymentModal({
 
           {/* Amount and Mode */}
           <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Amount (₹)"
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-              min="1"
-            />
+            <div className="flex flex-col gap-2">
+              <Input
+                label="Principal Amount (₹)"
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                required
+                min="1"
+              />
+              {selectedTenant?.include_gst && (
+                <div className="flex flex-col mt-1">
+                  <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                    GST (+{selectedTenant.gst_percent}%)
+                  </span>
+                  <div className="flex items-center h-10 px-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    ₹{(((Number(amount) || 0) * (selectedTenant.gst_percent || 0)) / 100).toFixed(2)}
+                  </div>
+                </div>
+              )}
+            </div>
             <Select
               label="Payment Mode"
               value={paymentMode}

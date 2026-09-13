@@ -1,3 +1,5 @@
+const plugin = require('tailwindcss/plugin');
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: 'class',
@@ -8,11 +10,6 @@ module.exports = {
   ],
   theme: {
     extend: {
-      screens: {
-        // Landing-page split composition (photo left / login card right): only on wide,
-        // landscape-ish viewports. Portrait tablets keep the stacked mobile layout.
-        desk: { raw: '(min-width: 1024px) and (min-aspect-ratio: 4/3)' },
-      },
       colors: {
         brand: {
           50: '#eff6ff',
@@ -31,5 +28,10 @@ module.exports = {
       },
     },
   },
-  plugins: [],
-}
+  plugins: [
+    plugin(function ({ addVariant }) {
+      addVariant('desk', '@media (min-width: 1024px) and (min-aspect-ratio: 4/3)');
+    }),
+  ],
+};
+
