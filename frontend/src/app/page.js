@@ -378,7 +378,7 @@ export default function RootPage() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4 desk:space-y-5 [@media(max-height:720px)]:desk:!space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4 desk:space-y-5 [@media(max-height:720px)]:desk:!space-y-4" autoComplete="off">
                 <div>
                   <label className="block text-[10px] desk:text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5 desk:mb-2" htmlFor="identifier">
                     Phone Number or Email
@@ -572,7 +572,7 @@ export default function RootPage() {
                   </div>
                 )}
 
-                <form onSubmit={handleRequestOtp} className="space-y-4">
+                <form onSubmit={handleRequestOtp} className="space-y-4" autoComplete="off">
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
                       Registered Email Address
@@ -646,7 +646,7 @@ export default function RootPage() {
                   </div>
                 )}
 
-                <form onSubmit={handleResetPassword} className="space-y-4">
+                <form onSubmit={handleResetPassword} className="space-y-4" autoComplete="off">
                   {/* OTP Input */}
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">

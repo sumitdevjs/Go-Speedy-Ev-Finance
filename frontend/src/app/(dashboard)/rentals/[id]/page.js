@@ -1294,7 +1294,7 @@ export default function TenantDetailPage() {
         title="Record Installment Collection"
         subtitle={`Tenant: ${tenant.name} • Remaining: ${formatCurrency(balance.outstanding)}`}
       >
-        <form onSubmit={handleRecordPayment} className="space-y-4">
+        <form onSubmit={handleRecordPayment} className="space-y-4" autoComplete="off">
           {paymentError && (
             <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />

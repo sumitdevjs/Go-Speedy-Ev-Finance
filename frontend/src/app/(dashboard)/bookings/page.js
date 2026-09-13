@@ -333,7 +333,7 @@ export default function BookingsPage() {
         title="Record Walk-in Booking"
         subtitle="Collect advance token and reserve an EV model for a customer"
       >
-        <form onSubmit={handleCreateBooking} className="space-y-4">
+        <form onSubmit={handleCreateBooking} className="space-y-4" autoComplete="off">
           {error && (
             <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -423,7 +423,7 @@ export default function BookingsPage() {
         onClose={() => setIsEditModalOpen(false)}
         title="Edit Walk-in Booking"
       >
-        <form onSubmit={handleEditBooking} className="space-y-4">
+        <form onSubmit={handleEditBooking} className="space-y-4" autoComplete="off">
           <Input
             label="Customer Full Name"
             value={editData.name}

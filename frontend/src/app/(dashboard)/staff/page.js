@@ -29,7 +29,7 @@ export default function StaffPage() {
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState(''); // '' | 'true' | 'false'
+  const [activeFilter, setActiveFilter] = useState('true'); // '' | 'true' | 'false'
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -362,8 +362,8 @@ export default function StaffPage() {
             }}
             className="w-full md:w-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
           >
-            <option value="" className="dark:bg-slate-900">All Staff</option>
             <option value="true" className="dark:bg-slate-900">Active Only</option>
+            <option value="" className="dark:bg-slate-900">All Staff</option>
             <option value="false" className="dark:bg-slate-900">Deactivated Only</option>
           </select>
         </div>
@@ -390,7 +390,7 @@ export default function StaffPage() {
         title="Register New Staff Member"
         subtitle="Create an operator account for Delhi hub collections and registrations"
       >
-        <form onSubmit={handleCreateStaff} className="space-y-4">
+        <form onSubmit={handleCreateStaff} className="space-y-4" autoComplete="off">
           {error && (
             <div className="rounded-lg bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 p-3 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -472,7 +472,7 @@ export default function StaffPage() {
         title={`Edit ${editingStaff?.name || 'Staff Member'}`}
         subtitle="Update contact details or change their system role"
       >
-        <form onSubmit={handleUpdateStaff} className="space-y-4">
+        <form onSubmit={handleUpdateStaff} className="space-y-4" autoComplete="off">
           {editError && (
             <div className="rounded-lg bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 p-3 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -553,7 +553,7 @@ export default function StaffPage() {
         title={`Reset Password for ${passwordModalUser?.name}`}
         subtitle="Assign a new secure login password"
       >
-        <form onSubmit={handleResetPassword} className="space-y-4">
+        <form onSubmit={handleResetPassword} className="space-y-4" autoComplete="off">
           {resetError && (
             <div className="rounded-lg bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 p-3 text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
