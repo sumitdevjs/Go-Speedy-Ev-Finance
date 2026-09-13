@@ -10,7 +10,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE TABLE IF NOT EXISTS users (
   id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name                     TEXT NOT NULL,
-  phone                    TEXT UNIQUE,                  -- NULL for OAuth users until updated
+  phone                    VARCHAR(10) UNIQUE CHECK (phone IS NULL OR phone ~ '^[0-9]{10}$'), -- exactly 10-digit number only
   email                    TEXT UNIQUE,
   password_hash            TEXT,                         -- NULL for OAuth users
   oauth_provider           TEXT,                         -- 'google', etc.
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS tenants (
 
   -- Personal
   name           TEXT NOT NULL,
-  phone          TEXT NOT NULL,
+  phone          VARCHAR(10) NOT NULL CHECK (phone ~ '^[0-9]{10}$'),
   gender         TEXT NOT NULL CHECK (gender IN ('male','female')),
   address        TEXT,
   has_pending_docs BOOLEAN NOT NULL DEFAULT false,
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS tenants (
                                downpayment_mode IN ('cash','online','not_paid')),
   dp_by_other      BOOLEAN NOT NULL DEFAULT false,
   dp_other_name    TEXT,
-  dp_other_phone   TEXT,
+  dp_other_phone   VARCHAR(10) CHECK (dp_other_phone IS NULL OR dp_other_phone ~ '^[0-9]{10}$'),
 
   -- Installments
   installment_daily_rate  NUMERIC(8,2) NOT NULL DEFAULT 250,
@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS tenants (
                             CHECK (installment_frequency IN ('daily','weekly','monthly')),
   installment_by_self     BOOLEAN NOT NULL DEFAULT true,
   installment_other_name  TEXT,
-  installment_other_phone TEXT,
+  installment_other_phone VARCHAR(10) CHECK (installment_other_phone IS NULL OR installment_other_phone ~ '^[0-9]{10}$'),
 
   -- Contract timeline
   start_date        DATE,
@@ -188,7 +188,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   ev_model_id     UUID REFERENCES ev_models(id),
   model_name_raw  TEXT,                           -- if model not yet in ev_models
   name            TEXT NOT NULL,
-  phone           TEXT NOT NULL,
+  phone           VARCHAR(10) NOT NULL CHECK (phone ~ '^[0-9]{10}$'),
   aadhar_path     TEXT,
   booking_amount  NUMERIC(10,2) CHECK (booking_amount >= 0),
   booking_date    DATE NOT NULL DEFAULT CURRENT_DATE,

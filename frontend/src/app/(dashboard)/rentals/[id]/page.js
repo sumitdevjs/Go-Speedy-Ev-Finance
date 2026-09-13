@@ -307,8 +307,10 @@ export default function TenantDetailPage() {
                   icon={X}
                   onClick={() => setIsEditMode(false)}
                   disabled={isSaving}
+                  className="px-2.5 py-1.5"
                 >
-                  Cancel Edit
+                  <span className="hidden sm:inline">Cancel Edit</span>
+                  <span className="sm:hidden">Cancel</span>
                 </Button>
                 <Button
                   variant="primary"
@@ -316,8 +318,10 @@ export default function TenantDetailPage() {
                   icon={Save}
                   onClick={handleSaveChanges}
                   loading={isSaving}
+                  className="px-2.5 py-1.5"
                 >
-                  Save Changes
+                  <span className="hidden sm:inline">Save Changes</span>
+                  <span className="sm:hidden">Save</span>
                 </Button>
               </>
             ) : (
@@ -328,8 +332,11 @@ export default function TenantDetailPage() {
                     size="sm"
                     icon={Edit}
                     onClick={() => setIsEditMode(true)}
+                    className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-2.5 xs:py-1.5"
+                    title="Edit Details"
                   >
-                    Edit Details
+                    <span className="hidden sm:inline">Edit Details</span>
+                    <span className="hidden xs:inline sm:hidden">Edit</span>
                   </Button>
                 )}
                 {isRented && (
@@ -339,8 +346,11 @@ export default function TenantDetailPage() {
                       size="sm"
                       icon={PlusCircle}
                       onClick={() => setIsPaymentModalOpen(true)}
+                      className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-2.5 xs:py-1.5"
+                      title="Record Payment"
                     >
-                      Record Payment
+                      <span className="hidden sm:inline">Record Payment</span>
+                      <span className="hidden xs:inline sm:hidden">Pay</span>
                     </Button>
                     {balance.outstanding === 0 && (
                       <Button
@@ -348,8 +358,11 @@ export default function TenantDetailPage() {
                         size="sm"
                         icon={CheckCircle}
                         onClick={handleCompleteRental}
+                        className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-2.5 xs:py-1.5"
+                        title="Convert to Purchase"
                       >
-                        Convert to Purchase
+                        <span className="hidden sm:inline">Convert to Purchase</span>
+                        <span className="hidden xs:inline sm:hidden">Convert</span>
                       </Button>
                     )}
                   </>
@@ -360,8 +373,11 @@ export default function TenantDetailPage() {
                     size="sm"
                     icon={XCircle}
                     onClick={() => setIsCancelModalOpen(true)}
+                    className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-2.5 xs:py-1.5"
+                    title="Cancel Contract"
                   >
-                    Cancel Contract
+                    <span className="hidden sm:inline">Cancel Contract</span>
+                    <span className="hidden xs:inline sm:hidden">Cancel</span>
                   </Button>
                 )}
               </>

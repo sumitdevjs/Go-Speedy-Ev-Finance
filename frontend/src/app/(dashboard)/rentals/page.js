@@ -185,8 +185,15 @@ export default function RentalsListPage() {
         subtitle="Live registry of active contracts, daily collections, and overdue accounts"
         action={
           <Link href="/rentals/new">
-            <Button variant="primary" size="sm" icon={Plus}>
-              Issue New Rental
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Plus}
+              className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-3 xs:py-1.5"
+              title="Issue New Rental"
+            >
+              <span className="hidden sm:inline">Issue New Rental</span>
+              <span className="hidden xs:inline sm:hidden">New</span>
             </Button>
           </Link>
         }

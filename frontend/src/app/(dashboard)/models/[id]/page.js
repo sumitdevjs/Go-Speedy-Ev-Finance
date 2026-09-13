@@ -13,6 +13,7 @@ import Table from '../../../../components/ui/Table';
 import Card from '../../../../components/ui/Card';
 import Modal from '../../../../components/ui/Modal';
 import Badge from '../../../../components/ui/Badge';
+import Spinner from '../../../../components/ui/Spinner';
 import api from '../../../../lib/api';
 import { toast } from '../../../../lib/toast';
 import { confirmDialog } from '../../../../lib/confirmDialog';
@@ -177,7 +178,11 @@ export default function ModelViewPage({ params }) {
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-slate-500">Loading model...</div>;
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Spinner size="lg" className="text-emerald-500" />
+      </div>
+    );
   }
 
   if (error || !model) {
@@ -258,65 +263,66 @@ export default function ModelViewPage({ params }) {
   }
 
   return (
-    <div>
-      <div className="sticky top-0 z-30 bg-slate-50/80 dark:bg-[#0B1120]/80 backdrop-blur-xl border-b border-slate-200/80 dark:border-white/10 px-4 md:px-8 py-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between transition-colors">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={ArrowLeft}
-            onClick={() => router.push('/models')}
-            className="hidden sm:flex"
-          />
-          <div>
-            <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-              {model.name}
-              <Badge 
-                status={model.is_active ? 'Active' : 'Cancelled'} 
-                variant={model.is_active ? 'emerald' : 'rose'} 
-                size="sm"
-              />
-            </h1>
-            <p className="text-xs font-semibold text-slate-500 mt-0.5">
-              {model.company} • Added {formatDate(model.created_at)}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            icon={model.is_active ? XCircle : CheckCircle}
-            onClick={handleToggleDeactivate}
-            className={model.is_active ? "text-rose-600 hover:text-rose-700" : "text-emerald-600 hover:text-emerald-700"}
-          >
-            {model.is_active ? 'Deactivate Model' : 'Reactivate Model'}
-          </Button>
-          {!isEditMode ? (
-            <Button variant="primary" size="sm" icon={Edit2} onClick={() => setIsEditMode(true)}>
-              Edit Details
+    <div className="min-h-screen flex flex-col">
+      <Header
+        title={isEditMode ? `Editing: ${model.name}` : model.name}
+        subtitle={`${model.company} • Added ${formatDate(model.created_at)}`}
+        backHref="/models"
+        action={
+          <div className="flex items-center gap-1.5 sm:gap-2 justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              icon={model.is_active ? XCircle : CheckCircle}
+              onClick={handleToggleDeactivate}
+              className={`h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-2.5 xs:py-1.5 ${
+                model.is_active ? "text-rose-600 hover:text-rose-700" : "text-emerald-600 hover:text-emerald-700"
+              }`}
+              title={model.is_active ? 'Deactivate Model' : 'Reactivate Model'}
+            >
+              <span className="hidden md:inline">{model.is_active ? 'Deactivate Model' : 'Reactivate Model'}</span>
+              <span className="hidden xs:inline md:hidden">{model.is_active ? 'Deactivate' : 'Reactivate'}</span>
             </Button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => { setIsEditMode(false); setFormData(model); }}>
-                Cancel
+            {!isEditMode ? (
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Edit2}
+                onClick={() => setIsEditMode(true)}
+                className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-3 xs:py-1.5"
+                title="Edit Details"
+              >
+                <span className="hidden sm:inline">Edit Details</span>
+                <span className="hidden xs:inline sm:hidden">Edit</span>
               </Button>
-              <Button variant="primary" size="sm" icon={Save} loading={savingDetails} onClick={handleUpdateDetails}>
-                Save Changes
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
+            ) : (
+              <div className="flex items-center gap-1.5 xs:gap-2">
+                <Button variant="outline" size="sm" onClick={() => { setIsEditMode(false); setFormData(model); }} className="px-2.5 py-1.5">
+                  Cancel
+                </Button>
+                <Button variant="primary" size="sm" icon={Save} loading={savingDetails} onClick={handleUpdateDetails} className="px-2.5 py-1.5">
+                  <span className="hidden sm:inline">Save Changes</span>
+                  <span className="sm:hidden">Save</span>
+                </Button>
+              </div>
+            )}
+          </div>
+        }
+      />
 
-      <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
+      <div className="p-3.5 xs:p-4 md:p-8 max-w-5xl mx-auto w-full space-y-6 flex-1">
         
         {/* Model Overview Card */}
-        <Card className="p-6">
+        <Card className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <Bike className="w-4 h-4 text-blue-500" /> Model Specifications
+              <Bike className="w-4 h-4 text-emerald-500" /> Model Specifications
             </h3>
+            <Badge 
+              status={model.is_active ? 'Active' : 'Cancelled'} 
+              variant={model.is_active ? 'emerald' : 'rose'} 
+              size="sm"
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mt-6">

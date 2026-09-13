@@ -147,19 +147,27 @@ export default function StaffDashboard() {
         title="Operations Desk"
         subtitle={`Live Operational Queue • ${todayDateFormatted}`}
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 xs:gap-2">
             <Button
               variant="outline"
               size="sm"
               icon={User}
               onClick={() => setIsProfileModalOpen(true)}
+              title="My Profile"
+              className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-2.5 xs:py-1.5"
             >
-              <span className="hidden sm:inline">My Profile</span>
+              <span className="hidden md:inline">My Profile</span>
             </Button>
             <Link href="/rentals/new">
-              <Button variant="primary" size="sm" icon={PlusCircle}>
+              <Button
+                variant="primary"
+                size="sm"
+                icon={PlusCircle}
+                className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-3 xs:py-1.5"
+                title="Issue Rental"
+              >
                 <span className="hidden sm:inline">Issue Rental</span>
-                <span className="sm:hidden">New</span>
+                <span className="hidden xs:inline sm:hidden">New</span>
               </Button>
             </Link>
           </div>

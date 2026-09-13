@@ -10,6 +10,10 @@ module.exports = {
   ],
   theme: {
     extend: {
+      screens: {
+        'xxs': '320px',
+        'xs': '375px',
+      },
       colors: {
         brand: {
           50: '#eff6ff',
