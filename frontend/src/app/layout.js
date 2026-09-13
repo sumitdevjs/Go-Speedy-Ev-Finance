@@ -3,6 +3,13 @@ import './globals.css';
 import { ThemeProvider } from '../store/themeContext';
 import SmoothScroll from '../components/ui/SmoothScroll';
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: 'cover',
+};
+
 export const metadata = {
   title: 'Go Speedy EV — Rent & Purchase Finance Monitor',
   description: 'Production-grade EV Rent & Purchase Monitor System for Delhi operations.',

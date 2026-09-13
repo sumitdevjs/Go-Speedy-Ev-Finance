@@ -222,7 +222,7 @@ router.get(
     if (!isAllowedOrigin(clientOrigin) && req.headers.referer) {
       try {
         clientOrigin = new URL(req.headers.referer).origin;
-      } catch (_) {}
+      } catch (_) { }
     }
     if (!isAllowedOrigin(clientOrigin)) clientOrigin = DEFAULT_FRONTEND_ORIGIN;
 

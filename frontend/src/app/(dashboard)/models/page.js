@@ -276,8 +276,11 @@ export default function ModelsPage() {
             size="sm"
             icon={Plus}
             onClick={handleOpenAddModal}
+            className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-3 xs:py-1.5"
+            title="Add New EV Model"
           >
-            Add New EV Model
+            <span className="hidden sm:inline">Add New EV Model</span>
+            <span className="hidden xs:inline sm:hidden">Model</span>
           </Button>
         }
       />

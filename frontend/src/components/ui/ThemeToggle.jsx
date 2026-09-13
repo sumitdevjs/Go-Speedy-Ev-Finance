@@ -14,7 +14,7 @@ export default function ThemeToggle({ variant = 'default' }) {
 
   if (!mounted) {
     return (
-      <div className="h-8 w-24 rounded-lg bg-white/10 animate-pulse" />
+      <div className="h-8 w-8 sm:w-24 rounded-lg bg-slate-200/50 dark:bg-slate-800 animate-pulse shrink-0" />
     );
   }
 
@@ -33,21 +33,27 @@ export default function ThemeToggle({ variant = 'default' }) {
 
   return (
     <>
-      {/* Phones: one compact pill showing the current theme; tapping cycles Light → Dark → System */}
+      {/* Phones: ultra-clean compact icon-only toggle (tapping cycles Light ☀️ → Dark 🌙 → System 💻) */}
       <button
         type="button"
         onClick={cycleTheme}
-        title={`Theme: ${active.label} (tap to change)`}
-        aria-label={`Theme: ${active.label}. Tap to change`}
-        className={`sm:hidden inline-flex items-center gap-1.5 pl-3 pr-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+        title={`Theme: ${active.label} (Tap to switch)`}
+        aria-label={`Theme: ${active.label}. Tap to switch`}
+        className={`sm:hidden h-8 w-8 xs:h-8.5 xs:w-8.5 inline-flex items-center justify-center rounded-lg text-xs font-semibold transition-all active:scale-90 cursor-pointer shrink-0 ${
           variant === 'glass'
             ? 'bg-slate-900/50 backdrop-blur-md border border-white/15 text-white/90 shadow-sm'
-            : 'bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'
+            : 'bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
         }`}
       >
-        <ActiveIcon className="w-3.5 h-3.5" />
-        <span>{active.label}</span>
-        <ChevronDown className="w-3 h-3 opacity-70" />
+        <ActiveIcon
+          className={`w-4 h-4 transition-colors ${
+            active.key === 'light'
+              ? 'text-amber-500'
+              : active.key === 'dark'
+              ? 'text-blue-400'
+              : 'text-slate-600 dark:text-slate-300'
+          }`}
+        />
       </button>
 
     <div

@@ -34,10 +34,8 @@ class AuthController {
       return successResponse(res, 200, { user: result.user }, 'Token refreshed');
     } catch (error) {
       console.error('Refresh Token Error:', error);
-      // Clear cookies on fail
-      res.clearCookie('access_token');
-      res.clearCookie('refresh_token');
-      res.clearCookie('user_id');
+      // Clear cookies on fail with proper options
+      this._clearCookies(res);
       return errorResponse(res, 401, 'Session expired or invalid. Please log in again.');
     }
   }
@@ -50,10 +48,8 @@ class AuthController {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Always clear cookies
-      res.clearCookie('access_token');
-      res.clearCookie('refresh_token');
-      res.clearCookie('user_id');
+      // Always clear cookies with proper options
+      this._clearCookies(res);
       return successResponse(res, 200, null, 'Logged out successfully');
     }
   }
@@ -85,19 +81,24 @@ class AuthController {
     }
   }
 
-  _setCookies(res, accessToken, refreshToken, userId) {
+  _getCookieOpts() {
     const env = require('../../config/env');
     const isProduction = env.NODE_ENV === 'production';
-    const cookieOpts = {
+    return {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? 'none' : 'lax',
+      path: '/',
     };
-    
+  }
+
+  _setCookies(res, accessToken, refreshToken, userId) {
+    const cookieOpts = this._getCookieOpts();
+
     // Access token - 15 mins
     res.cookie('access_token', accessToken, {
       ...cookieOpts,
-      maxAge: 15 * 60 * 1000, 
+      maxAge: 15 * 60 * 1000,
     });
 
     // Refresh token - 7 days
@@ -111,6 +112,13 @@ class AuthController {
       ...cookieOpts,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+  }
+
+  _clearCookies(res) {
+    const cookieOpts = this._getCookieOpts();
+    res.clearCookie('access_token', cookieOpts);
+    res.clearCookie('refresh_token', cookieOpts);
+    res.clearCookie('user_id', cookieOpts);
   }
 }
 

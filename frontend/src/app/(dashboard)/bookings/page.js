@@ -303,9 +303,11 @@ export default function BookingsPage() {
             size="sm"
             icon={Plus}
             onClick={() => setIsAddModalOpen(true)}
+            className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-3 xs:py-1.5"
+            title="New Booking"
           >
             <span className="hidden sm:inline">New Booking</span>
-            <span className="sm:hidden">New</span>
+            <span className="hidden xs:inline sm:hidden">New</span>
           </Button>
         }
       />

@@ -14,13 +14,18 @@ class AuthService {
     this.otpCache = new Map();
   }
 
-  async login(email, password) {
-    // Find user
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .or(`email.eq.${email},phone.eq.${email}`)
-      .single();
+  async login(identifier, password) {
+    const cleanId = String(identifier || '').trim();
+    const isEmail = cleanId.includes('@');
+
+    let query = supabase.from('users').select('*');
+    if (isEmail) {
+      query = query.eq('email', cleanId.toLowerCase());
+    } else {
+      query = query.eq('phone', cleanId);
+    }
+
+    const { data: user, error } = await query.single();
 
     if (error || !user) {
       throw new Error('Account not found with this phone number or email.');
