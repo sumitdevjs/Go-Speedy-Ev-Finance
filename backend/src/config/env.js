@@ -18,20 +18,23 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.string().optional(),
   BACKEND_URL: z.string().optional(),
-  SESSION_SECRET: z.string().optional().default('gospeedy_session_secret_change_me'),
+  // Unused (no express-session wired up — OAuth uses stateless JWTs).
+  SESSION_SECRET: z.string().optional(),
 
-  // SMTP Email Configuration (Gmail OTP)
-  SMTP_HOST: z.string().default('smtp.gmail.com'),
-  SMTP_PORT: z.string().default('465'),
-  SMTP_USER: z.string().default('gospeedy.admin@gmail.com'),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.string().optional(),
+  SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
+  // Visible "From" address — separate from SMTP_USER, which for relays like
+  // Brevo is just the login credential, not a DKIM/SPF-aligned sender.
+  EMAIL_FROM: z.string().optional(),
 });
 
 // Validate the environment variables
 const _env = envSchema.safeParse(process.env);
 
 if (!_env.success) {
-  console.error('❌ Invalid environment variables:', JSON.stringify(_env.error.format(), null, 2));
+  console.error('Invalid environment variables:', JSON.stringify(_env.error.format(), null, 2));
   throw new Error('Environment variable validation failed. Check your Vercel Environment Variables.');
 }
 

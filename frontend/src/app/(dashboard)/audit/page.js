@@ -160,7 +160,7 @@ function ChangeDiff({ changes, isExpanded, onToggle, targetName }) {
                   <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${
                     isRoleChange ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'
                   }`}>
-                    {isRoleChange ? '⚠ Role Changed' : formatFieldName(key)}
+                    {isRoleChange ? 'Role Changed' : formatFieldName(key)}
                   </p>
                   <div className="flex items-center gap-2 flex-wrap">
                     {'from' in entry && (

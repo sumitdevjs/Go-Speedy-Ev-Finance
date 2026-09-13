@@ -221,6 +221,10 @@ export default function NewPurchaseWizardPage() {
         setErrorMessage('All downpayment and financial details are required');
         return false;
       }
+      if (formData.dp_by_other && formData.dp_other_phone && !/^\d{10}$/.test(formData.dp_other_phone.trim())) {
+        setErrorMessage('Sponsor phone number must be exactly 10 digits');
+        return false;
+      }
     }
     if (step === 7) {
       if (formData.amc_amount === '' || formData.amc_start_date === '' || formData.amc_expire_date === '') {
@@ -493,7 +497,9 @@ export default function NewPurchaseWizardPage() {
                   label="Phone Number"
                   placeholder="10-digit mobile number"
                   value={formData.phone}
-                  onChange={(e) => updateField('phone', e.target.value)}
+                  onChange={(e) => updateField('phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  maxLength={10}
+                  inputMode="numeric"
                   required
                 />
 
@@ -900,9 +906,11 @@ export default function NewPurchaseWizardPage() {
                     />
                     <Input
                       label="Sponsor Mobile Phone"
-                      placeholder="Phone"
+                      placeholder="10-digit mobile number"
                       value={formData.dp_other_phone}
-                      onChange={(e) => updateField('dp_other_phone', e.target.value)}
+                      onChange={(e) => updateField('dp_other_phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      maxLength={10}
+                      inputMode="numeric"
                     />
                   </div>
                 )}

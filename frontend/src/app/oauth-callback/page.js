@@ -7,6 +7,10 @@ import api from '../../lib/api';
 import BrandLogo from '../../components/ui/BrandLogo';
 import { Zap } from 'lucide-react';
 
+// Module-level so it survives React StrictMode's dev-only mount/unmount/
+// remount, which would otherwise POST the same one-time OAuth code twice.
+const exchangedCodes = new Set();
+
 /**
  * /oauth-callback
  *
@@ -50,7 +54,8 @@ export default function OAuthCallbackPage() {
 
     const verify = async () => {
       try {
-        if (code) {
+        if (code && !exchangedCodes.has(code)) {
+          exchangedCodes.add(code);
           // Exchange the one-time code for auth cookies.
           // This AJAX call goes through the Next.js proxy (/api → backend),
           // so cookies are set on the frontend's domain — not the backend's.

@@ -97,6 +97,11 @@ export default function StaffPage() {
       setError('Name, phone, and password are required');
       return;
     }
+
+    if (!/^\d{10}$/.test(phone.trim())) {
+      setError('Phone number must be exactly 10 digits');
+      return;
+    }
     
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}$/;
     if (!passwordRegex.test(password)) {
@@ -150,6 +155,11 @@ export default function StaffPage() {
 
     if (!editName.trim() || !editPhone.trim()) {
       setEditError('Name and phone are required');
+      return;
+    }
+
+    if (!/^\d{10}$/.test(editPhone.trim())) {
+      setEditError('Phone number must be exactly 10 digits');
       return;
     }
 
@@ -410,7 +420,9 @@ export default function StaffPage() {
             label="Phone Number"
             placeholder="10-digit mobile number"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+            maxLength={10}
+            inputMode="numeric"
             required
           />
 
@@ -492,7 +504,9 @@ export default function StaffPage() {
             label="Phone Number"
             placeholder="10-digit mobile number"
             value={editPhone}
-            onChange={(e) => setEditPhone(e.target.value)}
+            onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+            maxLength={10}
+            inputMode="numeric"
             required
           />
 

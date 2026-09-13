@@ -335,7 +335,8 @@ class AuthService {
     }
 
     if (updateErr) {
-      throw new Error('Failed to update password: ' + updateErr.message);
+      console.error('[Password Reset] Failed to update password:', updateErr);
+      throw new Error('Failed to update password. Please try again.');
     }
 
     // Clear cache
@@ -353,7 +354,7 @@ class AuthService {
       ip,
     });
 
-    console.log(`✅ Password successfully reset for user: ${cleanEmail}`);
+    console.log(`Password successfully reset for user: ${cleanEmail}`);
 
     return {
       success: true,

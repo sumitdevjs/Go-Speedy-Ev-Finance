@@ -92,7 +92,7 @@ class BookingsService {
     try {
       // 4. Create Rental
       const startDate = tenantData.start_date ? new Date(tenantData.start_date) : new Date();
-      const totalMonths = tenantData.total_months || 24;
+      const totalMonths = Number(tenantData.total_months) || 24;
       const expectedEndDate = new Date(startDate);
       expectedEndDate.setMonth(expectedEndDate.getMonth() + totalMonths);
 
@@ -127,7 +127,10 @@ class BookingsService {
         .update({ stock_count: model.stock_count })
         .eq('id', tenantData.ev_model_id);
         
-      if (error.code === '23505') throw new Error(`Unique constraint violation: ${error.details || error.message}`);
+      if (error.code === '23505') {
+        console.error('[convertBooking] Unique constraint violation:', error);
+        throw new Error('Unique constraint violation: a record with this value already exists.');
+      }
       throw error;
     }
   }

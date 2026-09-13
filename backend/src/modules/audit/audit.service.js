@@ -22,10 +22,8 @@ class AuditService {
 
     if (error) throw error;
 
-    // entity_id is polymorphic (users/tenants/bookings/payments/...), so it has
-    // no FK constraint and PostgREST can't embed it automatically like `users`
-    // (the actor) above. For staff/user actions specifically, batch-resolve the
-    // target user's name so the log can say *who* the change was made to.
+    // entity_id is polymorphic, so PostgREST can't embed it like `users`
+    // above — batch-resolve the target user's name separately.
     const targetUserIds = [...new Set(
       data
         .filter(row => row.entity_type === 'users' && row.entity_id)

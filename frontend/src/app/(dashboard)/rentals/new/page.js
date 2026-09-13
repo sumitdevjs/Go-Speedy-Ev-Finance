@@ -252,6 +252,10 @@ export default function NewRentalWizardPage() {
         setErrorMessage('All downpayment and financial details are required');
         return false;
       }
+      if (formData.dp_by_other && formData.dp_other_phone && !/^\d{10}$/.test(formData.dp_other_phone.trim())) {
+        setErrorMessage('Sponsor phone number must be exactly 10 digits');
+        return false;
+      }
     }
     if (step === 7) {
       const missingRef = formData.references.some(r => !r.category || !r.name.trim() || !r.area.trim() || !r.phone.trim());
@@ -280,6 +284,10 @@ export default function NewRentalWizardPage() {
     if (step === 9 && !isDirectPurchase) {
       if (!formData.installment_frequency || formData.start_date === '' || formData.total_months === '') {
         setErrorMessage('All installment details (except daily rate) are required');
+        return false;
+      }
+      if (!formData.installment_by_self && formData.installment_other_phone && !/^\d{10}$/.test(formData.installment_other_phone.trim())) {
+        setErrorMessage('Payer phone number must be exactly 10 digits');
         return false;
       }
     }
@@ -570,7 +578,9 @@ export default function NewRentalWizardPage() {
                   label="Phone Number"
                   placeholder="10-digit mobile number"
                   value={formData.phone}
-                  onChange={(e) => updateField('phone', e.target.value)}
+                  onChange={(e) => updateField('phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  maxLength={10}
+                  inputMode="numeric"
                   required
                 />
 
@@ -990,9 +1000,11 @@ export default function NewRentalWizardPage() {
                     />
                     <Input
                       label="Sponsor Mobile Phone"
-                      placeholder="Phone"
+                      placeholder="10-digit mobile number"
                       value={formData.dp_other_phone}
-                      onChange={(e) => updateField('dp_other_phone', e.target.value)}
+                      onChange={(e) => updateField('dp_other_phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      maxLength={10}
+                      inputMode="numeric"
                     />
                   </div>
                 )}
@@ -1046,9 +1058,11 @@ export default function NewRentalWizardPage() {
                     />
                     <Input
                       label="Mobile Phone"
-                      placeholder="Phone"
+                      placeholder="10-digit mobile number"
                       value={ref.phone}
-                      onChange={(e) => updateReference(idx, 'phone', e.target.value)}
+                      onChange={(e) => updateReference(idx, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      maxLength={10}
+                      inputMode="numeric"
                       required
                     />
                   </div>
@@ -1085,9 +1099,11 @@ export default function NewRentalWizardPage() {
                     />
                     <Input
                       label="Mobile Phone"
-                      placeholder="10-digit number"
+                      placeholder="10-digit mobile number"
                       value={g.phone}
-                      onChange={(e) => updateGuarantor(idx, 'phone', e.target.value)}
+                      onChange={(e) => updateGuarantor(idx, 'phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      maxLength={10}
+                      inputMode="numeric"
                       required
                     />
                     <Input
@@ -1149,6 +1165,19 @@ export default function NewRentalWizardPage() {
                   value={formData.start_date}
                   onChange={(e) => updateField('start_date', e.target.value)}
                 />
+                <Input
+                  label="Expected Completion (Last Date)"
+                  type="date"
+                  value={(() => {
+                    if (!formData.start_date) return '';
+                    const d = new Date(formData.start_date);
+                    if (isNaN(d.getTime())) return '';
+                    d.setMonth(d.getMonth() + (Number(formData.total_months) || 24));
+                    return d.toISOString().split('T')[0];
+                  })()}
+                  disabled
+                  helperText={`Computed automatically: Start Date + ${formData.total_months || 24} months`}
+                />
               </div>
 
               <div className="pt-2 border-t border-slate-100">
@@ -1207,9 +1236,11 @@ export default function NewRentalWizardPage() {
                     />
                     <Input
                       label="Payer Mobile Phone"
-                      placeholder="Phone"
+                      placeholder="10-digit mobile number"
                       value={formData.installment_other_phone}
-                      onChange={(e) => updateField('installment_other_phone', e.target.value)}
+                      onChange={(e) => updateField('installment_other_phone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      maxLength={10}
+                      inputMode="numeric"
                     />
                   </div>
                 )}

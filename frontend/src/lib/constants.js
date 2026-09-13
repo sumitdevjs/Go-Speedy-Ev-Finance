@@ -68,6 +68,7 @@ export const formatDate = (dateString) => {
   if (!dateString) return '—';
   try {
     const d = new Date(dateString);
+    if (isNaN(d.getTime())) return dateString;
     return d.toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',

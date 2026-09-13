@@ -145,10 +145,10 @@ function SidebarInner({ isOpen, onClose }) {
   };
 
   return (
-    <aside className="w-64 shrink-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 flex flex-col h-full select-none transition-colors pt-3">
+    <aside className="w-64 shrink-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 flex flex-col h-full select-none transition-colors">
       {/* Brand Header */}
-      <div className="h-16 shrink-0 flex items-center px-4 border-b border-slate-100 dark:border-slate-800 justify-between">
-        <Link href="/dashboard" className="flex items-center">
+      <div className="h-[76px] shrink-0 flex items-center justify-center px-4 border-b border-slate-100 dark:border-slate-800 relative">
+        <Link href="/dashboard" className="flex flex-col items-center justify-center transition-transform hover:scale-[1.02]">
           <BrandLogo size="sidebar" showText={true} />
         </Link>
 
@@ -156,7 +156,7 @@ function SidebarInner({ isOpen, onClose }) {
         <button
           type="button"
           onClick={onClose}
-          className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-smooth lg:hidden shrink-0"
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-smooth lg:hidden shrink-0"
           aria-label="Close navigation"
         >
           <X className="h-5 w-5" />
@@ -164,7 +164,7 @@ function SidebarInner({ isOpen, onClose }) {
       </div>
 
       {/* Navigation Section */}
-      <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-1">
+      <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-1" data-lenis-prevent>
         <div className="px-3 pb-1 flex items-center justify-between">
           <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
             {role === 'staff' ? 'Staff Desk' : 'Operations'}

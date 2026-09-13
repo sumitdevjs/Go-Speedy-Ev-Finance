@@ -7,10 +7,12 @@ const requestLogger = require('../../middleware/requestLogger');
 const router = express.Router();
 router.use(requireAuth);
 
+const phoneSchema = z.string().regex(/^\d{10}$/, 'Phone number must be exactly 10 digits');
+
 const createRentalSchema = z.object({
   ev_model_id: z.string().uuid(),
   name: z.string().min(1),
-  phone: z.string().min(10),
+  phone: phoneSchema,
   gender: z.enum(['male', 'female']),
   address: z.string().min(1),
   chassis_no: z.string().min(1),
@@ -34,13 +36,13 @@ const createRentalSchema = z.object({
     category: z.string().min(1),
     name: z.string().min(1),
     area: z.string().min(1),
-    phone: z.string().min(10)
+    phone: phoneSchema
   })).optional(),
   guarantors: z.array(z.object({
     gender: z.string().min(1),
     name: z.string().min(1),
     address: z.string().min(1),
-    phone: z.string().min(10)
+    phone: phoneSchema
   })).optional(),
   aadhar_path: z.string().optional(),
   pan_path: z.string().optional(),
@@ -63,7 +65,12 @@ const createRentalSchema = z.object({
   notes: z.string().optional(),
 }).passthrough();
 
-const updateRentalSchema = z.object({}).passthrough();
+// status must go through /:id/complete or /:id/cancel, which enforce the
+// real business rules (e.g. balance must be zero before completing).
+const updateRentalSchema = z.object({}).passthrough().refine(
+  (data) => !('status' in data),
+  { message: 'status cannot be changed via a generic update — use the /complete or /cancel endpoints.' }
+);
 
 const validateBody = (schema) => (req, res, next) => {
   schema.parse(req.body);

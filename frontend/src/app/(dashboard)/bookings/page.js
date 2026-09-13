@@ -90,6 +90,11 @@ export default function BookingsPage() {
       return;
     }
 
+    if (!/^\d{10}$/.test(phone.trim())) {
+      setError('Phone number must be exactly 10 digits');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const res = await api.post('/api/bookings', {
@@ -135,6 +140,14 @@ export default function BookingsPage() {
 
   const handleEditBooking = async (e) => {
     e.preventDefault();
+    if (!editData.name?.trim() || !editData.phone?.trim()) {
+      toast.error('Name and phone number are required');
+      return;
+    }
+    if (!/^\d{10}$/.test(editData.phone.trim())) {
+      toast.error('Phone number must be exactly 10 digits');
+      return;
+    }
     try {
       setIsEditing(true);
       const res = await api.patch(`/api/bookings/${editData.id}`, {
@@ -353,7 +366,9 @@ export default function BookingsPage() {
             label="Contact Phone Number"
             placeholder="10-digit mobile number"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+            maxLength={10}
+            inputMode="numeric"
             required
           />
 
@@ -432,8 +447,11 @@ export default function BookingsPage() {
           />
           <Input
             label="Contact Phone Number"
+            placeholder="10-digit mobile number"
             value={editData.phone}
-            onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+            onChange={(e) => setEditData({ ...editData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+            maxLength={10}
+            inputMode="numeric"
             required
           />
           <Select
