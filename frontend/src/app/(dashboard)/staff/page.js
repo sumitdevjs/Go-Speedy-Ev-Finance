@@ -97,6 +97,12 @@ export default function StaffPage() {
       setError('Name, phone, and password are required');
       return;
     }
+    
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}$/;
+    if (!passwordRegex.test(password)) {
+      setError('Password must be at least 6 characters, contain 1 uppercase, 1 number, and 1 special character.');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -208,8 +214,9 @@ export default function StaffPage() {
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setResetError('');
-    if (!newPassword || newPassword.length < 6) {
-      setResetError('Password must be at least 6 characters');
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{6,}$/;
+    if (!newPassword || !passwordRegex.test(newPassword)) {
+      setResetError('Password must be at least 6 characters, contain 1 uppercase, 1 number, and 1 special character.');
       return;
     }
 
@@ -418,7 +425,7 @@ export default function StaffPage() {
           <Input
             label="Initial Password"
             type="password"
-            placeholder="Min 6 characters"
+            placeholder="Min 6 chars, 1 uppercase, 1 number, 1 special char"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -557,7 +564,7 @@ export default function StaffPage() {
           <Input
             label="New Password"
             type="password"
-            placeholder="Enter new password"
+            placeholder="Min 6 chars, 1 uppercase, 1 number, 1 special char"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             required
