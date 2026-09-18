@@ -59,7 +59,9 @@ export default function NewRentalWizardPage() {
   const searchParams = useSearchParams();
 
   const [currentStep, setCurrentStep] = useState(1);
+  const [modelType, setModelType] = useState('new'); // 'new' | 'old'
   const [models, setModels] = useState([]);
+  const [oldEvs, setOldEvs] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -73,6 +75,7 @@ export default function NewRentalWizardPage() {
   const [formData, setFormData] = useState({
     // Step 1: Model
     ev_model_id: searchParams.get('model_id') || '',
+    old_ev_id: '',
 
     // Step 2: Personal
     name: searchParams.get('name') || '',
@@ -92,11 +95,12 @@ export default function NewRentalWizardPage() {
     scooty_insurance_path: '',
     rider_insurance_path: '',
     rider_license_path: '',
-    amc_doc_path: '',
 
     // Step 4: Scooty Hardware
     chassis_no: '',
-    motor_ctrl_no: '',
+    motor_no: '',
+    controller_no: '',
+    charger_no: '',
     battery_no: '',
     vehicle_number: '',
     rto_type: 'rto',
@@ -168,6 +172,11 @@ export default function NewRentalWizardPage() {
         setModels(res.data.data || []);
       }
     });
+    api.get('/api/old-evs/available').then((res) => {
+      if (res.data?.success) {
+        setOldEvs(res.data.data || []);
+      }
+    });
 
     const saved = localStorage.getItem(DRAFT_KEY);
     if (saved && !searchParams.get('booking_id')) {
@@ -219,8 +228,12 @@ export default function NewRentalWizardPage() {
   const validateStep = (step) => {
     setErrorMessage('');
     if (step === 1) {
-      if (!formData.ev_model_id) {
+      if (modelType === 'new' && !formData.ev_model_id) {
         setErrorMessage('Please select an EV model to proceed');
+        return false;
+      }
+      if (modelType === 'old' && !formData.old_ev_id) {
+        setErrorMessage('Please select a returned EV to proceed');
         return false;
       }
     }
@@ -235,7 +248,7 @@ export default function NewRentalWizardPage() {
       }
     }
     if (step === 4) {
-      if (!formData.vehicle_number?.trim() || !formData.chassis_no.trim() || !formData.motor_ctrl_no.trim() || !formData.battery_no.trim() || !formData.rto_type || !formData.hp_financer || !formData.date_of_purchase || !formData.date_of_delivery) {
+      if (!formData.vehicle_number?.trim() || !formData.chassis_no.trim() || !formData.motor_no.trim() || !formData.controller_no.trim() || !formData.charger_no.trim() || !formData.battery_no.trim() || !formData.rto_type || !formData.hp_financer || !formData.date_of_purchase || !formData.date_of_delivery) {
         setErrorMessage('All hardware and registration details are required');
         return false;
       }
@@ -306,7 +319,7 @@ export default function NewRentalWizardPage() {
     if (currentStep === 4) {
       try {
         setIsSubmitting(true);
-        const res = await api.get(`/api/rentals/check-uniqueness?chassis_no=${encodeURIComponent(formData.chassis_no)}&motor_ctrl_no=${encodeURIComponent(formData.motor_ctrl_no)}&battery_no=${encodeURIComponent(formData.battery_no)}&vehicle_number=${encodeURIComponent(formData.vehicle_number || '')}`);
+        const res = await api.get(`/api/rentals/check-uniqueness?chassis_no=${encodeURIComponent(formData.chassis_no)}&motor_no=${encodeURIComponent(formData.motor_no)}&controller_no=${encodeURIComponent(formData.controller_no)}&charger_no=${encodeURIComponent(formData.charger_no)}&battery_no=${encodeURIComponent(formData.battery_no)}&vehicle_number=${encodeURIComponent(formData.vehicle_number || '')}`);
         if (res.data?.success && res.data.data?.exists) {
           setErrorMessage(res.data.data.message);
           return;
@@ -386,7 +399,7 @@ export default function NewRentalWizardPage() {
     setErrorMessage('');
 
     try {
-      const { booking_id, isDirectPurchase: _, hp_financer_other, ...restFormData } = formData;
+      const { booking_id, isDirectPurchase: _, hp_financer_other, amc_doc_path, ...restFormData } = formData;
       const payload = {
         ...restFormData,
         hp_financer: formData.hp_financer === 'other' ? (hp_financer_other || 'Other') : formData.hp_financer,
@@ -515,43 +528,123 @@ export default function NewRentalWizardPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {models.filter(m => m.is_active || formData.ev_model_id === m.id).map((m) => {
-                  const selected = formData.ev_model_id === m.id;
-                  const inStock = (m.stock_count || 0) > 0;
+              <div className="flex items-center gap-2 mb-4 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit">
+                <button
+                  type="button"
+                  onClick={() => setModelType('new')}
+                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
+                    modelType === 'new' 
+                      ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400' 
+                      : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+                >
+                  Brand New Models
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModelType('old')}
+                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
+                    modelType === 'old' 
+                      ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400' 
+                      : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+                >
+                  Returned / Refurbished EVs
+                </button>
+              </div>
 
-                  return (
-                    <div
-                      key={m.id}
-                      onClick={() => inStock && updateField('ev_model_id', m.id)}
-                      className={`p-4 rounded-xl border-2 transition-smooth cursor-pointer ${
-                        selected
-                          ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-500/10 shadow-sm'
-                          : inStock
-                          ? 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/60'
-                          : 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/40 opacity-60 cursor-not-allowed'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-900 dark:text-white">{m.name}</span>
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                            inStock
-                              ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-                              : 'bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-400'
+              {modelType === 'new' ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {models.filter(m => m.is_active || formData.ev_model_id === m.id).map((m) => {
+                    const selected = formData.ev_model_id === m.id && !formData.old_ev_id;
+                    const inStock = (m.stock_count || 0) > 0;
+
+                    return (
+                      <div
+                        key={m.id}
+                        onClick={() => {
+                          if (inStock) {
+                            updateField('ev_model_id', m.id);
+                            updateField('old_ev_id', null);
+                            // Clear pre-filled hardware fields just in case
+                            updateField('chassis_no', '');
+                            updateField('motor_no', '');
+                            updateField('controller_no', '');
+                            updateField('charger_no', '');
+                            updateField('battery_no', '');
+                          }
+                        }}
+                        className={`p-4 rounded-xl border-2 transition-smooth cursor-pointer ${
+                          selected
+                            ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-500/10 shadow-sm'
+                            : inStock
+                            ? 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/60'
+                            : 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/40 opacity-60 cursor-not-allowed'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-900 dark:text-white">{m.name}</span>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                              inStock
+                                ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+                                : 'bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-400'
+                            }`}
+                          >
+                            {m.stock_count} in stock
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{m.company} • {m.ward}</p>
+                        <p className="text-sm font-black text-blue-600 dark:text-blue-400 mt-3">
+                          {formatCurrency(m.total_price)}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {oldEvs.length === 0 ? (
+                    <p className="text-sm text-slate-500 py-4 col-span-2">No returned EVs available in stock.</p>
+                  ) : (
+                    oldEvs.map((ev) => {
+                      const selected = formData.old_ev_id === ev.id;
+                      return (
+                        <div
+                          key={ev.id}
+                          onClick={() => {
+                            updateField('old_ev_id', ev.id);
+                            updateField('ev_model_id', ev.original_ev_model_id);
+                            // Pre-fill hardware numbers
+                            updateField('chassis_no', ev.chassis_no || '');
+                            updateField('motor_no', ev.motor_no || '');
+                            updateField('controller_no', ev.controller_no || '');
+                            updateField('charger_no', ev.charger_no || '');
+                            updateField('battery_no', ev.battery_no || '');
+                          }}
+                          className={`p-4 rounded-xl border-2 transition-smooth cursor-pointer ${
+                            selected
+                              ? 'border-blue-600 bg-blue-50/40 dark:bg-blue-500/10 shadow-sm'
+                              : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/60'
                           }`}
                         >
-                          {m.stock_count} in stock
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{m.company} • {m.ward}</p>
-                      <p className="text-sm font-black text-blue-600 dark:text-blue-400 mt-3">
-                        {formatCurrency(m.total_price)}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-900 dark:text-white">
+                              {ev.original_ev_model?.name || 'Unknown Model'} (Used)
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            Chassis: {ev.chassis_no || 'N/A'} • Refurbished Price:
+                          </p>
+                          <p className="text-sm font-black text-amber-600 dark:text-amber-400 mt-3">
+                            {formatCurrency(ev.price)}
+                          </p>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -692,12 +785,6 @@ export default function NewRentalWizardPage() {
                   currentPath={formData.rider_license_path}
                   onUploaded={(path) => updateField('rider_license_path', path)}
                 />
-                <FileUpload
-                  label="AMC Document"
-                  docType="amc_doc_path"
-                  currentPath={formData.amc_doc_path}
-                  onUploaded={(path) => updateField('amc_doc_path', path)}
-                />
               </div>
             </div>
           )}
@@ -726,14 +813,34 @@ export default function NewRentalWizardPage() {
                   placeholder="e.g. CHSS-882190"
                   value={formData.chassis_no}
                   onChange={(e) => updateField('chassis_no', e.target.value)}
+                  disabled={!!formData.old_ev_id}
                   required
                 />
 
                 <Input
-                  label="Motor Controller Number"
+                  label="Motor Number"
                   placeholder="e.g. MTR-49102"
-                  value={formData.motor_ctrl_no}
-                  onChange={(e) => updateField('motor_ctrl_no', e.target.value)}
+                  value={formData.motor_no}
+                  onChange={(e) => updateField('motor_no', e.target.value)}
+                  disabled={!!formData.old_ev_id}
+                  required
+                />
+
+                <Input
+                  label="Controller Number"
+                  placeholder="e.g. CTRL-8921"
+                  value={formData.controller_no}
+                  onChange={(e) => updateField('controller_no', e.target.value)}
+                  disabled={!!formData.old_ev_id}
+                  required
+                />
+
+                <Input
+                  label="Charger Number"
+                  placeholder="e.g. CHG-39201"
+                  value={formData.charger_no}
+                  onChange={(e) => updateField('charger_no', e.target.value)}
+                  disabled={!!formData.old_ev_id}
                   required
                 />
 
@@ -742,6 +849,7 @@ export default function NewRentalWizardPage() {
                   placeholder="e.g. BAT-99120"
                   value={formData.battery_no}
                   onChange={(e) => updateField('battery_no', e.target.value)}
+                  disabled={!!formData.old_ev_id}
                   required
                 />
               </div>

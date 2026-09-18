@@ -75,20 +75,6 @@ class ModelsService {
   }
 
   async updateModel(id, updates) {
-    // If trying to change price, check for active rentals
-    if (updates.total_price !== undefined) {
-      const { count, error: countError } = await supabase
-        .from('tenants')
-        .select('*', { count: 'exact', head: true })
-        .eq('ev_model_id', id)
-        .eq('status', 'rented');
-
-      if (countError) throw countError;
-
-      if (count > 0) {
-        throw new Error(`Cannot change price: there are ${count} active rentals using this model`);
-      }
-    }
 
     const { data, error } = await supabase
       .from('ev_models')

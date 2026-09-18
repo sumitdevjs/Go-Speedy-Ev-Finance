@@ -45,10 +45,26 @@ CREATE TABLE IF NOT EXISTS ev_models (
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- ── TABLE 3: tenants ────────────────────────────────────────────────────────
+-- ── TABLE 3: old_evs ─────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS old_evs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  original_ev_model_id UUID REFERENCES ev_models(id),
+  returned_from_tenant_id UUID, -- References tenants(id), but defined later to avoid circular dependency
+  chassis_no TEXT,
+  motor_no TEXT,
+  controller_no TEXT,
+  battery_no TEXT,
+  charger_no TEXT,
+  price NUMERIC(12,2),
+  status TEXT DEFAULT 'available' CHECK (status IN ('available', 'rented', 'sold')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ── TABLE 4: tenants ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS tenants (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ev_model_id    UUID NOT NULL REFERENCES ev_models(id),
+  old_ev_id      UUID REFERENCES old_evs(id),
 
   -- Status
   status         TEXT NOT NULL DEFAULT 'rented'
@@ -76,7 +92,9 @@ CREATE TABLE IF NOT EXISTS tenants (
 
   -- Scooty hardware
   chassis_no    TEXT,
-  motor_ctrl_no TEXT,
+  motor_no      TEXT,
+  controller_no TEXT,
+  charger_no    TEXT,
   battery_no    TEXT,
   rto_type      TEXT CHECK (rto_type IS NULL OR rto_type IN ('rto','non_rto')),
   hp_financer   TEXT,
@@ -139,7 +157,6 @@ CREATE TABLE IF NOT EXISTS tenants (
   amc_expire_date          DATE,
   amc_service_log          JSONB NOT NULL DEFAULT '[]',
   -- Each entry: { date, what_change, old_serial_no, new_serial_no, cost }
-  amc_doc_path             TEXT,
 
   -- Buyback / Early Exit
   buyback_amount           NUMERIC(12,2),
@@ -152,12 +169,16 @@ CREATE TABLE IF NOT EXISTS tenants (
 );
 
 -- Unique partial indexes: enforced only when value is present
-CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_chassis
-  ON tenants(chassis_no) WHERE chassis_no IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_motor
-  ON tenants(motor_ctrl_no) WHERE motor_ctrl_no IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_battery
-  ON tenants(battery_no) WHERE battery_no IS NOT NULL;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_chassis
+    ON tenants(chassis_no) WHERE chassis_no IS NOT NULL;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_motor
+    ON tenants(motor_no) WHERE motor_no IS NOT NULL;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_controller
+    ON tenants(controller_no) WHERE controller_no IS NOT NULL;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_charger
+    ON tenants(charger_no) WHERE charger_no IS NOT NULL;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_battery
+    ON tenants(battery_no) WHERE battery_no IS NOT NULL;
 
 -- Query indexes
 CREATE INDEX IF NOT EXISTS idx_tenants_model    ON tenants(ev_model_id);
@@ -165,7 +186,7 @@ CREATE INDEX IF NOT EXISTS idx_tenants_status   ON tenants(status);
 CREATE INDEX IF NOT EXISTS idx_tenants_phone    ON tenants(phone);
 CREATE INDEX IF NOT EXISTS idx_tenants_name_trgm ON tenants USING gin(name gin_trgm_ops);
 
--- ── TABLE 4: payments ───────────────────────────────────────────────────────
+-- ── TABLE 5: payments ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS payments (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id    UUID NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
@@ -182,7 +203,7 @@ CREATE INDEX IF NOT EXISTS idx_payments_tenant ON payments(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_payments_date   ON payments(payment_date);
 CREATE INDEX IF NOT EXISTS idx_payments_collector ON payments(collected_by);
 
--- ── TABLE 5: bookings ───────────────────────────────────────────────────────
+-- ── TABLE 6: bookings ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS bookings (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ev_model_id     UUID REFERENCES ev_models(id),
@@ -204,7 +225,7 @@ CREATE TABLE IF NOT EXISTS bookings (
 
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
 
--- ── TABLE 6: audit_logs ─────────────────────────────────────────────────────
+-- ── TABLE 7: audit_logs ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS audit_logs (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES users(id),
@@ -228,6 +249,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
 
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ev_models ENABLE ROW LEVEL SECURITY;
+ALTER TABLE old_evs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;

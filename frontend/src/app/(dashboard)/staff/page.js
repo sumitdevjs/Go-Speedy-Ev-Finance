@@ -93,8 +93,8 @@ export default function StaffPage() {
     e.preventDefault();
     setError('');
 
-    if (!name.trim() || !phone.trim() || !password) {
-      setError('Name, phone, and password are required');
+    if (!name.trim() || !phone.trim() || !email.trim() || !password) {
+      setError('Name, phone, email, and password are required');
       return;
     }
 
@@ -153,8 +153,8 @@ export default function StaffPage() {
     e.preventDefault();
     setEditError('');
 
-    if (!editName.trim() || !editPhone.trim()) {
-      setEditError('Name and phone are required');
+    if (!editName.trim() || !editPhone.trim() || !editEmail.trim()) {
+      setEditError('Name, phone, and email are required');
       return;
     }
 
@@ -435,6 +435,7 @@ export default function StaffPage() {
             placeholder="e.g. staff@gmail.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
           />
 
           <Input
@@ -519,6 +520,7 @@ export default function StaffPage() {
             placeholder="e.g. staff@gmail.com"
             value={editEmail}
             onChange={(e) => setEditEmail(e.target.value)}
+            required
           />
 
           <div>

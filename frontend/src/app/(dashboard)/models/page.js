@@ -19,6 +19,7 @@ import { toast } from '../../../lib/toast';
 import { confirmDialog } from '../../../lib/confirmDialog';
 
 export default function ModelsPage() {
+  const [activeTab, setActiveTab] = useState('new'); // 'new' or 'old'
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -32,6 +33,13 @@ export default function ModelsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+
+  // Old EVs State
+  const [oldEvs, setOldEvs] = useState([]);
+  const [loadingOldEvs, setLoadingOldEvs] = useState(false);
+  const [isEditPriceOpen, setIsEditPriceOpen] = useState(false);
+  const [selectedOldEv, setSelectedOldEv] = useState(null);
+  const [editPrice, setEditPrice] = useState('');
 
   // Add Stock state
   const [isAddStockOpen, setIsAddStockOpen] = useState(false);
@@ -57,6 +65,26 @@ export default function ModelsPage() {
   useEffect(() => {
     staggerFadeIn('.gsap-filter-bar', { y: 14, duration: 0.45, stagger: 0 });
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'old') {
+      fetchOldEvs();
+    }
+  }, [activeTab]);
+
+  const fetchOldEvs = async () => {
+    try {
+      setLoadingOldEvs(true);
+      const res = await api.get('/api/old-evs');
+      if (res.data?.success) {
+        setOldEvs(res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to load old EVs:', err);
+    } finally {
+      setLoadingOldEvs(false);
+    }
+  };
 
   const fetchModels = async () => {
     try {
@@ -191,6 +219,21 @@ export default function ModelsPage() {
     }
   };
 
+  const handleUpdateOldEvPrice = async (e) => {
+    e.preventDefault();
+    try {
+      setIsSubmitting(true);
+      await api.patch(`/api/old-evs/${selectedOldEv.id}/price`, { price: Number(editPrice) });
+      toast.success('Price updated successfully');
+      setIsEditPriceOpen(false);
+      fetchOldEvs();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update price');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const columns = [
     {
       header: 'Model Name',
@@ -265,6 +308,69 @@ export default function ModelsPage() {
     },
   ];
 
+  const oldEvsColumns = [
+    {
+      header: 'Original Model',
+      key: 'model',
+      render: (row) => (
+        <div>
+          <p className="font-bold text-slate-900 dark:text-white">{row.original_ev_model?.name || 'Unknown'}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{row.original_ev_model?.company}</p>
+        </div>
+      ),
+    },
+    {
+      header: 'Hardware Details',
+      key: 'hardware',
+      render: (row) => (
+        <div>
+          <p className="text-xs text-slate-800 dark:text-slate-200">Chassis: {row.chassis_no}</p>
+          <p className="text-[11px] text-slate-500">M: {row.motor_no} | C: {row.controller_no}</p>
+        </div>
+      ),
+    },
+    {
+      header: 'Status',
+      key: 'status',
+      render: (row) => {
+        let variant = 'slate';
+        if (row.status === 'available') variant = 'emerald';
+        if (row.status === 'rented') variant = 'amber';
+        if (row.status === 'sold') variant = 'blue';
+        return <Badge status={row.status.toUpperCase()} variant={variant} size="sm" />;
+      },
+    },
+    {
+      header: 'Used Price',
+      key: 'price',
+      render: (row) => (
+        <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(row.price)}</span>
+      ),
+    },
+    {
+      header: 'Actions',
+      key: 'actions',
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          {row.status === 'available' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={Edit2}
+              title="Edit Price"
+              onClick={() => {
+                setSelectedOldEv(row);
+                setEditPrice(row.price?.toString() || '');
+                setIsEditPriceOpen(true);
+              }}
+              className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            />
+          )}
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div>
       <Header
@@ -286,8 +392,34 @@ export default function ModelsPage() {
       />
 
       <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
-        {/* Search Bar */}
-        <div className="gsap-filter-bar flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
+        {/* Toggle Bar */}
+        <div className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit">
+          <button
+            onClick={() => setActiveTab('new')}
+            className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
+              activeTab === 'new' 
+                ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400' 
+                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            Brand New Models
+          </button>
+          <button
+            onClick={() => setActiveTab('old')}
+            className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
+              activeTab === 'old' 
+                ? 'bg-white dark:bg-slate-700 shadow-sm text-amber-600 dark:text-amber-400' 
+                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+            }`}
+          >
+            Returned / Refurbished EVs
+          </button>
+        </div>
+
+        {activeTab === 'new' ? (
+          <>
+            {/* Search Bar */}
+            <div className="gsap-filter-bar flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
           <SearchBar
             value={search}
             onChange={(val) => {
@@ -334,6 +466,17 @@ export default function ModelsPage() {
           totalItems={totalRecords}
           onPageChange={setPage}
         />
+          </>
+        ) : (
+          <div className="animate-in fade-in zoom-in-95 duration-300">
+            <Table
+              columns={oldEvsColumns}
+              data={oldEvs}
+              loading={loadingOldEvs}
+              emptyText="No returned/refurbished EVs found."
+            />
+          </div>
+        )}
       </div>
 
       {/* Add/Edit Model Modal */}
@@ -470,6 +613,44 @@ export default function ModelsPage() {
               loading={isStockSubmitting}
             >
               Confirm Stock
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Old EV Price Modal */}
+      <Modal
+        isOpen={isEditPriceOpen}
+        onClose={() => setIsEditPriceOpen(false)}
+        title="Update Used Price"
+        subtitle="Set a custom selling or rental valuation for this specific returned EV."
+      >
+        <form onSubmit={handleUpdateOldEvPrice} className="space-y-4" autoComplete="off">
+          <Input
+            label="Used Price (₹)"
+            type="number"
+            min={0}
+            placeholder="e.g. 50000"
+            value={editPrice}
+            onChange={(e) => setEditPrice(e.target.value)}
+            required
+          />
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button
+              variant="outline"
+              size="md"
+              type="button"
+              onClick={() => setIsEditPriceOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              loading={isSubmitting}
+            >
+              Update Price
             </Button>
           </div>
         </form>

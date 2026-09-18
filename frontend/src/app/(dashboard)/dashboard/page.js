@@ -39,6 +39,7 @@ export default function DashboardPage() {
 function AdminDashboard() {
   const [stats, setStats] = useState({
     totalStock: 0,
+    oldStock: 0,
     activeRentals: 0,
     overdueCount: 0,
     totalCollections: 0,
@@ -59,6 +60,10 @@ function AdminDashboard() {
       const modelsRes = await api.get('/api/models/dropdown');
       const models = modelsRes.data?.data || [];
       const totalStock = models.filter(m => m.is_active).reduce((sum, m) => sum + (m.stock_count || 0), 0);
+
+      // Fetch Used EVs for stock
+      const oldEvsRes = await api.get('/api/old-evs/available');
+      const oldStock = oldEvsRes.data?.data?.length || 0;
 
       // Fetch Rentals (Active/Cancelled)
       const rentalsRes = await api.get('/api/rentals?limit=10000');
@@ -88,6 +93,7 @@ function AdminDashboard() {
 
       setStats({
         totalStock,
+        oldStock,
         activeRentals: active.length,
         overdueCount: overdue.length,
         totalCollections: totalCol,
@@ -107,7 +113,8 @@ function AdminDashboard() {
       staggerFadeIn('.gsap-admin-kpi', { stagger: 0.08, y: 15, duration: 0.5, hover: true });
       staggerFadeIn('.gsap-admin-row', { stagger: 0.04, y: 10, duration: 0.4, delay: 0.1 });
 
-      animateCounter('#gsap-admin-stock', stats.totalStock, { suffix: ' units', duration: 0.8 });
+      animateCounter('#gsap-admin-stock-new', stats.totalStock, { duration: 0.8 });
+      animateCounter('#gsap-admin-stock-old', stats.oldStock, { duration: 0.8 });
       animateCounter('#gsap-admin-active', stats.activeRentals, { suffix: ' tenants', duration: 0.8 });
       animateCounter('#gsap-admin-overdue', stats.overdueCount, { suffix: ' cases', duration: 0.8 });
       animateCounter('#gsap-admin-collections', stats.totalCollections, { prefix: '₹', duration: 1.2 });
@@ -130,8 +137,20 @@ function AdminDashboard() {
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Available EV Stock
               </p>
-              <h3 id="gsap-admin-stock" className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-                {loading ? <Spinner size="sm" /> : `${stats.totalStock} units`}
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1 flex items-baseline gap-2">
+                {loading ? <Spinner size="sm" /> : (
+                  <>
+                    <span title="Brand New Stock">
+                      <span id="gsap-admin-stock-new">{stats.totalStock}</span>
+                      <span className="text-sm font-medium text-slate-500 ml-1">New</span>
+                    </span>
+                    <span className="text-sm font-medium text-slate-300 dark:text-slate-600">|</span>
+                    <span title="Returned/Refurbished Stock" className="text-amber-600 dark:text-amber-500">
+                      <span id="gsap-admin-stock-old">{stats.oldStock}</span>
+                      <span className="text-sm font-medium text-amber-500/70 ml-1">Used</span>
+                    </span>
+                  </>
+                )}
               </h3>
               
               <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium mt-1">

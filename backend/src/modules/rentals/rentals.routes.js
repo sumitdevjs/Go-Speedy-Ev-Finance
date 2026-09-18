@@ -16,8 +16,11 @@ const createRentalSchema = z.object({
   gender: z.enum(['male', 'female']),
   address: z.string().min(1),
   chassis_no: z.string().min(1),
-  motor_ctrl_no: z.string().min(1),
+  motor_no: z.string().min(1),
+  controller_no: z.string().min(1),
+  charger_no: z.string().min(1),
   battery_no: z.string().min(1),
+  old_ev_id: z.string().uuid().optional().nullable(),
   rto_type: z.string().min(1),
   hp_financer: z.string().min(1),
   date_of_purchase: z.string().min(1),
@@ -115,7 +118,13 @@ router.get('/', rentalsController.getAll.bind(rentalsController));
  *         name: chassis_no
  *         schema: { type: string }
  *       - in: query
- *         name: motor_ctrl_no
+ *         name: motor_no
+ *         schema: { type: string }
+ *       - in: query
+ *         name: controller_no
+ *         schema: { type: string }
+ *       - in: query
+ *         name: charger_no
  *         schema: { type: string }
  *       - in: query
  *         name: battery_no

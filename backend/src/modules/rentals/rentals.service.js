@@ -271,18 +271,27 @@ class RentalsService {
 
     if (cancelError) throw cancelError;
 
-    // 2. Restore stock
-    const { data: model } = await supabase
-      .from('ev_models')
-      .select('stock_count')
-      .eq('id', tenant.ev_model_id)
+    // 2. Insert into old_evs instead of restoring stock to ev_models
+    const { data: tenantDetails } = await supabase
+      .from('tenants')
+      .select('chassis_no, motor_no, controller_no, battery_no, charger_no, ev_model_id')
+      .eq('id', id)
       .single();
 
-    if (model) {
+    if (tenantDetails) {
       await supabase
-        .from('ev_models')
-        .update({ stock_count: model.stock_count + 1 })
-        .eq('id', tenant.ev_model_id);
+        .from('old_evs')
+        .insert([{
+          original_ev_model_id: tenantDetails.ev_model_id,
+          returned_from_tenant_id: id,
+          chassis_no: tenantDetails.chassis_no,
+          motor_no: tenantDetails.motor_no,
+          controller_no: tenantDetails.controller_no,
+          battery_no: tenantDetails.battery_no,
+          charger_no: tenantDetails.charger_no,
+          price: 0, // Admin can update this later
+          status: 'available'
+        }]);
     }
     
     return { success: true };
@@ -313,12 +322,12 @@ class RentalsService {
   }
 
   async checkUniqueHardwareOrPolicy(fields) {
-    const { chassis_no, motor_ctrl_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number } = fields;
+    const { chassis_no, motor_no, controller_no, charger_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number } = fields;
 
     // buildEqOrFilter escapes values so a comma/parenthesis can't inject
     // extra filter clauses into the query.
     const orFilter = buildEqOrFilter({
-      chassis_no, motor_ctrl_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number,
+      chassis_no, motor_no, controller_no, charger_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number,
     });
 
     if (!orFilter) {
@@ -327,7 +336,7 @@ class RentalsService {
 
     const { data, error } = await supabase
       .from('tenants')
-      .select('chassis_no, motor_ctrl_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number')
+      .select('chassis_no, motor_no, controller_no, charger_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number')
       .or(orFilter);
 
     if (error) throw error;
@@ -336,7 +345,9 @@ class RentalsService {
       // Find which one matched to give a specific error message
       const conflict = data[0];
       if (chassis_no && conflict.chassis_no === chassis_no) return { exists: true, message: 'Chassis number already exists in the system.' };
-      if (motor_ctrl_no && conflict.motor_ctrl_no === motor_ctrl_no) return { exists: true, message: 'Motor controller number already exists in the system.' };
+      if (motor_no && conflict.motor_no === motor_no) return { exists: true, message: 'Motor number already exists in the system.' };
+      if (controller_no && conflict.controller_no === controller_no) return { exists: true, message: 'Controller number already exists in the system.' };
+      if (charger_no && conflict.charger_no === charger_no) return { exists: true, message: 'Charger number already exists in the system.' };
       if (battery_no && conflict.battery_no === battery_no) return { exists: true, message: 'Battery serial number already exists in the system.' };
       if (vehicle_number && conflict.vehicle_number === vehicle_number) return { exists: true, message: 'Vehicle number already exists in the system.' };
       if (scooty_policy_number && conflict.scooty_policy_number === scooty_policy_number) return { exists: true, message: 'Scooty policy number already exists in the system.' };

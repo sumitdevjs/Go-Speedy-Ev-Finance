@@ -9,7 +9,7 @@ class DocumentsService {
   async getDocumentsForTenant(tenantId) {
     const { data: tenant, error: fetchError } = await supabase
       .from('tenants')
-      .select('aadhar_path, pan_path, cheque_path, electricity_bill_path, tenant_photo_path, scooty_photo_path, rent_agreement_path, scooty_insurance_path, rider_insurance_path, rider_license_path, invoice_doc_path, amc_doc_path')
+      .select('aadhar_path, pan_path, cheque_path, electricity_bill_path, tenant_photo_path, scooty_photo_path, rent_agreement_path, scooty_insurance_path, rider_insurance_path, rider_license_path, invoice_doc_path')
       .eq('id', tenantId)
       .single();
 
