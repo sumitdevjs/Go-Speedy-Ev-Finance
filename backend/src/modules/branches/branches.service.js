@@ -28,7 +28,12 @@ class BranchesService {
     }
 
     const { data, count, error } = await queryBuilder.range(offset, offset + limit - 1);
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST205' || error.code === '42P01') {
+        return { data: [], meta: getPaginationMeta(0, page, limit) };
+      }
+      throw error;
+    }
 
     const meta = getPaginationMeta(count, page, limit);
     return { data, meta };
@@ -48,8 +53,13 @@ class BranchesService {
     }
 
     const { data, error } = await queryBuilder;
-    if (error) throw error;
-    return data;
+    if (error) {
+      if (error.code === 'PGRST205' || error.code === '42P01') {
+        return [];
+      }
+      throw error;
+    }
+    return data || [];
   }
 
   async getById(id) {

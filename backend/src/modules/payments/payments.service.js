@@ -4,7 +4,7 @@ const { applyScope } = require('../../middleware/scope');
 
 class PaymentsService {
   async getPayments(tenantId, req = null) {
-    let query = supabase.from('payments').select('*, users(name), branch:branch_id (id, name, code)');
+    let query = supabase.from('payments').select('*, users(name)');
     
     if (tenantId) {
       query = query.eq('tenant_id', tenantId);
@@ -15,6 +15,18 @@ class PaymentsService {
     const { data, error } = await query.order('payment_date', { ascending: false }).order('created_at', { ascending: false });
 
     if (error) throw error;
+
+    if (data && data.some(p => p.branch_id)) {
+      try {
+        const branchIds = [...new Set(data.map(p => p.branch_id).filter(Boolean))];
+        if (branchIds.length > 0) {
+          const { data: bList } = await supabase.from('branches').select('id, name, code').in('id', branchIds);
+          const bMap = new Map((bList || []).map(b => [b.id, b]));
+          data.forEach(p => { if (p.branch_id) p.branch = bMap.get(p.branch_id) || null; });
+        }
+      } catch (e) {}
+    }
+
     return data;
   }
 
@@ -31,22 +43,24 @@ class PaymentsService {
     if (tenantError || !tenant) throw new Error('Tenant not found');
     if (tenant.status !== 'rented') throw new Error(`Cannot record payment: rental status is ${tenant.status}`);
 
-    // 2. Insert Payment with branch attribution
+    // 2. Insert Payment with branch attribution if columns exist
+    const insertPayload = {
+      tenant_id,
+      amount,
+      payment_date,
+      mode,
+      notes,
+      gst_amount: gst_amount || 0,
+      collected_by: collectedBy
+    };
+    if (tenant.branch_id) insertPayload.branch_id = tenant.branch_id;
+    if (tenant.head_office_id) insertPayload.head_office_id = tenant.head_office_id;
+    if (late_fee_paid) insertPayload.late_fee_paid = late_fee_paid;
+    if (is_penalty_waiver !== undefined) insertPayload.is_penalty_waiver = Boolean(is_penalty_waiver);
+
     const { data: newPayment, error: paymentError } = await supabase
       .from('payments')
-      .insert([{
-        tenant_id,
-        amount,
-        payment_date,
-        mode,
-        notes,
-        gst_amount: gst_amount || 0,
-        late_fee_paid: late_fee_paid || 0,
-        is_penalty_waiver: Boolean(is_penalty_waiver),
-        branch_id: tenant.branch_id || null,
-        head_office_id: tenant.head_office_id || null,
-        collected_by: collectedBy
-      }])
+      .insert([insertPayload])
       .select('*')
       .single();
 

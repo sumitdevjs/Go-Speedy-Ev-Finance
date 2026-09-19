@@ -10,7 +10,7 @@ class ModelsService {
 
     let queryBuilder = supabase
       .from('ev_models')
-      .select('*, branch:branch_id (id, name, code, ward_no)', { count: 'exact' })
+      .select('*', { count: 'exact' })
       .order('created_at', { ascending: false });
 
     if (req) {
@@ -36,6 +36,20 @@ class ModelsService {
 
     if (error) throw error;
 
+    // Safely batch-resolve branch details if branch_id exists on rows
+    if (data && data.some(m => m.branch_id)) {
+      try {
+        const branchIds = [...new Set(data.map(m => m.branch_id).filter(Boolean))];
+        if (branchIds.length > 0) {
+          const { data: bList } = await supabase.from('branches').select('id, name, code, ward_no').in('id', branchIds);
+          const bMap = new Map((bList || []).map(b => [b.id, b]));
+          data.forEach(m => { if (m.branch_id) m.branch = bMap.get(m.branch_id) || null; });
+        }
+      } catch (e) {
+        // Silently continue if branches table does not exist
+      }
+    }
+
     const meta = getPaginationMeta(count, page, limit);
     return { data, meta };
   }
@@ -44,7 +58,7 @@ class ModelsService {
   async getAllModelsForDropdown(req = null) {
     let queryBuilder = supabase
       .from('ev_models')
-      .select('id, name, company, total_price, stock_count, is_active, branch_id')
+      .select('id, name, company, total_price, stock_count, is_active')
       .eq('is_active', true)
       .order('name', { ascending: true });
 

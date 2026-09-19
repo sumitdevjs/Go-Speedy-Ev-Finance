@@ -10,7 +10,7 @@ class RentalsService {
     
     let queryBuilder = supabase
       .from('tenants')
-      .select('*, ev_models(name, company, total_price), branch:branch_id (id, name, code, ward_no), users!tenants_created_by_fkey(name)', { count: 'exact' });
+      .select('*, ev_models(name, company, total_price), users!tenants_created_by_fkey(name)', { count: 'exact' });
 
     if (req) {
       queryBuilder = applyScope(queryBuilder, req);
@@ -51,6 +51,18 @@ class RentalsService {
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
+
+    // Safely batch-resolve branch details if branch_id exists on rows
+    if (tenants && tenants.some(t => t.branch_id)) {
+      try {
+        const branchIds = [...new Set(tenants.map(t => t.branch_id).filter(Boolean))];
+        if (branchIds.length > 0) {
+          const { data: bList } = await supabase.from('branches').select('id, name, code, ward_no').in('id', branchIds);
+          const bMap = new Map((bList || []).map(b => [b.id, b]));
+          tenants.forEach(t => { if (t.branch_id) t.branch = bMap.get(t.branch_id) || null; });
+        }
+      } catch (e) {}
+    }
 
     // Fetch total paid for all these tenants to compute balance
     const tenantIds = tenants.map(t => t.id);

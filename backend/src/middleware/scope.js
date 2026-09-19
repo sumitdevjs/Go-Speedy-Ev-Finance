@@ -2,6 +2,24 @@
  * Scoping middleware & query helpers for Multi-Branch and Head-Office Hierarchy
  */
 
+let hasBranchSupport = false;
+
+const checkBranchSupport = async () => {
+  try {
+    const supabase = require('../config/db');
+    const { error } = await supabase.from('branches').select('id').limit(1);
+    hasBranchSupport = !error || (error.code !== 'PGRST205' && error.code !== '42P01');
+  } catch {
+    hasBranchSupport = false;
+  }
+  return hasBranchSupport;
+};
+
+// Initial check and periodic background refresh
+checkBranchSupport();
+const branchTimer = setInterval(checkBranchSupport, 30000);
+if (branchTimer.unref) branchTimer.unref();
+
 const getScope = (req) => {
   const user = req.user || {};
   const role = user.role;
@@ -29,6 +47,10 @@ const getScope = (req) => {
  * @returns {Object} queryBuilder with filters applied
  */
 const applyScope = (queryBuilder, req, options = {}) => {
+  if (!hasBranchSupport) {
+    return queryBuilder;
+  }
+
   const scope = getScope(req);
   const branchCol = options.branchColumn || 'branch_id';
   const hoCol = options.headOfficeColumn || 'head_office_id';
@@ -71,33 +93,43 @@ const applyScope = (queryBuilder, req, options = {}) => {
  * Ensures staff cannot spoof another branch.
  */
 const resolveCreateScope = (req, payload = {}) => {
+  if (!hasBranchSupport) {
+    return { branch_id: null, head_office_id: null };
+  }
+
   const scope = getScope(req);
   const selectedBranchId = payload.branch_id || req.headers?.['x-branch-id'];
   const selectedHoId = payload.head_office_id || req.headers?.['x-head-office-id'];
 
   if (scope.isSuperAdmin) {
     return {
-      branch_id: selectedBranchId || scope.userBranchId,
-      head_office_id: selectedHoId || scope.userHeadOfficeId,
+      branch_id: selectedBranchId || scope.userBranchId || null,
+      head_office_id: selectedHoId || scope.userHeadOfficeId || null,
     };
   }
 
   if (scope.isHoAdmin) {
     return {
-      branch_id: selectedBranchId || scope.userBranchId,
-      head_office_id: scope.userHeadOfficeId,
+      branch_id: selectedBranchId || scope.userBranchId || null,
+      head_office_id: scope.userHeadOfficeId || null,
     };
   }
 
   // Branch Admin & Staff are forced to their assigned branch & HO
   return {
-    branch_id: scope.userBranchId,
-    head_office_id: scope.userHeadOfficeId,
+    branch_id: scope.userBranchId || null,
+    head_office_id: scope.userHeadOfficeId || null,
   };
 };
+
+const isBranchSupported = () => hasBranchSupport;
+const setBranchSupportForTest = (val) => { hasBranchSupport = val; };
 
 module.exports = {
   getScope,
   applyScope,
   resolveCreateScope,
+  isBranchSupported,
+  checkBranchSupport,
+  setBranchSupportForTest,
 };

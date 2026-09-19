@@ -1,6 +1,9 @@
-const { applyScope, resolveCreateScope } = require('../../src/middleware/scope');
+const { applyScope, resolveCreateScope, setBranchSupportForTest } = require('../../src/middleware/scope');
 
 describe('Data Scoping and Multi-Tenant Isolation', () => {
+  beforeAll(() => {
+    setBranchSupportForTest(true);
+  });
   // Mock query builder mimicking Supabase/PostgREST chain
   const createMockQuery = () => {
     const filters = [];

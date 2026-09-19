@@ -18,8 +18,13 @@ class HeadOfficesService {
       .eq('is_active', true)
       .order('name', { ascending: true });
 
-    if (error) throw error;
-    return data;
+    if (error) {
+      if (error.code === 'PGRST205' || error.code === '42P01') {
+        return [];
+      }
+      throw error;
+    }
+    return data || [];
   }
 
   async getById(id) {

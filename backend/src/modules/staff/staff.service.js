@@ -11,7 +11,7 @@ class StaffService {
 
     let queryBuilder = supabase
       .from('users')
-      .select('id, name, phone, email, role, ward_area, is_active, head_office_id, branch_id, branches:branch_id (id, name, code, ward_no), head_offices:head_office_id (id, name, code), created_at, updated_at', { count: 'exact' })
+      .select('*', { count: 'exact' })
       .order('created_at', { ascending: false });
 
     if (req) {
@@ -32,6 +32,24 @@ class StaffService {
 
     if (error) throw error;
 
+    // Safely batch-resolve branch & head office info if present
+    if (data && data.length > 0) {
+      try {
+        const branchIds = [...new Set(data.map(u => u.branch_id).filter(Boolean))];
+        if (branchIds.length > 0) {
+          const { data: bList } = await supabase.from('branches').select('id, name, code, ward_no').in('id', branchIds);
+          const bMap = new Map((bList || []).map(b => [b.id, b]));
+          data.forEach(u => { if (u.branch_id) u.branches = bMap.get(u.branch_id) || null; });
+        }
+        const hoIds = [...new Set(data.map(u => u.head_office_id).filter(Boolean))];
+        if (hoIds.length > 0) {
+          const { data: hoList } = await supabase.from('head_offices').select('id, name, code').in('id', hoIds);
+          const hoMap = new Map((hoList || []).map(h => [h.id, h]));
+          data.forEach(u => { if (u.head_office_id) u.head_offices = hoMap.get(u.head_office_id) || null; });
+        }
+      } catch (e) {}
+    }
+
     const meta = getPaginationMeta(count, page, limit);
     return { data, meta };
   }
@@ -48,21 +66,23 @@ class StaffService {
       assignedHoId = scope.head_office_id;
     }
     
+    const insertPayload = {
+      name,
+      phone,
+      email: email || null,
+      password_hash,
+      role: role || 'staff',
+      ward_area,
+      is_active: true,
+      created_by: createdBy
+    };
+    if (assignedBranchId) insertPayload.branch_id = assignedBranchId;
+    if (assignedHoId) insertPayload.head_office_id = assignedHoId;
+
     const { data, error } = await supabase
       .from('users')
-      .insert([{
-        name,
-        phone,
-        email: email || null,
-        password_hash,
-        role: role || 'staff',
-        ward_area,
-        branch_id: assignedBranchId,
-        head_office_id: assignedHoId,
-        is_active: true,
-        created_by: createdBy
-      }])
-      .select('id, name, phone, email, role, ward_area, branch_id, head_office_id, is_active, created_at')
+      .insert([insertPayload])
+      .select('*')
       .single();
 
     if (error) {

@@ -20,7 +20,7 @@ const requireAuth = async (req, res, next) => {
     // Verify user is still active
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, name, email, phone, role, head_office_id, branch_id, is_active')
+      .select('*')
       .eq('id', decoded.id)
       .single();
 

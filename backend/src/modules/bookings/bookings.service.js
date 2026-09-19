@@ -9,7 +9,7 @@ class BookingsService {
 
     let queryBuilder = supabase
       .from('bookings')
-      .select('*, ev_models(name, company), branch:branch_id (id, name, code), users!bookings_created_by_fkey(name)', { count: 'exact' })
+      .select('*, ev_models(name, company), users!bookings_created_by_fkey(name)', { count: 'exact' })
       .eq('status', 'pending');
 
     if (req) {
@@ -26,6 +26,17 @@ class BookingsService {
 
     if (error) throw error;
 
+    if (data && data.some(b => b.branch_id)) {
+      try {
+        const branchIds = [...new Set(data.map(b => b.branch_id).filter(Boolean))];
+        if (branchIds.length > 0) {
+          const { data: bList } = await supabase.from('branches').select('id, name, code').in('id', branchIds);
+          const bMap = new Map((bList || []).map(b => [b.id, b]));
+          data.forEach(b => { if (b.branch_id) b.branch = bMap.get(b.branch_id) || null; });
+        }
+      } catch (e) {}
+    }
+
     const meta = getPaginationMeta(count, page, limit);
     return { data, meta };
   }
@@ -40,14 +51,16 @@ class BookingsService {
       assignedHoId = scope.head_office_id;
     }
 
+    const insertPayload = {
+      ...bookingData,
+      created_by: createdBy
+    };
+    if (assignedBranchId) insertPayload.branch_id = assignedBranchId;
+    if (assignedHoId) insertPayload.head_office_id = assignedHoId;
+
     const { data, error } = await supabase
       .from('bookings')
-      .insert([{
-        ...bookingData,
-        branch_id: assignedBranchId,
-        head_office_id: assignedHoId,
-        created_by: createdBy
-      }])
+      .insert([insertPayload])
       .select('*')
       .single();
 

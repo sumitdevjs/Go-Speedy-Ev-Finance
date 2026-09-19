@@ -9,7 +9,7 @@ class PurchasesService {
     
     let queryBuilder = supabase
       .from('tenants')
-      .select('*, ev_models(name, company), branch:branch_id (id, name, code)', { count: 'exact' });
+      .select('*, ev_models(name, company)', { count: 'exact' });
 
     if (req) {
       queryBuilder = applyScope(queryBuilder, req);
@@ -49,6 +49,17 @@ class PurchasesService {
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
+
+    if (data && data.some(p => p.branch_id)) {
+      try {
+        const branchIds = [...new Set(data.map(p => p.branch_id).filter(Boolean))];
+        if (branchIds.length > 0) {
+          const { data: bList } = await supabase.from('branches').select('id, name, code').in('id', branchIds);
+          const bMap = new Map((bList || []).map(b => [b.id, b]));
+          data.forEach(p => { if (p.branch_id) p.branch = bMap.get(p.branch_id) || null; });
+        }
+      } catch (e) {}
+    }
 
     const meta = getPaginationMeta(count, page, limit);
     return { data, meta };
