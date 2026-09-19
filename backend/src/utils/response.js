@@ -9,7 +9,10 @@ const successResponse = (res, statusCode = 200, data = null, message = 'Success'
   };
   
   if (data !== null) response.data = data;
-  if (pagination !== null) response.pagination = pagination;
+  if (pagination !== null) {
+    response.pagination = pagination;
+    response.meta = pagination;
+  }
 
   return res.status(statusCode).json(response);
 };

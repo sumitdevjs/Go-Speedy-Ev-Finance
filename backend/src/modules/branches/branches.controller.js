@@ -44,11 +44,11 @@ class BranchesController {
 
   async create(req, res) {
     try {
-      const { head_office_id, ward_no, name, code, ward_area, address, phone } = req.body;
+      const { head_office_id, ward_no, name, code, ward_area, address, phone, contact_person, status_label } = req.body;
       if (!head_office_id || !name || !code) {
         return errorResponse(res, 400, 'head_office_id, name, and code are required');
       }
-      const data = await branchesService.create({ head_office_id, ward_no, name, code, ward_area, address, phone });
+      const data = await branchesService.create({ head_office_id, ward_no, name, code, ward_area, address, phone, contact_person, status_label });
       return successResponse(res, 201, data, 'Branch created successfully');
     } catch (error) {
       console.error('[BranchesController.create]', error);
