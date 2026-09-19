@@ -101,6 +101,7 @@ function NavGroup({ items, isActive }) {
 }
 
 function SidebarInner({ isOpen, onClose }) {
+  const pathname = usePathname();
   const { user, role, selectedBranch, logout } = useAuthStore();
   const logoRef = useRef(null);
 
