@@ -97,6 +97,8 @@ const documentsRoutes = require('./src/modules/documents/documents.routes');
 const purchasesRoutes = require('./src/modules/purchases/purchases.routes');
 const auditRoutes = require('./src/modules/audit/audit.routes');
 const oldEvsRoutes = require('./src/modules/models/oldEvs.routes');
+const headOfficesRoutes = require('./src/modules/headOffices/headOffices.routes');
+const branchesRoutes = require('./src/modules/branches/branches.routes');
 
 // Use Routes
 app.use('/api/auth', authRoutes);
@@ -109,6 +111,8 @@ app.use('/api/documents', documentsRoutes);
 app.use('/api/purchases', purchasesRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/old-evs', oldEvsRoutes);
+app.use('/api/head-offices', headOfficesRoutes);
+app.use('/api/branches', branchesRoutes);
 
 // Global Error Handler (must be last)
 app.use(errorHandler);

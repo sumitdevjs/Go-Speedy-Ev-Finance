@@ -29,10 +29,11 @@ export default function RentalsListPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const { selectedBranch } = useAuthStore();
 
   useEffect(() => {
     fetchRentals();
-  }, [search, statusFilter, overdueFilter, insuranceFilter, page, showCancelled]);
+  }, [search, statusFilter, overdueFilter, insuranceFilter, page, showCancelled, selectedBranch]);
 
   // One-time entrance for the header/filter chrome when the page first mounts.
   useEffect(() => {

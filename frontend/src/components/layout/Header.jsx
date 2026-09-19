@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PlusCircle, MapPin, Menu, ArrowLeft } from 'lucide-react';
 import Button from '../ui/Button';
 import ThemeToggle from '../ui/ThemeToggle';
+import BranchSwitcher from './BranchSwitcher';
 import { useAuthStore } from '../../store/authStore';
 import { useSidebar } from '../../store/sidebarContext';
 
@@ -56,9 +57,7 @@ export default function Header({ title, subtitle, action, backHref, onBack }) {
             <h1 className="text-sm xs:text-base md:text-lg font-bold text-slate-900 dark:text-white tracking-tight truncate">
               {title || 'Dashboard'}
             </h1>
-            <span className="hidden sm:inline-flex items-center gap-1 rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:text-slate-300 shrink-0">
-              <MapPin className="h-3 w-3 text-slate-500 dark:text-slate-400" /> Delhi HQ
-            </span>
+            <BranchSwitcher />
           </div>
           {subtitle && (
             <p className="text-[11px] md:text-xs text-slate-500 dark:text-slate-400 truncate hidden sm:block">

@@ -4,7 +4,7 @@ const { successResponse, errorResponse } = require('../../utils/response');
 class RentalsController {
   async getAll(req, res) {
     try {
-      const { data, meta } = await rentalsService.getRentals(req.query);
+      const { data, meta } = await rentalsService.getRentals(req.query, req);
       return successResponse(res, 200, data, 'Rentals retrieved', meta);
     } catch (error) {
       console.error(error);
@@ -26,7 +26,7 @@ class RentalsController {
 
   async create(req, res, next) {
     try {
-      const data = await rentalsService.createRental(req.body, req.user.id);
+      const data = await rentalsService.createRental(req.body, req.user.id, req);
       return successResponse(res, 201, data, 'Rental created successfully');
     } catch (error) {
       if (error.message.includes('out of stock') || error.message.includes('Unique constraint violation')) {

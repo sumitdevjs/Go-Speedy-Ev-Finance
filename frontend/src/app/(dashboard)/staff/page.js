@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { UserCheck, Plus, Key, UserX, AlertCircle, Pencil } from 'lucide-react';
+import { UserCheck, Plus, Key, UserX, AlertCircle, Pencil, MapPin, Building2 } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
 import Button from '../../../components/ui/Button';
@@ -20,12 +20,14 @@ import { confirmDialog } from '../../../lib/confirmDialog';
 import { staggerFadeIn } from '../../../lib/gsap';
 
 const ROLE_OPTIONS = [
-  { value: 'staff', label: 'Staff / Operator (Fleet & Collections)' },
-  { value: 'admin', label: 'Administrator (Full System Control)' },
+  { value: 'staff', label: 'Staff / Field Operator (Ward Fleet & Collections)' },
+  { value: 'branch_admin', label: 'Branch Admin (Ward Manager)' },
+  { value: 'ho_admin', label: 'Head Office Admin (City Hub Manager)' },
+  { value: 'super_admin', label: 'Super Admin (Global Master Control)' },
 ];
 
 export default function StaffPage() {
-  const { user: currentUser } = useAuthStore();
+  const { user: currentUser, selectedBranch } = useAuthStore();
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -33,6 +35,10 @@ export default function StaffPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+
+  // Reference data for assignments
+  const [headOffices, setHeadOffices] = useState([]);
+  const [branches, setBranches] = useState([]);
 
   // Add Staff Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -42,16 +48,20 @@ export default function StaffPage() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('staff');
   const [wardArea, setWardArea] = useState('');
+  const [headOfficeId, setHeadOfficeId] = useState('');
+  const [branchId, setBranchId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   // Edit Staff Modal
-  const [editingStaff, setEditingStaff] = useState(null); // the row being edited, or null
+  const [editingStaff, setEditingStaff] = useState(null);
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editRole, setEditRole] = useState('staff');
   const [editWardArea, setEditWardArea] = useState('');
+  const [editHeadOfficeId, setEditHeadOfficeId] = useState('');
+  const [editBranchId, setEditBranchId] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -62,8 +72,24 @@ export default function StaffPage() {
   const [resetError, setResetError] = useState('');
 
   useEffect(() => {
+    const fetchDropdowns = async () => {
+      try {
+        const [hoRes, brRes] = await Promise.all([
+          api.get('/api/head-offices/dropdown').catch(() => ({ data: { data: [] } })),
+          api.get('/api/branches/dropdown').catch(() => ({ data: { data: [] } })),
+        ]);
+        if (hoRes.data?.success) setHeadOffices(hoRes.data.data || []);
+        if (brRes.data?.success) setBranches(brRes.data.data || []);
+      } catch (err) {
+        console.error('Failed to load branches dropdown:', err);
+      }
+    };
+    fetchDropdowns();
+  }, []);
+
+  useEffect(() => {
     fetchStaff();
-  }, [search, activeFilter, page]);
+  }, [search, activeFilter, page, selectedBranch]);
 
   // One-time entrance animation for the filter bar
   useEffect(() => {
@@ -118,6 +144,8 @@ export default function StaffPage() {
         password,
         role,
         ward_area: wardArea.trim() || null,
+        head_office_id: headOfficeId || null,
+        branch_id: branchId || null,
       });
 
       if (res.data?.success) {
@@ -127,6 +155,8 @@ export default function StaffPage() {
         setEmail('');
         setPassword('');
         setWardArea('');
+        setHeadOfficeId('');
+        setBranchId('');
         toast.success('Staff member registered.');
         fetchStaff();
       }
@@ -144,6 +174,8 @@ export default function StaffPage() {
     setEditEmail(staffMember.email || '');
     setEditRole(staffMember.role || 'staff');
     setEditWardArea(staffMember.ward_area || '');
+    setEditHeadOfficeId(staffMember.head_office_id || '');
+    setEditBranchId(staffMember.branch_id || '');
     setEditError('');
   };
 
@@ -170,6 +202,8 @@ export default function StaffPage() {
         phone: editPhone.trim(),
         email: editEmail.trim() || null,
         ward_area: editWardArea.trim() || null,
+        head_office_id: editHeadOfficeId || null,
+        branch_id: editBranchId || null,
       };
       // Omit role entirely when self-editing — the field is locked in the UI too,
       // and the backend also rejects a self role-change as a second line of defense.
@@ -267,9 +301,27 @@ export default function StaffPage() {
       render: (row) => <Badge status={row.role} size="sm" />,
     },
     {
-      header: 'Ward / Area',
-      key: 'ward_area',
-      render: (row) => <span className="font-semibold text-slate-700 dark:text-slate-300">{row.ward_area || '—'}</span>,
+      header: 'Assigned Branch / Ward',
+      key: 'branch',
+      render: (row) => {
+        const branchLabel = row.branches
+          ? (row.branches.ward_no ? `Ward ${row.branches.ward_no}: ${row.branches.name}` : row.branches.name)
+          : (row.ward_area || 'Global / Unassigned');
+        const hoLabel = row.head_offices?.name || null;
+        return (
+          <div>
+            <div className="flex items-center gap-1.5 font-semibold text-xs text-slate-800 dark:text-slate-200">
+              <MapPin className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+              <span>{branchLabel}</span>
+            </div>
+            {hoLabel && (
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 pl-5">
+                {hoLabel}
+              </p>
+            )}
+          </div>
+        );
+      },
     },
     {
       header: 'Status',
@@ -454,9 +506,51 @@ export default function StaffPage() {
             options={ROLE_OPTIONS}
           />
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Select
+              label="Head Office"
+              value={headOfficeId}
+              onChange={(e) => {
+                setHeadOfficeId(e.target.value);
+                if (e.target.value && branchId) {
+                  const br = branches.find(b => b.id === branchId);
+                  if (br && br.head_office_id !== e.target.value) setBranchId('');
+                }
+              }}
+              options={[
+                { value: '', label: 'Select Head Office (Optional)' },
+                ...headOffices.map((ho) => ({ value: ho.id, label: `${ho.name} (${ho.city})` })),
+              ]}
+            />
+
+            <Select
+              label="Assigned Ward / Branch"
+              value={branchId}
+              onChange={(e) => {
+                const bId = e.target.value;
+                setBranchId(bId);
+                if (bId) {
+                  const br = branches.find((b) => b.id === bId);
+                  if (br?.head_office_id && !headOfficeId) {
+                    setHeadOfficeId(br.head_office_id);
+                  }
+                }
+              }}
+              options={[
+                { value: '', label: 'Select Ward / Branch (Optional)' },
+                ...branches
+                  .filter((b) => !headOfficeId || b.head_office_id === headOfficeId)
+                  .map((b) => ({
+                    value: b.id,
+                    label: b.ward_no ? `Ward ${b.ward_no}: ${b.name} (${b.code})` : `${b.name} (${b.code})`,
+                  })),
+              ]}
+            />
+          </div>
+
           <Input
-            label="Ward / Area"
-            placeholder="e.g. Delhi Central"
+            label="Ward / Area Notes"
+            placeholder="e.g. Rohini Sector 7 Hub"
             value={wardArea}
             onChange={(e) => setWardArea(e.target.value)}
           />
@@ -486,7 +580,7 @@ export default function StaffPage() {
         isOpen={Boolean(editingStaff)}
         onClose={() => setEditingStaff(null)}
         title={`Edit ${editingStaff?.name || 'Staff Member'}`}
-        subtitle="Update contact details or change their system role"
+        subtitle="Update contact details or change their system role and ward assignment"
       >
         <form onSubmit={handleUpdateStaff} className="space-y-4" autoComplete="off">
           {editError && (
@@ -538,9 +632,51 @@ export default function StaffPage() {
             )}
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Select
+              label="Head Office"
+              value={editHeadOfficeId}
+              onChange={(e) => {
+                setEditHeadOfficeId(e.target.value);
+                if (e.target.value && editBranchId) {
+                  const br = branches.find(b => b.id === editBranchId);
+                  if (br && br.head_office_id !== e.target.value) setEditBranchId('');
+                }
+              }}
+              options={[
+                { value: '', label: 'Select Head Office (Optional)' },
+                ...headOffices.map((ho) => ({ value: ho.id, label: `${ho.name} (${ho.city})` })),
+              ]}
+            />
+
+            <Select
+              label="Assigned Ward / Branch"
+              value={editBranchId}
+              onChange={(e) => {
+                const bId = e.target.value;
+                setEditBranchId(bId);
+                if (bId) {
+                  const br = branches.find((b) => b.id === bId);
+                  if (br?.head_office_id && !editHeadOfficeId) {
+                    setEditHeadOfficeId(br.head_office_id);
+                  }
+                }
+              }}
+              options={[
+                { value: '', label: 'Select Ward / Branch (Optional)' },
+                ...branches
+                  .filter((b) => !editHeadOfficeId || b.head_office_id === editHeadOfficeId)
+                  .map((b) => ({
+                    value: b.id,
+                    label: b.ward_no ? `Ward ${b.ward_no}: ${b.name} (${b.code})` : `${b.name} (${b.code})`,
+                  })),
+              ]}
+            />
+          </div>
+
           <Input
-            label="Ward / Area"
-            placeholder="e.g. Delhi Central"
+            label="Ward / Area Notes"
+            placeholder="e.g. Rohini Sector 7 Hub"
             value={editWardArea}
             onChange={(e) => setEditWardArea(e.target.value)}
           />

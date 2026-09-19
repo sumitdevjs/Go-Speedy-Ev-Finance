@@ -95,6 +95,8 @@ class AuthService {
       role: user.role,
       name: user.name,
       email: user.email,
+      head_office_id: user.head_office_id,
+      branch_id: user.branch_id,
     });
     
     // Generate new refresh token
@@ -123,6 +125,8 @@ class AuthService {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        head_office_id: user.head_office_id,
+        branch_id: user.branch_id,
       },
       accessToken,
       refreshToken,

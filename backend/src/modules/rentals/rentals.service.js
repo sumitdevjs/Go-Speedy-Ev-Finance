@@ -2,14 +2,19 @@ const supabase = require('../../config/db');
 const { calcBalance } = require('../../utils/balanceCalc');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
 const { buildSearchFilter, buildEqOrFilter } = require('../../utils/searchFilter');
+const { applyScope, resolveCreateScope } = require('../../middleware/scope');
 
 class RentalsService {
-  async getRentals(query = {}) {
+  async getRentals(query = {}, req = null) {
     const { page, limit, offset } = getPaginationOptions(query);
     
     let queryBuilder = supabase
       .from('tenants')
-      .select('*, ev_models(name, company, total_price), users!tenants_created_by_fkey(name)', { count: 'exact' });
+      .select('*, ev_models(name, company, total_price), branch:branch_id (id, name, code, ward_no), users!tenants_created_by_fkey(name)', { count: 'exact' });
+
+    if (req) {
+      queryBuilder = applyScope(queryBuilder, req);
+    }
 
     if (query.status) {
       queryBuilder = queryBuilder.eq('status', query.status);
@@ -129,6 +134,15 @@ class RentalsService {
       }
     }
 
+    let assignedBranchId = tenantData.branch_id || null;
+    let assignedHoId = tenantData.head_office_id || null;
+
+    if (req) {
+      const scope = resolveCreateScope(req, tenantData);
+      assignedBranchId = scope.branch_id;
+      assignedHoId = scope.head_office_id;
+    }
+
     // Prevent new rental if an active one exists for this phone
     if (tenantData.phone) {
       const { data: existingActive } = await supabase
@@ -136,7 +150,6 @@ class RentalsService {
         .select('id')
         .eq('phone', tenantData.phone)
         .eq('status', 'rented')
-        .limit(1)
         .maybeSingle();
 
       if (existingActive) {
@@ -144,24 +157,50 @@ class RentalsService {
       }
     }
 
-    // 1. Fetch Model to get price and check stock
-    const { data: model, error: modelError } = await supabase
-      .from('ev_models')
-      .select('total_price, stock_count')
-      .eq('id', tenantData.ev_model_id)
-      .single();
-      
-    if (modelError || !model) throw new Error('EV Model not found');
-    if (model.stock_count <= 0) throw new Error('EV Model out of stock');
+    let modelTotalPrice = 0;
+    let originalStockCount = 0;
+    const isOldEv = Boolean(tenantData.old_ev_id);
 
-    // 2. Decrement stock
-    const { error: stockError } = await supabase
-      .from('ev_models')
-      .update({ stock_count: model.stock_count - 1 })
-      .eq('id', tenantData.ev_model_id)
-      .gt('stock_count', 0); // Safety net for concurrent access
+    if (isOldEv) {
+      const { data: oldEv, error: oldEvErr } = await supabase
+        .from('old_evs')
+        .select('*')
+        .eq('id', tenantData.old_ev_id)
+        .single();
 
-    if (stockError) throw new Error('Failed to reserve stock. It might be exhausted.');
+      if (oldEvErr || !oldEv) throw new Error('Selected used EV not found');
+      if (oldEv.status !== 'available') throw new Error('Selected used EV is no longer available');
+
+      modelTotalPrice = Number(oldEv.price) || 0;
+
+      // Mark old EV as rented or sold
+      await supabase
+        .from('old_evs')
+        .update({ status: tenantData.status === 'direct_purchase' ? 'sold' : 'rented' })
+        .eq('id', tenantData.old_ev_id);
+    } else {
+      // 1. Fetch Model to get price and check stock
+      const { data: model, error: modelError } = await supabase
+        .from('ev_models')
+        .select('total_price, stock_count')
+        .eq('id', tenantData.ev_model_id)
+        .single();
+        
+      if (modelError || !model) throw new Error('EV Model not found');
+      if (model.stock_count <= 0) throw new Error('EV Model out of stock');
+
+      originalStockCount = model.stock_count;
+
+      // 2. Decrement stock
+      const { error: stockError } = await supabase
+        .from('ev_models')
+        .update({ stock_count: model.stock_count - 1 })
+        .eq('id', tenantData.ev_model_id)
+        .gt('stock_count', 0);
+
+      if (stockError) throw new Error('Failed to reserve stock. It might be exhausted.');
+      modelTotalPrice = model.total_price;
+    }
 
     // 3. Compute dates
     const startDate = tenantData.start_date ? new Date(tenantData.start_date) : new Date();
@@ -186,9 +225,12 @@ class RentalsService {
         .from('tenants')
         .insert([{
           ...tenantData,
+          branch_id: assignedBranchId,
+          head_office_id: assignedHoId,
+          late_fee_daily_rate: tenantData.late_fee_daily_rate || 50.00,
           references: tenantData.references || [],
           guarantors: tenantData.guarantors || [],
-          total_price: model.total_price, // snapshot price
+          total_price: tenantData.total_price || modelTotalPrice, // snapshot price
           start_date: tenantData.status === 'direct_purchase' ? null : startDate.toISOString().split('T')[0],
           expected_end_date: tenantData.status === 'direct_purchase' ? null : expectedEndDate.toISOString().split('T')[0],
           created_by: createdBy
@@ -199,11 +241,18 @@ class RentalsService {
       if (error) throw error;
       return data;
     } catch (error) {
-      // Rollback stock
-      await supabase
-        .from('ev_models')
-        .update({ stock_count: model.stock_count })
-        .eq('id', tenantData.ev_model_id);
+      // Rollback stock or old_ev reservation
+      if (!isOldEv && tenantData.ev_model_id) {
+        await supabase
+          .from('ev_models')
+          .update({ stock_count: originalStockCount })
+          .eq('id', tenantData.ev_model_id);
+      } else if (isOldEv && tenantData.old_ev_id) {
+        await supabase
+          .from('old_evs')
+          .update({ status: 'available' })
+          .eq('id', tenantData.old_ev_id);
+      }
       
       if (error.code === '23505') {
         console.error('[createRental] Unique constraint violation:', error);
@@ -274,7 +323,7 @@ class RentalsService {
     // 2. Insert into old_evs instead of restoring stock to ev_models
     const { data: tenantDetails } = await supabase
       .from('tenants')
-      .select('chassis_no, motor_no, controller_no, battery_no, charger_no, ev_model_id')
+      .select('chassis_no, motor_no, controller_no, battery_no, charger_no, ev_model_id, branch_id, head_office_id')
       .eq('id', id)
       .single();
 
@@ -289,6 +338,8 @@ class RentalsService {
           controller_no: tenantDetails.controller_no,
           battery_no: tenantDetails.battery_no,
           charger_no: tenantDetails.charger_no,
+          branch_id: tenantDetails.branch_id,
+          head_office_id: tenantDetails.head_office_id,
           price: 0, // Admin can update this later
           status: 'available'
         }]);

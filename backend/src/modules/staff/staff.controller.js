@@ -7,7 +7,7 @@ const clientIp = (req) => req.ip || req.headers['x-forwarded-for'];
 class StaffController {
   async getAll(req, res) {
     try {
-      const { data, meta } = await staffService.getAllStaff(req.query);
+      const { data, meta } = await staffService.getAllStaff(req.query, req);
       return successResponse(res, 200, data, 'Staff retrieved successfully', meta);
     } catch (error) {
       console.error(error);
@@ -17,7 +17,7 @@ class StaffController {
 
   async create(req, res) {
     try {
-      const data = await staffService.createStaff(req.body, req.user.id);
+      const data = await staffService.createStaff(req.body, req.user.id, req);
       await logAudit({
         userId: req.user.id,
         userRole: req.user.role,

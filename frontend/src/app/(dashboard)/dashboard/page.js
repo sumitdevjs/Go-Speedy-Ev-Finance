@@ -37,6 +37,7 @@ export default function DashboardPage() {
 }
 
 function AdminDashboard() {
+  const { selectedBranch } = useAuthStore();
   const [stats, setStats] = useState({
     totalStock: 0,
     oldStock: 0,
@@ -50,7 +51,7 @@ function AdminDashboard() {
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [selectedBranch]);
 
   const fetchDashboardData = async () => {
     try {

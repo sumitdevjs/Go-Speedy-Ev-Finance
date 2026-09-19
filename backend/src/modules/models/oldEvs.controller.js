@@ -4,7 +4,7 @@ const { successResponse, errorResponse } = require('../../utils/response');
 class OldEvsController {
   async getAvailable(req, res) {
     try {
-      const data = await oldEvsService.getAvailableOldEvs();
+      const data = await oldEvsService.getAvailableOldEvs(req);
       return successResponse(res, 200, data, 'Available old EVs retrieved');
     } catch (error) {
       console.error(error);
@@ -14,7 +14,7 @@ class OldEvsController {
 
   async getAll(req, res) {
     try {
-      const data = await oldEvsService.getAllOldEvs();
+      const data = await oldEvsService.getAllOldEvs(req);
       return successResponse(res, 200, data, 'All old EVs retrieved');
     } catch (error) {
       console.error(error);

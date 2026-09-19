@@ -1,23 +1,34 @@
 const supabase = require('../../config/db');
+const { applyScope } = require('../../middleware/scope');
 
 class OldEvsService {
-  async getAvailableOldEvs() {
-    const { data, error } = await supabase
+  async getAvailableOldEvs(req = null) {
+    let queryBuilder = supabase
       .from('old_evs')
-      .select('*, original_ev_model:original_ev_model_id (name, company, total_price)')
+      .select('*, original_ev_model:original_ev_model_id (name, company, total_price), branch:branch_id (id, name, code)')
       .eq('status', 'available')
       .order('created_at', { ascending: false });
 
+    if (req) {
+      queryBuilder = applyScope(queryBuilder, req);
+    }
+
+    const { data, error } = await queryBuilder;
     if (error) throw error;
     return data;
   }
 
-  async getAllOldEvs() {
-    const { data, error } = await supabase
+  async getAllOldEvs(req = null) {
+    let queryBuilder = supabase
       .from('old_evs')
-      .select('*, original_ev_model:original_ev_model_id (name, company, total_price)')
+      .select('*, original_ev_model:original_ev_model_id (name, company, total_price), branch:branch_id (id, name, code)')
       .order('created_at', { ascending: false });
 
+    if (req) {
+      queryBuilder = applyScope(queryBuilder, req);
+    }
+
+    const { data, error } = await queryBuilder;
     if (error) throw error;
     return data;
   }

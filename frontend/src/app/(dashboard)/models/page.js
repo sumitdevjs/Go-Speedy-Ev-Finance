@@ -57,9 +57,11 @@ export default function ModelsPage() {
   const [stockCount, setStockCount] = useState('5');
   const [initialStockDate, setInitialStockDate] = useState(new Date().toISOString().split('T')[0]);
 
+  const { selectedBranch } = useAuthStore();
+
   useEffect(() => {
     fetchModels();
-  }, [search, stockStatus, activeFilter, page]);
+  }, [search, stockStatus, activeFilter, page, selectedBranch]);
 
   // One-time entrance animation for the filter bar
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function ModelsPage() {
     if (activeTab === 'old') {
       fetchOldEvs();
     }
-  }, [activeTab]);
+  }, [activeTab, selectedBranch]);
 
   const fetchOldEvs = async () => {
     try {

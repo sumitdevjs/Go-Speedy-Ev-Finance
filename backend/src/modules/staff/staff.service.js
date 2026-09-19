@@ -3,15 +3,20 @@ const bcrypt = require('bcryptjs');
 const { buildDiff } = require('../../utils/auditLog');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
 const { buildSearchFilter } = require('../../utils/searchFilter');
+const { applyScope, resolveCreateScope } = require('../../middleware/scope');
 
 class StaffService {
-  async getAllStaff(query = {}) {
+  async getAllStaff(query = {}, req = null) {
     const { page, limit, offset } = getPaginationOptions(query);
 
     let queryBuilder = supabase
       .from('users')
-      .select('id, name, phone, email, role, ward_area, is_active, created_at, updated_at', { count: 'exact' })
+      .select('id, name, phone, email, role, ward_area, is_active, head_office_id, branch_id, branches:branch_id (id, name, code, ward_no), head_offices:head_office_id (id, name, code), created_at, updated_at', { count: 'exact' })
       .order('created_at', { ascending: false });
+
+    if (req) {
+      queryBuilder = applyScope(queryBuilder, req);
+    }
 
     if (query.search) {
       queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'phone', 'email'], query.search));
@@ -31,8 +36,17 @@ class StaffService {
     return { data, meta };
   }
 
-  async createStaff({ name, phone, email, password, role, ward_area }, createdBy) {
+  async createStaff({ name, phone, email, password, role, ward_area, branch_id, head_office_id }, createdBy, req = null) {
     const password_hash = await bcrypt.hash(password, 10);
+
+    let assignedBranchId = branch_id || null;
+    let assignedHoId = head_office_id || null;
+
+    if (req) {
+      const scope = resolveCreateScope(req, { branch_id, head_office_id });
+      assignedBranchId = scope.branch_id;
+      assignedHoId = scope.head_office_id;
+    }
     
     const { data, error } = await supabase
       .from('users')
@@ -41,12 +55,14 @@ class StaffService {
         phone,
         email: email || null,
         password_hash,
-        role,
+        role: role || 'staff',
         ward_area,
+        branch_id: assignedBranchId,
+        head_office_id: assignedHoId,
         is_active: true,
         created_by: createdBy
       }])
-      .select('id, name, phone, email, role, ward_area, is_active, created_at')
+      .select('id, name, phone, email, role, ward_area, branch_id, head_office_id, is_active, created_at')
       .single();
 
     if (error) {
@@ -69,7 +85,7 @@ class StaffService {
     // diff instead of just dumping the new request body.
     const { data: before, error: fetchError } = await supabase
       .from('users')
-      .select('name, phone, email, role, ward_area, is_active')
+      .select('name, phone, email, role, ward_area, branch_id, head_office_id, is_active')
       .eq('id', id)
       .single();
     if (fetchError) throw fetchError;
@@ -78,7 +94,7 @@ class StaffService {
       .from('users')
       .update(updates)
       .eq('id', id)
-      .select('id, name, phone, email, role, ward_area, is_active')
+      .select('id, name, phone, email, role, ward_area, branch_id, head_office_id, is_active')
       .single();
 
     if (error) {

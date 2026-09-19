@@ -1,14 +1,19 @@
 const supabase = require('../../config/db');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
 const { buildSearchFilter } = require('../../utils/searchFilter');
+const { applyScope } = require('../../middleware/scope');
 
 class PurchasesService {
-  async getPurchases(query = {}) {
+  async getPurchases(query = {}, req = null) {
     const { page, limit, offset } = getPaginationOptions(query);
     
     let queryBuilder = supabase
       .from('tenants')
-      .select('*, ev_models(name, company)', { count: 'exact' });
+      .select('*, ev_models(name, company), branch:branch_id (id, name, code)', { count: 'exact' });
+
+    if (req) {
+      queryBuilder = applyScope(queryBuilder, req);
+    }
       
     if (query.status) {
       // When showing cancelled, we only want cancelled direct purchases

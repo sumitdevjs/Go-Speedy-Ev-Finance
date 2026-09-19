@@ -4,7 +4,7 @@ const { successResponse, errorResponse } = require('../../utils/response');
 class BookingsController {
   async getAll(req, res) {
     try {
-      const { data, meta } = await bookingsService.getBookings(req.query);
+      const { data, meta } = await bookingsService.getBookings(req.query, req);
       return successResponse(res, 200, data, 'Bookings retrieved successfully', meta);
     } catch (error) {
       console.error(error);
@@ -14,7 +14,7 @@ class BookingsController {
 
   async create(req, res) {
     try {
-      const data = await bookingsService.createBooking(req.body, req.user.id);
+      const data = await bookingsService.createBooking(req.body, req.user.id, req);
       return successResponse(res, 201, data, 'Booking created successfully');
     } catch (error) {
       console.error(error);

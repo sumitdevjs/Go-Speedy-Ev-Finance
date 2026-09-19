@@ -4,7 +4,7 @@ const { successResponse, errorResponse } = require('../../utils/response');
 class ModelsController {
   async getAll(req, res) {
     try {
-      const { data, meta } = await modelsService.getAllModels(req.query);
+      const { data, meta } = await modelsService.getAllModels(req.query, req);
       return successResponse(res, 200, data, 'Models retrieved successfully', meta);
     } catch (error) {
       console.error(error);
@@ -14,7 +14,7 @@ class ModelsController {
 
   async getAllForDropdown(req, res) {
     try {
-      const data = await modelsService.getAllModelsForDropdown();
+      const data = await modelsService.getAllModelsForDropdown(req);
       return successResponse(res, 200, data, 'Models retrieved successfully');
     } catch (error) {
       console.error(error);
@@ -38,7 +38,7 @@ class ModelsController {
 
   async create(req, res) {
     try {
-      const data = await modelsService.createModel(req.body, req.user.id);
+      const data = await modelsService.createModel(req.body, req.user.id, req);
       return successResponse(res, 201, data, 'Model created successfully');
     } catch (error) {
       console.error(error);

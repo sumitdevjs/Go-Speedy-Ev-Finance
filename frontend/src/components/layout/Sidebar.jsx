@@ -15,6 +15,8 @@ import {
   LogOut,
   Zap,
   X,
+  Building2,
+  MapPin,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Badge from '../ui/Badge';
@@ -99,9 +101,12 @@ function NavGroup({ items, isActive }) {
 }
 
 function SidebarInner({ isOpen, onClose }) {
-  const pathname = usePathname();
-  const { user, role, logout } = useAuthStore();
+  const { user, role, selectedBranch, logout } = useAuthStore();
   const logoRef = useRef(null);
+
+  const isSuperAdmin = role === 'super_admin' || role === 'admin';
+  const isHoAdmin = role === 'ho_admin';
+  const isBranchAdmin = role === 'branch_admin';
 
   // A tiny "wake up" wiggle on the logo whenever the drawer opens on mobile —
   // makes the panel feel alive rather than just sliding into place.
@@ -135,9 +140,31 @@ function SidebarInner({ isOpen, onClose }) {
   const navItems = role === 'staff' ? staffNavItems : adminNavItemsList;
 
   const adminNavItems = [
+    ...(isSuperAdmin || isHoAdmin ? [{ name: 'Branches & Wards', href: '/branches', icon: Building2 }] : []),
     { name: 'Staff Management', href: '/staff', icon: UserCheck },
     { name: 'Audit Logs', href: '/audit', icon: ShieldCheck },
   ];
+
+  // Derive role label & badge variant
+  let roleLabel = 'Staff Desk';
+  let badgeVariant = 'emerald';
+  if (role === 'super_admin' || role === 'admin') {
+    roleLabel = 'Super Admin';
+    badgeVariant = 'indigo';
+  } else if (role === 'ho_admin') {
+    roleLabel = 'HO Admin';
+    badgeVariant = 'purple';
+  } else if (role === 'branch_admin') {
+    roleLabel = 'Branch Admin';
+    badgeVariant = 'blue';
+  }
+
+  // Branch display label
+  const branchDisplay = selectedBranch
+    ? (selectedBranch.ward_no ? `Ward ${selectedBranch.ward_no}: ${selectedBranch.name}` : selectedBranch.name)
+    : (user?.branch?.name 
+        ? (user.branch.ward_no ? `Ward ${user.branch.ward_no}: ${user.branch.name}` : user.branch.name) 
+        : (isSuperAdmin ? 'All Wards (Global)' : (user?.ward_area || 'Central Branch')));
 
   const isActive = (href) => {
     if (href === '/dashboard') return pathname === '/dashboard';
@@ -190,7 +217,7 @@ function SidebarInner({ isOpen, onClose }) {
 
       {/* User Card & Logout */}
       <div className="shrink-0 p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80">
-        <div className="flex items-center justify-between gap-2.5 mb-3">
+        <div className="flex items-center justify-between gap-2.5 mb-2">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
               {user?.name || (role === 'staff' ? 'Staff Operator' : 'Administrator')}
@@ -200,10 +227,16 @@ function SidebarInner({ isOpen, onClose }) {
             </p>
           </div>
           <Badge
-            status={role === 'staff' ? 'Staff Desk' : 'Admin'}
-            variant={role === 'staff' ? 'emerald' : 'blue'}
+            status={roleLabel}
+            variant={badgeVariant}
             size="sm"
           />
+        </div>
+
+        {/* Current Active Branch / Ward Tag */}
+        <div className="flex items-center gap-1.5 mb-3 px-2 py-1 rounded-md bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 text-[11px] text-slate-600 dark:text-slate-300">
+          <MapPin className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0" />
+          <span className="truncate font-medium">{branchDisplay}</span>
         </div>
 
         <button

@@ -1,15 +1,20 @@
 const supabase = require('../../config/db');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
 const { buildSearchFilter } = require('../../utils/searchFilter');
+const { applyScope, resolveCreateScope } = require('../../middleware/scope');
 
 class BookingsService {
-  async getBookings(query = {}) {
+  async getBookings(query = {}, req = null) {
     const { page, limit, offset } = getPaginationOptions(query);
 
     let queryBuilder = supabase
       .from('bookings')
-      .select('*, ev_models(name, company), users!bookings_created_by_fkey(name)', { count: 'exact' })
+      .select('*, ev_models(name, company), branch:branch_id (id, name, code), users!bookings_created_by_fkey(name)', { count: 'exact' })
       .eq('status', 'pending');
+
+    if (req) {
+      queryBuilder = applyScope(queryBuilder, req);
+    }
 
     if (query.search) {
       queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'phone'], query.search));
@@ -25,11 +30,22 @@ class BookingsService {
     return { data, meta };
   }
 
-  async createBooking(bookingData, createdBy) {
+  async createBooking(bookingData, createdBy, req = null) {
+    let assignedBranchId = bookingData.branch_id || null;
+    let assignedHoId = bookingData.head_office_id || null;
+
+    if (req) {
+      const scope = resolveCreateScope(req, bookingData);
+      assignedBranchId = scope.branch_id;
+      assignedHoId = scope.head_office_id;
+    }
+
     const { data, error } = await supabase
       .from('bookings')
       .insert([{
         ...bookingData,
+        branch_id: assignedBranchId,
+        head_office_id: assignedHoId,
         created_by: createdBy
       }])
       .select('*')
@@ -100,6 +116,8 @@ class BookingsService {
         .from('tenants')
         .insert([{
           ...tenantData,
+          branch_id: tenantData.branch_id || booking.branch_id || null,
+          head_office_id: tenantData.head_office_id || booking.head_office_id || null,
           total_price: model.total_price,
           booking_amount: booking.booking_amount,
           name: tenantData.name || booking.name,

@@ -5,7 +5,7 @@ class PaymentsController {
   async getAll(req, res) {
     try {
       const { tenant_id } = req.query;
-      const data = await paymentsService.getPayments(tenant_id);
+      const data = await paymentsService.getPayments(tenant_id, req);
       return successResponse(res, 200, data, 'Payments retrieved successfully');
     } catch (error) {
       console.error(error);

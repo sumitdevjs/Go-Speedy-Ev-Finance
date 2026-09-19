@@ -2,15 +2,20 @@ const supabase = require('../../config/db');
 const crypto = require('crypto');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
 const { buildSearchFilter } = require('../../utils/searchFilter');
+const { applyScope, resolveCreateScope } = require('../../middleware/scope');
 
 class ModelsService {
-  async getAllModels(query = {}) {
+  async getAllModels(query = {}, req = null) {
     const { page, limit, offset } = getPaginationOptions(query);
 
     let queryBuilder = supabase
       .from('ev_models')
-      .select('*', { count: 'exact' })
+      .select('*, branch:branch_id (id, name, code, ward_no)', { count: 'exact' })
       .order('created_at', { ascending: false });
+
+    if (req) {
+      queryBuilder = applyScope(queryBuilder, req);
+    }
 
     if (query.search) {
       queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'company', 'ward'], query.search));
@@ -35,19 +40,34 @@ class ModelsService {
     return { data, meta };
   }
 
-  // Lightweight list for dropdowns — returns all models without pagination
-  async getAllModelsForDropdown() {
-    const { data, error } = await supabase
+  // Lightweight list for dropdowns — returns all models with branch scoping
+  async getAllModelsForDropdown(req = null) {
+    let queryBuilder = supabase
       .from('ev_models')
-      .select('id, name, company, total_price, stock_count, is_active')
+      .select('id, name, company, total_price, stock_count, is_active, branch_id')
+      .eq('is_active', true)
       .order('name', { ascending: true });
 
+    if (req) {
+      queryBuilder = applyScope(queryBuilder, req);
+    }
+
+    const { data, error } = await queryBuilder;
     if (error) throw error;
     return data;
   }
 
-  async createModel(modelData, createdBy) {
-    const { initial_stock_date, ward = 'Delhi Central', ...restData } = modelData;
+  async createModel(modelData, createdBy, req = null) {
+    const { initial_stock_date, ward = 'Delhi Central', branch_id, head_office_id, ...restData } = modelData;
+
+    let assignedBranchId = branch_id || null;
+    let assignedHoId = head_office_id || null;
+
+    if (req) {
+      const scope = resolveCreateScope(req, { branch_id, head_office_id });
+      assignedBranchId = scope.branch_id;
+      assignedHoId = scope.head_office_id;
+    }
     
     let initialLogs = [];
     if (restData.stock_count > 0 && initial_stock_date) {
@@ -64,6 +84,8 @@ class ModelsService {
       .insert([{
         ...restData,
         ward,
+        branch_id: assignedBranchId,
+        head_office_id: assignedHoId,
         stock_logs: initialLogs,
         created_by: createdBy
       }])
