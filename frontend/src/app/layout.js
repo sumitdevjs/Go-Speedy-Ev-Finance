@@ -2,6 +2,7 @@ import 'lenis/dist/lenis.css';
 import './globals.css';
 import { ThemeProvider } from '../store/themeContext';
 import SmoothScroll from '../components/ui/SmoothScroll';
+import WebsiteIntro from '../components/ui/WebsiteIntro';
 
 export const viewport = {
   width: 'device-width',
@@ -28,6 +29,7 @@ export default function RootLayout({ children }) {
         suppressHydrationWarning
       >
         <ThemeProvider>
+          <WebsiteIntro />
           <SmoothScroll>
             {children}
           </SmoothScroll>

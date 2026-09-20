@@ -131,27 +131,6 @@ function AdminDashboard() {
       />
 
       <div className="p-4 md:p-4 space-y-6 md:space-y-8 max-w-7xl mx-auto pb-6">
-        {/* Brand Banner: Go Speedy Pvt. Ltd / Welcome to The Future / The House of Ev */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/80 border border-emerald-500/25 p-5 sm:p-6 shadow-xl text-white">
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
-                <Zap className="w-3.5 h-3.5 fill-emerald-400 text-emerald-400 animate-pulse" />
-                <span>Go Speedy Pvt. Ltd</span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                Welcome to The Future
-              </h2>
-              <p className="text-sm sm:text-base font-extrabold uppercase tracking-widest text-emerald-400 mt-1 flex items-center gap-2">
-                <span className="h-[2px] w-6 bg-emerald-400 inline-block" />
-                <span>The House of Ev</span>
-              </p>
-            </div>
-          </div>
-          {/* Ambient Glow */}
-          <div className="absolute right-0 top-0 -mt-12 -mr-12 w-64 h-64 rounded-full bg-emerald-500/15 blur-3xl pointer-events-none" />
-        </div>
-
         {/* KPI Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* Available Stock */}
