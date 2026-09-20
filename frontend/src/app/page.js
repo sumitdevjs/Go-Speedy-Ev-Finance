@@ -375,22 +375,21 @@ export default function RootPage() {
           <div className="gsap-login-card desk:col-span-5 w-full max-w-[540px] mx-auto desk:mr-0 desk:max-w-[520px] xl:max-w-[540px]">
             <div className="bg-white/90 dark:bg-[#0b1222]/85 backdrop-blur-2xl rounded-2xl desk:rounded-[28px] p-3.5 xxs:p-4 xs:p-5 sm:p-7 desk:p-8 xl:p-9 [@media(max-height:720px)]:desk:!p-6 shadow-[0_25px_60px_rgba(15,23,42,0.15)] dark:shadow-[0_25px_60px_rgba(0,0,0,0.7)] border border-slate-200/80 dark:border-white/10 text-slate-900 dark:text-white transition-all">
               {/* Card brand header (desktop only) */}
-              <div className="hidden desk:block mb-7 [@media(max-height:720px)]:desk:!hidden">
+              <div className="hidden desk:flex items-center justify-between mb-7 [@media(max-height:720px)]:desk:!hidden">
                 <Brand size="lg" />
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  New to GoSpeedy? <button type="button" className="font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">Learn More →</button>
+                </span>
               </div>
 
               <div className="mb-4 xs:mb-5 desk:mb-6 [@media(max-height:720px)]:desk:!mb-4">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-[11px] font-extrabold uppercase tracking-wider mb-2">
-                  <Zap className="w-3 h-3 text-emerald-500" />
-                  <span>Go Speedy Pvt. Ltd</span>
-                </div>
                 <h2 className="text-xl xxs:text-[22px] desk:text-[30px] [@media(max-height:720px)]:desk:!text-[24px] font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-                  Welcome to The Future
+                  Welcome Back
                 </h2>
-                <p className="text-xs xxs:text-[13px] desk:text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-1 uppercase tracking-wider">
-                  The House of Ev
+                <p className="text-xs xxs:text-[13px] desk:text-sm font-bold text-slate-700 dark:text-slate-300 mt-1">
+                  Sign in to your GoSpeedy account
                 </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">Sign in to continue to your dashboard.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">Access your fleet, rentals, finance and more — all in one place.</p>
               </div>
 
               {error && (
