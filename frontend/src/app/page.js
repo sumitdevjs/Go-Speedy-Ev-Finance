@@ -407,27 +407,25 @@ export default function RootPage() {
                     Phone Number or Email
                   </label>
                   <div className="relative">
-                    <span className={`absolute left-3 xs:left-3.5 desk:left-4 top-1/2 -translate-y-1/2 ${
-                      error && (error.toLowerCase().includes('phone') || error.toLowerCase().includes('email') || error.toLowerCase().includes('account') || (!identifier && error))
-                        ? 'text-rose-500'
-                        : 'text-slate-400 dark:text-slate-500'
-                    }`}>
+                    <span className={`absolute left-3 xs:left-3.5 desk:left-4 top-1/2 -translate-y-1/2 ${error && (error.toLowerCase().includes('phone') || error.toLowerCase().includes('email') || error.toLowerCase().includes('account') || (!identifier && error))
+                      ? 'text-rose-500'
+                      : 'text-slate-400 dark:text-slate-500'
+                      }`}>
                       <User size={15} />
                     </span>
                     <input
                       id="identifier"
                       type="text"
-                      className={`w-full bg-slate-50 dark:bg-[#131d35]/90 border ${
-                        error && (error.toLowerCase().includes('phone') || error.toLowerCase().includes('email') || error.toLowerCase().includes('account') || (!identifier && error))
-                          ? 'border-rose-500 ring-1 ring-rose-500/40 text-rose-600 dark:text-rose-300'
-                          : 'border-slate-200 dark:border-slate-700/80 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 text-slate-900 dark:text-white'
-                      } rounded-xl pl-9 xs:pl-10 desk:pl-11 pr-3 xs:pr-4 py-2.5 xs:py-3 desk:py-3.5 [@media(max-height:720px)]:desk:!py-3 text-xs xs:text-sm desk:text-base placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none transition-all font-sans`}
+                      className={`w-full bg-slate-50 dark:bg-[#131d35]/90 border ${error && (error.toLowerCase().includes('phone') || error.toLowerCase().includes('email') || error.toLowerCase().includes('account') || (!identifier && error))
+                        ? 'border-rose-500 ring-1 ring-rose-500/40 text-rose-600 dark:text-rose-300'
+                        : 'border-slate-200 dark:border-slate-700/80 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 text-slate-900 dark:text-white'
+                        } rounded-xl pl-9 xs:pl-10 desk:pl-11 pr-3 xs:pr-4 py-2.5 xs:py-3 desk:py-3.5 [@media(max-height:720px)]:desk:!py-3 text-xs xs:text-sm desk:text-base placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none transition-all font-sans`}
                       value={identifier}
                       onChange={(e) => {
                         setIdentifier(e.target.value);
                         if (error) setError('');
                       }}
-                      placeholder="e.g. 9999999999 or admin@gmail.com"
+                      placeholder="e.g admin@gmail.com"
                       autoComplete="username"
                     />
                   </div>
@@ -440,21 +438,19 @@ export default function RootPage() {
                     </label>
                   </div>
                   <div className="relative">
-                    <span className={`absolute left-3 xs:left-3.5 desk:left-4 top-1/2 -translate-y-1/2 ${
-                      error && (error.toLowerCase().includes('password') || error.toLowerCase().includes('pass') || (!password && error))
-                        ? 'text-rose-500'
-                        : 'text-slate-400 dark:text-slate-500'
-                    }`}>
+                    <span className={`absolute left-3 xs:left-3.5 desk:left-4 top-1/2 -translate-y-1/2 ${error && (error.toLowerCase().includes('password') || error.toLowerCase().includes('pass') || (!password && error))
+                      ? 'text-rose-500'
+                      : 'text-slate-400 dark:text-slate-500'
+                      }`}>
                       <Lock size={15} />
                     </span>
                     <input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
-                      className={`w-full bg-slate-50 dark:bg-[#131d35]/90 border ${
-                        error && (error.toLowerCase().includes('password') || error.toLowerCase().includes('pass') || (!password && error))
-                          ? 'border-rose-500 ring-1 ring-rose-500/40 text-rose-600 dark:text-rose-300'
-                          : 'border-slate-200 dark:border-slate-700/80 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 text-slate-900 dark:text-white'
-                      } rounded-xl pl-9 xs:pl-10 desk:pl-11 pr-10 xs:pr-11 py-2.5 xs:py-3 desk:py-3.5 [@media(max-height:720px)]:desk:!py-3 text-xs xs:text-sm desk:text-base placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none transition-all font-sans`}
+                      className={`w-full bg-slate-50 dark:bg-[#131d35]/90 border ${error && (error.toLowerCase().includes('password') || error.toLowerCase().includes('pass') || (!password && error))
+                        ? 'border-rose-500 ring-1 ring-rose-500/40 text-rose-600 dark:text-rose-300'
+                        : 'border-slate-200 dark:border-slate-700/80 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 text-slate-900 dark:text-white'
+                        } rounded-xl pl-9 xs:pl-10 desk:pl-11 pr-10 xs:pr-11 py-2.5 xs:py-3 desk:py-3.5 [@media(max-height:720px)]:desk:!py-3 text-xs xs:text-sm desk:text-base placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none transition-all font-sans`}
                       value={password}
                       onChange={(e) => {
                         setPassword(e.target.value);
@@ -502,11 +498,11 @@ export default function RootPage() {
               >
                 {/* Official Google "G" SVG */}
                 <svg width="17" height="17" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                  <path fill="none" d="M0 0h48v48H0z"/>
+                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+                  <path fill="none" d="M0 0h48v48H0z" />
                 </svg>
                 <span>Continue with Google</span>
               </a>

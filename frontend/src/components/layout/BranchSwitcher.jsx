@@ -115,9 +115,13 @@ export default function BranchSwitcher() {
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 sm:right-0 sm:left-auto mt-2 w-72 xs:w-84 max-h-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+        <div
+          data-lenis-prevent
+          className="absolute left-0 sm:right-0 sm:left-auto mt-2 w-72 xs:w-84 max-h-[75vh] sm:max-h-[440px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+          onWheel={(e) => e.stopPropagation()}
+        >
           {/* Header & Search */}
-          <div className="p-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/90">
+          <div className="p-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/90 shrink-0">
             <div className="relative">
               <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -132,7 +136,16 @@ export default function BranchSwitcher() {
           </div>
 
           {/* Option List */}
-          <div className="overflow-y-auto flex-1 p-1 divide-y divide-slate-100 dark:divide-slate-800/60">
+          <div
+            data-lenis-prevent
+            className="overflow-y-auto flex-1 min-h-0 p-1 divide-y divide-slate-100 dark:divide-slate-800/60 overscroll-contain dropdown-scroll"
+            style={{
+              overscrollBehavior: 'contain',
+              WebkitOverflowScrolling: 'touch',
+            }}
+            onWheel={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+          >
             {/* Global All Option (Only for Super Admin) */}
             {isSuperAdmin && (
               <div className="pb-1">
