@@ -11,7 +11,7 @@ export const viewport = {
 };
 
 export const metadata = {
-  title: 'Go Speedy EV — Rent & Purchase Finance Monitor',
+  title: 'Go Speedy Pvt. Ltd — Welcome to The Future | The House of Ev',
   description: 'Production-grade EV Rent & Purchase Monitor System for Delhi operations.',
   icons: {
     icon: '/favicon.png?v=3',

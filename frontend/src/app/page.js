@@ -276,19 +276,26 @@ export default function RootPage() {
         </div>
 
         <div className="gsap-left-content px-3.5 xxs:px-4 xs:px-5 sm:px-8 pt-4 xs:pt-6 sm:pt-8 pb-3 xs:pb-4 sm:pb-6 w-full max-w-[1720px] mx-auto [text-shadow:0_1px_2px_rgba(7,12,24,0.9),0_2px_14px_rgba(7,12,24,0.8)]">
-          <p className="text-[9px] xxs:text-[10px] sm:text-xs font-bold uppercase tracking-[0.15em] xs:tracking-[0.18em] text-emerald-400 leading-relaxed">
-            Clean Mobility.
-            <br className="sm:hidden" />
-            <span className="hidden sm:inline"> </span>
-            Better Tomorrow.
-          </p>
+          {/* Line 1: Go Speedy Pvt. Ltd */}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 text-[11px] font-bold tracking-wider mb-2 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+            <Zap className="w-3.5 h-3.5 fill-emerald-400 text-emerald-400 animate-pulse" />
+            <span>Go Speedy Pvt. Ltd</span>
+          </div>
 
-          <h1 className="mt-1.5 xs:mt-2 sm:mt-3 text-[20px] xxs:text-[23px] xs:text-[26px] sm:text-5xl font-black tracking-tight leading-[1.12] sm:leading-[1.1] max-w-[88%] sm:max-w-[60%] text-white">
-            Powering Smarter <br />
-            <span className="text-emerald-400">Electric Mobility.</span>
+          {/* Line 2: Welcome to The Future */}
+          <h1 className="mt-1 xs:mt-1.5 sm:mt-2 text-[26px] xxs:text-[28px] xs:text-[32px] sm:text-5xl font-black tracking-tight leading-[1.1] text-white">
+            Welcome to <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-300">
+              The Future
+            </span>
           </h1>
 
-          <p className="mt-2 xs:mt-2.5 sm:mt-4 text-[11px] xxs:text-xs xs:text-[13px] sm:text-lg text-slate-300/90 leading-relaxed max-w-[85%] xs:max-w-[70%] sm:max-w-[58%]">
+          {/* Line 3: The House of Ev */}
+          <p className="mt-2 text-base xxs:text-lg sm:text-2xl font-black uppercase tracking-wide text-emerald-400">
+            The House of Ev
+          </p>
+
+          <p className="mt-2 text-[11px] xxs:text-xs xs:text-[13px] sm:text-base text-slate-300/90 leading-relaxed max-w-[85%] xs:max-w-[70%] sm:max-w-[58%]">
             Manage EV rentals, fleet operations and finance — all from one simple platform.
           </p>
 
@@ -314,20 +321,28 @@ export default function RootPage() {
         <div className="w-full grid grid-cols-1 desk:grid-cols-12 desk:gap-12 items-center">
           {/* LEFT SIDE (desktop only): intro & features */}
           <div className="gsap-left-content hidden desk:flex desk:col-span-7 flex-col justify-center text-left [text-shadow:0_1px_2px_rgba(7,12,24,0.9),0_2px_14px_rgba(7,12,24,0.8)]">
-            {/* Pill Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-950/70 border border-emerald-500/40 text-emerald-400 text-sm font-semibold tracking-wide self-start mb-6">
-              <Leaf className="w-4 h-4 fill-emerald-400 text-emerald-400" />
-              <span>Clean Mobility. Better Tomorrow.</span>
+            {/* Line 1: Go Speedy Pvt. Ltd */}
+            <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 text-sm sm:text-base font-extrabold tracking-wider self-start mb-6 shadow-[0_0_25px_rgba(16,185,129,0.2)]">
+              <Zap className="w-4 h-4 fill-emerald-400 text-emerald-400 animate-pulse" />
+              <span>Go Speedy Pvt. Ltd</span>
             </div>
 
-            {/* Headline */}
-            <h1 className="text-[52px] xl:text-[58px] 2xl:text-[64px] font-black text-white tracking-tight leading-[1.08]">
-              Powering Smarter <br />
-              <span className="text-emerald-400">Electric Mobility.</span>
+            {/* Line 2: Welcome to The Future */}
+            <h1 className="text-[50px] xl:text-[60px] 2xl:text-[68px] font-black text-white tracking-tight leading-[1.08] [text-shadow:0_2px_14px_rgba(0,0,0,0.8)]">
+              Welcome to <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-emerald-400 drop-shadow-[0_0_25px_rgba(52,211,153,0.4)]">
+                The Future
+              </span>
             </h1>
 
+            {/* Line 3: The House of Ev */}
+            <p className="text-2xl xl:text-3xl 2xl:text-4xl font-black tracking-wider uppercase text-emerald-400 mt-5 flex items-center gap-3 [text-shadow:0_2px_10px_rgba(0,0,0,0.9)]">
+              <span className="h-[3px] w-10 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full inline-block" />
+              <span>The House of Ev</span>
+            </p>
+
             {/* Subtitle */}
-            <p className="text-lg xl:text-xl text-slate-300/90 mt-5 max-w-[520px] leading-relaxed">
+            <p className="text-base xl:text-lg text-slate-300/85 mt-4 max-w-[520px] leading-relaxed">
               Manage EV rentals, fleet operations and finance — all from one simple platform.
             </p>
 
@@ -365,8 +380,17 @@ export default function RootPage() {
               </div>
 
               <div className="mb-4 xs:mb-5 desk:mb-6 [@media(max-height:720px)]:desk:!mb-4">
-                <h2 className="text-xl xxs:text-[22px] desk:text-[34px] [@media(max-height:720px)]:desk:!text-[26px] font-black text-slate-900 dark:text-white tracking-tight leading-tight">Welcome back</h2>
-                <p className="text-xs xxs:text-[13px] desk:text-base text-slate-500 dark:text-slate-400 mt-0.5 xs:mt-1 desk:mt-1.5">Sign in to continue to your dashboard.</p>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-[11px] font-extrabold uppercase tracking-wider mb-2">
+                  <Zap className="w-3 h-3 text-emerald-500" />
+                  <span>Go Speedy Pvt. Ltd</span>
+                </div>
+                <h2 className="text-xl xxs:text-[22px] desk:text-[30px] [@media(max-height:720px)]:desk:!text-[24px] font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                  Welcome to The Future
+                </h2>
+                <p className="text-xs xxs:text-[13px] desk:text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-1 uppercase tracking-wider">
+                  The House of Ev
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">Sign in to continue to your dashboard.</p>
               </div>
 
               {error && (
