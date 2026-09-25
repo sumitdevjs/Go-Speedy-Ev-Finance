@@ -24,17 +24,75 @@ import api from '../../../lib/api';
 import { formatCurrency, formatDate } from '../../../lib/constants';
 import { useAuthStore } from '../../../store/authStore';
 import StaffDashboard from '../../../components/staff/StaffDashboard';
+import HoDashboard from '../../../components/ho/HoDashboard';
 import SustainabilityBanner from '../../../components/dashboard/SustainabilityBanner';
 import { gsap, animateCounter, staggerFadeIn } from '../../../lib/gsap';
 
 export default function DashboardPage() {
   const { role } = useAuthStore();
+  const [adminViewMode, setAdminViewMode] = useState('operations'); // 'operations' | 'ho_zonal'
 
   if (role === 'staff') {
     return <StaffDashboard />;
   }
 
-  return <AdminDashboard />;
+  if (role === 'ho_admin') {
+    return <HoDashboard />;
+  }
+
+  // Super Admin / Admin: Can view Operations AdminDashboard or toggle to HoDashboard (Head Office Zonal View)
+  return (
+    <div className="relative">
+      {/* Top Perspective Switcher for Super Admin / Admin */}
+      <div className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-2.5 flex items-center justify-between transition-colors">
+        <div className="flex items-center gap-2.5">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 hidden xs:inline">
+            Executive Perspective:
+          </span>
+          <div className="inline-flex p-1 rounded-xl bg-slate-200/70 dark:bg-slate-800 border border-slate-300/60 dark:border-slate-700">
+            <button
+              type="button"
+              id="btn-perspective-ops"
+              onClick={() => setAdminViewMode('operations')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                adminViewMode === 'operations'
+                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Operations Overview
+            </button>
+            <button
+              type="button"
+              id="btn-perspective-ho"
+              onClick={() => setAdminViewMode('ho_zonal')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                adminViewMode === 'ho_zonal'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400'
+              }`}
+            >
+              <span>Head Office Command</span>
+              <span className={`px-1.5 py-0.2 rounded text-[10px] font-black ${
+                adminViewMode === 'ho_zonal' ? 'bg-white/20 text-white' : 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
+              }`}>
+                HO
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="hidden sm:inline">
+            {adminViewMode === 'ho_zonal' ? 'Zonal HO Governance Active' : 'Ward Fleet & Counter Desk Monitoring'}
+          </span>
+        </div>
+      </div>
+
+      {adminViewMode === 'ho_zonal' ? <HoDashboard /> : <AdminDashboard />}
+    </div>
+  );
 }
 
 function AdminDashboard() {
@@ -86,7 +144,7 @@ function AdminDashboard() {
       // Fetch Payments
       const paymentsRes = await api.get('/api/payments?limit=10000');
       const payments = paymentsRes.data?.data || [];
-      
+
       const totalPayments = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
       const totalDownpayments = allTenants.reduce((sum, t) => sum + Number(t.downpayment_paid || 0), 0);
       const totalBookings = allTenants.reduce((sum, t) => sum + Number(t.booking_amount || 0), 0);
@@ -154,12 +212,12 @@ function AdminDashboard() {
                   </>
                 )}
               </h3>
-              
+
               <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium mt-1">
                 Ready for deployment
               </p>
             </div>
-            
+
             <div className="relative h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
               <Bike className="h-6 w-6" />
             </div>
@@ -287,42 +345,42 @@ function AdminDashboard() {
                 <>
                   <div className="divide-y divide-slate-100 dark:divide-white/5 max-h-[320px] overflow-y-auto pr-1">
                     {overdueTenants.map((tenant) => (
-                    <div
-                      key={tenant.id}
-                      className="py-3.5 flex items-center justify-between gap-4 hover:bg-slate-50/70 dark:hover:bg-white/5 rounded-xl px-2 transition-smooth"
-                    >
-                      <div className="min-w-0">
-                        <Link
-                          href={`/rentals/${tenant.id}`}
-                          className="text-sm font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block"
-                        >
-                          {tenant.name}
-                        </Link>
-                        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                          <span className="flex items-center gap-1">
-                            <Phone className="h-3 w-3" /> {tenant.phone}
-                          </span>
-                          <span>•</span>
-                          <span>{tenant.ev_models?.name || 'EV Model'}</span>
+                      <div
+                        key={tenant.id}
+                        className="py-3.5 flex items-center justify-between gap-4 hover:bg-slate-50/70 dark:hover:bg-white/5 rounded-xl px-2 transition-smooth"
+                      >
+                        <div className="min-w-0">
+                          <Link
+                            href={`/rentals/${tenant.id}`}
+                            className="text-sm font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block"
+                          >
+                            {tenant.name}
+                          </Link>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                            <span className="flex items-center gap-1">
+                              <Phone className="h-3 w-3" /> {tenant.phone}
+                            </span>
+                            <span>•</span>
+                            <span>{tenant.ev_models?.name || 'EV Model'}</span>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-3 shrink-0">
-                        <div className="text-right">
-                          <Badge status="overdue" size="sm">
-                            {tenant.computed_balance?.daysOverdue} days overdue
-                          </Badge>
-                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-1">
-                            {formatCurrency(tenant.computed_balance?.outstanding)}
-                          </p>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <Badge status="overdue" size="sm">
+                              {tenant.computed_balance?.daysOverdue} days overdue
+                            </Badge>
+                            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-1">
+                              {formatCurrency(tenant.computed_balance?.outstanding)}
+                            </p>
+                          </div>
+                          <Link href={`/rentals/${tenant.id}`}>
+                            <Button variant="outline" size="sm">
+                              Collect
+                            </Button>
+                          </Link>
                         </div>
-                        <Link href={`/rentals/${tenant.id}`}>
-                          <Button variant="outline" size="sm">
-                            Collect
-                          </Button>
-                        </Link>
                       </div>
-                    </div>
                     ))}
                   </div>
                   <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/5 text-center">
@@ -367,20 +425,20 @@ function AdminDashboard() {
                 <>
                   <div className="divide-y divide-slate-100 dark:divide-white/5 max-h-[320px] overflow-y-auto pr-1">
                     {recentRentals.map((r) => (
-                    <div key={r.id} className="py-3 flex items-center justify-between hover:bg-slate-50/70 dark:hover:bg-white/5 rounded-xl px-2 transition-smooth">
-                      <div className="min-w-0">
-                        <Link
-                          href={`/rentals/${r.id}`}
-                          className="text-xs font-bold text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 truncate block"
-                        >
-                          {r.name}
-                        </Link>
-                        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
-                          {formatDate(r.created_at)}
-                        </p>
+                      <div key={r.id} className="py-3 flex items-center justify-between hover:bg-slate-50/70 dark:hover:bg-white/5 rounded-xl px-2 transition-smooth">
+                        <div className="min-w-0">
+                          <Link
+                            href={`/rentals/${r.id}`}
+                            className="text-xs font-bold text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 truncate block"
+                          >
+                            {r.name}
+                          </Link>
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                            {formatDate(r.created_at)}
+                          </p>
+                        </div>
+                        <Badge status={r.status} size="sm" />
                       </div>
-                      <Badge status={r.status} size="sm" />
-                    </div>
                     ))}
                   </div>
                   <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/5 text-center">

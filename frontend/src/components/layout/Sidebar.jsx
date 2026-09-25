@@ -84,11 +84,10 @@ function NavGroup({ items, isActive }) {
               key={item.name}
               href={item.href}
               data-active={active}
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors duration-200 ${
-                active
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors duration-200 ${active
                   ? 'text-blue-600 dark:text-blue-400 font-semibold'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
-              }`}
+                }`}
             >
               <Icon className={`h-4 w-4 shrink-0 ${active ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`} />
               <span className="truncate">{item.name}</span>
@@ -163,9 +162,9 @@ function SidebarInner({ isOpen, onClose }) {
   // Branch display label
   const branchDisplay = selectedBranch
     ? (selectedBranch.ward_no ? `Ward ${selectedBranch.ward_no}: ${selectedBranch.name}` : selectedBranch.name)
-    : (user?.branch?.name 
-        ? (user.branch.ward_no ? `Ward ${user.branch.ward_no}: ${user.branch.name}` : user.branch.name) 
-        : (isSuperAdmin ? 'All Wards (Global)' : (user?.ward_area || 'Central Branch')));
+    : (user?.branch?.name
+      ? (user.branch.ward_no ? `Ward ${user.branch.ward_no}: ${user.branch.name}` : user.branch.name)
+      : (isSuperAdmin ? 'All Wards (Global)' : (user?.ward_area || 'Central Branch')));
 
   const isActive = (href) => {
     if (href === '/dashboard') return pathname === '/dashboard';
@@ -282,18 +281,16 @@ export default function Sidebar({ isOpen, onClose }) {
 
       {/* Mobile Backdrop */}
       <div
-        className={`fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
-          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
+        className={`fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Mobile Slide-in Drawer */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 h-full transition-transform duration-300 ease-in-out lg:hidden shadow-2xl ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 w-64 h-full transition-transform duration-300 ease-in-out lg:hidden shadow-2xl ${isOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <SidebarInner isOpen={isOpen} onClose={onClose} />
       </div>

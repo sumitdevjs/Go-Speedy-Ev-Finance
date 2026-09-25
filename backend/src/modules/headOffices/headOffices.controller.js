@@ -55,6 +55,17 @@ class HeadOfficesController {
       return errorResponse(res, 400, error.message || 'Failed to update head office');
     }
   }
+
+  async getDashboard(req, res) {
+    try {
+      const hoId = req.params.id || req.user?.head_office_id;
+      const data = await headOfficesService.getHeadOfficeDashboard(hoId, req.user);
+      return successResponse(res, 200, data, 'Head office dashboard data retrieved successfully');
+    } catch (error) {
+      console.error('[HeadOfficesController.getDashboard]', error);
+      return errorResponse(res, 500, error.message || 'Failed to fetch dashboard data');
+    }
+  }
 }
 
 module.exports = new HeadOfficesController();

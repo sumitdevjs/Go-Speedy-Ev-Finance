@@ -7,7 +7,7 @@ const { applyScope, resolveCreateScope } = require('../../middleware/scope');
 class RentalsService {
   async getRentals(query = {}, req = null) {
     const { page, limit, offset } = getPaginationOptions(query);
-    
+
     let queryBuilder = supabase
       .from('tenants')
       .select('*, ev_models(name, company, total_price), users!tenants_created_by_fkey(name)', { count: 'exact' });
@@ -23,7 +23,7 @@ class RentalsService {
       queryBuilder = queryBuilder.neq('status', 'completed');
       queryBuilder = queryBuilder.neq('status', 'direct_purchase');
     }
-    
+
     if (query.search) {
       queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'phone'], query.search));
     }
@@ -61,7 +61,7 @@ class RentalsService {
           const bMap = new Map((bList || []).map(b => [b.id, b]));
           tenants.forEach(t => { if (t.branch_id) t.branch = bMap.get(t.branch_id) || null; });
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // Fetch total paid for all these tenants to compute balance
@@ -197,7 +197,7 @@ class RentalsService {
         .select('total_price, stock_count')
         .eq('id', tenantData.ev_model_id)
         .single();
-        
+
       if (modelError || !model) throw new Error('EV Model not found');
       if (model.stock_count <= 0) throw new Error('EV Model out of stock');
 
@@ -242,7 +242,7 @@ class RentalsService {
           late_fee_daily_rate: tenantData.late_fee_daily_rate || 50.00,
           references: tenantData.references || [],
           guarantors: tenantData.guarantors || [],
-          total_price: tenantData.total_price || modelTotalPrice, // snapshot price
+          total_price: tenantData.total_price || modelTotalPrice,
           start_date: tenantData.status === 'direct_purchase' ? null : startDate.toISOString().split('T')[0],
           expected_end_date: tenantData.status === 'direct_purchase' ? null : expectedEndDate.toISOString().split('T')[0],
           created_by: createdBy
@@ -265,7 +265,7 @@ class RentalsService {
           .update({ status: 'available' })
           .eq('id', tenantData.old_ev_id);
       }
-      
+
       if (error.code === '23505') {
         console.error('[createRental] Unique constraint violation:', error);
         throw new Error('Unique constraint violation: a record with this value already exists.');
@@ -356,19 +356,19 @@ class RentalsService {
           status: 'available'
         }]);
     }
-    
+
     return { success: true };
   }
 
   async completeRental(id) {
     // Verify it can be completed (outstanding = 0, dp cleared)
     const rental = await this.getRentalById(id);
-    
+
     if (rental.status !== 'rented') throw new Error('Rental is not currently active');
-    
+
     const dpOwed = (rental.total_price - (rental.booking_amount || 0)) - (rental.downpayment_paid || 0);
     // Actually the calculation logic in balanceCalc handles downpayment properly via contractAmount
-    
+
     if (rental.computed_balance.outstanding > 0) {
       throw new Error(`Cannot complete: Outstanding balance is ₹${rental.computed_balance.outstanding}`);
     }
@@ -415,7 +415,7 @@ class RentalsService {
       if (vehicle_number && conflict.vehicle_number === vehicle_number) return { exists: true, message: 'Vehicle number already exists in the system.' };
       if (scooty_policy_number && conflict.scooty_policy_number === scooty_policy_number) return { exists: true, message: 'Scooty policy number already exists in the system.' };
       if (rider_policy_number && conflict.rider_policy_number === rider_policy_number) return { exists: true, message: 'Rider policy number already exists in the system.' };
-      
+
       return { exists: true, message: 'One of the provided unique identifiers already exists in the system.' };
     }
 
