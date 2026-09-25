@@ -30,6 +30,11 @@ module.exports = {
           700: '#047857',
         },
       },
+      fontFamily: {
+        sans: ['"Charis SIL"', 'Georgia', 'serif'],
+        serif: ['"Charis SIL"', 'Georgia', 'serif'],
+        charis: ['"Charis SIL"', 'serif'],
+      },
     },
   },
   plugins: [
