@@ -5,10 +5,15 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '../../store/authStore';
 import Spinner from '../ui/Spinner';
 
+// ALL roles that can access admin-only pages
+const ADMIN_ROLES = ['admin', 'super_admin', 'ho_admin', 'branch_admin'];
+
 export default function ProtectedRoute({ children, adminOnly = false }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, role, isLoggedIn, isLoading, hasCheckedAuth, checkAuth } = useAuthStore();
+
+  const isAdminRole = ADMIN_ROLES.includes(role);
 
   useEffect(() => {
     if (!hasCheckedAuth) {
@@ -20,11 +25,11 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
     if (hasCheckedAuth && !isLoading) {
       if (!isLoggedIn) {
         router.replace('/');
-      } else if (adminOnly && role !== 'admin') {
+      } else if (adminOnly && !isAdminRole) {
         router.replace('/dashboard');
       }
     }
-  }, [isLoading, isLoggedIn, role, adminOnly, router, hasCheckedAuth]);
+  }, [isLoading, isLoggedIn, isAdminRole, adminOnly, router, hasCheckedAuth]);
 
   if (!hasCheckedAuth || isLoading) {
     return (
@@ -41,7 +46,7 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
     return null;
   }
 
-  if (adminOnly && role !== 'admin') {
+  if (adminOnly && !isAdminRole) {
     return null;
   }
 

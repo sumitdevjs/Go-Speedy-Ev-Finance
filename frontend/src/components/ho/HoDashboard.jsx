@@ -467,7 +467,7 @@ export default function HoDashboard() {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-slate-900 dark:text-white">Ward 2: Saroop Nagar</p>
-                    <p className="text-[10px] text-slate-500">Candidate: S. Sukhbir Singh Karala (9810141630)</p>
+                    <p className="text-[10px] text-slate-500">Operating Desk: North Delhi Ward Recovery</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -483,7 +483,7 @@ export default function HoDashboard() {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-slate-900 dark:text-white">Ward 9: Punjabi Bagh</p>
-                    <p className="text-[10px] text-slate-500">Candidate: S. Manjinder Singh Sirsa (9810333333)</p>
+                    <p className="text-[10px] text-slate-500">Operating Desk: West Delhi Ward Recovery</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -499,7 +499,7 @@ export default function HoDashboard() {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-slate-900 dark:text-white">Ward 16: Tagore Garden</p>
-                    <p className="text-[10px] text-slate-500">Candidate: S. Bhupinder Singh Anand (9873730737)</p>
+                    <p className="text-[10px] text-slate-500">Operating Desk: West Delhi Ward Recovery</p>
                   </div>
                 </div>
                 <div className="text-right">

@@ -58,7 +58,7 @@ export default function BranchSwitcher() {
 
   // If user is regular staff or branch admin without switch privileges:
   if (!canSwitch) {
-    const branchName = user?.branch?.name 
+    const branchName = user?.branch?.name
       ? (user.branch.ward_no ? `Ward ${user.branch.ward_no}: ${user.branch.name}` : user.branch.name)
       : (user?.ward_area || 'Central Branch');
 
@@ -155,11 +155,10 @@ export default function BranchSwitcher() {
                     setSelectedBranch(null);
                     setIsOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between p-2 text-xs rounded-lg text-left transition-colors cursor-pointer ${
-                    !selectedBranch
+                  className={`w-full flex items-center justify-between p-2 text-xs rounded-lg text-left transition-colors cursor-pointer ${!selectedBranch
                       ? 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold'
                       : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-2">
                     <Globe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
@@ -194,11 +193,10 @@ export default function BranchSwitcher() {
                             setSelectedBranch(branch);
                             setIsOpen(false);
                           }}
-                          className={`w-full flex items-center justify-between px-3 py-1.5 text-xs rounded-md text-left transition-colors cursor-pointer ${
-                            isSelected
+                          className={`w-full flex items-center justify-between px-3 py-1.5 text-xs rounded-md text-left transition-colors cursor-pointer ${isSelected
                               ? 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold'
                               : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                          }`}
+                            }`}
                         >
                           <div className="truncate pr-2">
                             <span className="font-medium">

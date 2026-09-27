@@ -60,22 +60,21 @@ class AuthController {
       let branch = null;
       let headOffice = null;
 
-      if (req.user?.branch_id) {
-        const { data: b } = await supabase
-          .from('branches')
-          .select('id, name, code, ward_no, ward_area')
-          .eq('id', req.user.branch_id)
-          .single();
-        branch = b || null;
+      const isSuperAdmin = req.user?.role === 'super_admin' || req.user?.email === 'admin@gmail.com';
+      const branchRef = !isSuperAdmin ? (req.user?.branch_id || req.user?.ward_area) : null;
+      if (branchRef) {
+        try {
+          const branchesService = require('../branches/branches.service');
+          branch = await branchesService.getById(branchRef);
+        } catch (e) {}
       }
 
-      if (req.user?.head_office_id) {
-        const { data: ho } = await supabase
-          .from('head_offices')
-          .select('id, name, code, city')
-          .eq('id', req.user.head_office_id)
-          .single();
-        headOffice = ho || null;
+      const hoRef = req.user?.head_office_id || branch?.head_office_id;
+      if (hoRef) {
+        try {
+          const headOfficesService = require('../headOffices/headOffices.service');
+          headOffice = await headOfficesService.getById(hoRef);
+        } catch (e) {}
       }
 
       return successResponse(res, 200, {

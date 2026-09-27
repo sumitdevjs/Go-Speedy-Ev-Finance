@@ -129,6 +129,17 @@ function SidebarInner({ isOpen, onClose }) {
     { name: 'Payments / Ledger', href: '/purchases', icon: ShoppingBag },
   ];
 
+  // Branch admin: same as staff but also sees their ward staff
+  const branchAdminNavItems = [
+    { name: 'Ward Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Rentals', href: '/rentals', icon: Users },
+    { name: 'Issue Rental', href: '/rentals/new', icon: UserPlus },
+    { name: 'Bookings', href: '/bookings', icon: CalendarCheck },
+    { name: 'EV Models & Stock', href: '/models', icon: Bike },
+    { name: 'Payments / Ledger', href: '/purchases', icon: ShoppingBag },
+    { name: 'My Branch Staff', href: '/staff', icon: UserCheck },
+  ];
+
   const adminNavItemsList = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Rentals', href: '/rentals', icon: Users },
@@ -137,7 +148,9 @@ function SidebarInner({ isOpen, onClose }) {
     { name: 'Purchases', href: '/purchases', icon: ShoppingBag },
   ];
 
-  const navItems = role === 'staff' ? staffNavItems : adminNavItemsList;
+  const navItems = role === 'staff' ? staffNavItems
+    : role === 'branch_admin' ? branchAdminNavItems
+    : adminNavItemsList;
 
   const adminNavItems = [
     ...(isSuperAdmin || isHoAdmin ? [{ name: 'Branches & Wards', href: '/branches', icon: Building2 }] : []),
@@ -194,16 +207,16 @@ function SidebarInner({ isOpen, onClose }) {
       <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-1" data-lenis-prevent>
         <div className="px-3 pb-1 flex items-center justify-between">
           <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-            {role === 'staff' ? 'Staff Desk' : 'Operations'}
+            {role === 'staff' ? 'Staff Desk' : role === 'branch_admin' ? 'Ward Desk' : 'Operations'}
           </p>
-          {role === 'staff' && (
+          {(role === 'staff' || role === 'branch_admin') && (
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
           )}
         </div>
 
         <NavGroup items={navItems} isActive={isActive} />
 
-        {role === 'admin' && (
+        {(isSuperAdmin || isHoAdmin) && (
           <>
             <div className="pt-4 pb-1">
               <p className="px-3 text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">

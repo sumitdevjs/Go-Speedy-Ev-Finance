@@ -14,6 +14,7 @@ import Pagination from '../../../components/ui/Pagination';
 import api from '../../../lib/api';
 import { formatCurrency, formatDate } from '../../../lib/constants';
 import { staggerFadeIn } from '../../../lib/gsap';
+import { useAuthStore } from '../../../store/authStore';
 
 export default function RentalsListPage() {
   const router = useRouter();

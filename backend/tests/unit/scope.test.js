@@ -116,12 +116,12 @@ describe('Data Scoping and Multi-Tenant Isolation', () => {
 
     test('ho_admin is forced to their own head_office_id', () => {
       const req = {
-        user: { role: 'ho_admin', head_office_id: 'ho-noida' },
+        user: { role: 'ho_admin', head_office_id: 'ho-delhi-01' },
       };
-      const data = { branch_id: 'noi-br-01', head_office_id: 'spoofed-ho-delhi' };
+      const data = { branch_id: 'del-wd-01', head_office_id: 'spoofed-ho' };
       const scope = resolveCreateScope(req, data);
-      expect(scope.branch_id).toBe('noi-br-01');
-      expect(scope.head_office_id).toBe('ho-noida');
+      expect(scope.branch_id).toBe('del-wd-01');
+      expect(scope.head_office_id).toBe('ho-delhi-01');
     });
   });
 });

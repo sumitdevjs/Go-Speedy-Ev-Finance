@@ -1,6 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import { gsap, animateModalIn, animateModalOut } from '../../lib/gsap';
 
 export default function Modal({
   isOpen,
@@ -10,39 +12,46 @@ export default function Modal({
   children,
   maxWidth = 'max-w-lg',
 }) {
-  const modalRef = useRef(null);
-  const backdropRef = useRef(null);
+  const [mounted, setMounted] = useState(false);
+  const [active, setActive] = useState(false);
+  const [shouldRender, setShouldRender] = useState(false);
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && isOpen) {
-        handleClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
+    setMounted(true);
+  }, []);
 
-  // Lock body scroll and trigger GSAP entrance when modal opens
   useEffect(() => {
+    let timeoutId;
     if (isOpen) {
+      setShouldRender(true);
+      const frameId = requestAnimationFrame(() => {
+        setActive(true);
+      });
+
+      // Lock scroll
       document.body.style.overflow = 'hidden';
       if (typeof window !== 'undefined' && window.__lenis) {
         window.__lenis.stop();
       }
-      if (modalRef.current) {
-        animateModalIn(modalRef.current);
-      }
-      if (backdropRef.current) {
-        gsap.fromTo(backdropRef.current, { opacity: 0 }, { opacity: 1, duration: 0.25 });
-      }
+
+      return () => {
+        cancelAnimationFrame(frameId);
+      };
     } else {
+      setActive(false);
+      timeoutId = setTimeout(() => {
+        setShouldRender(false);
+      }, 200);
+
+      // Unlock scroll
       document.body.style.overflow = '';
       if (typeof window !== 'undefined' && window.__lenis) {
         window.__lenis.start();
       }
     }
+
     return () => {
+      clearTimeout(timeoutId);
       document.body.style.overflow = '';
       if (typeof window !== 'undefined' && window.__lenis) {
         window.__lenis.start();
@@ -50,34 +59,49 @@ export default function Modal({
     };
   }, [isOpen]);
 
-  const handleClose = () => {
-    if (modalRef.current) {
-      animateModalOut(modalRef.current, () => {
-        onClose();
-      });
-      if (backdropRef.current) {
-        gsap.to(backdropRef.current, { opacity: 0, duration: 0.2 });
+  // Keyboard escape handler
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose?.();
       }
-    } else {
-      onClose();
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
     }
-  };
+  }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!mounted || !shouldRender) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center">
+  let portalRoot = document.getElementById('modal-portal-root');
+  if (!portalRoot && typeof document !== 'undefined') {
+    portalRoot = document.createElement('div');
+    portalRoot.id = 'modal-portal-root';
+    document.body.appendChild(portalRoot);
+  }
+
+  if (!portalRoot) return null;
+
+  return createPortal(
+    <div
+      className={`fixed inset-0 z-[9999] flex flex-col justify-end sm:justify-center items-center transition-opacity duration-200 ${
+        active ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      }`}
+    >
       {/* Blurred Backdrop */}
       <div
-        ref={backdropRef}
-        className="fixed inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity"
-        onClick={handleClose}
+        className={`fixed inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity duration-200 ${
+          active ? 'opacity-100' : 'opacity-0'
+        }`}
+        onClick={() => onClose?.()}
       />
 
-      {/* Modal Container — Bottom sheet on mobile, Centered on sm+ with Apple blur & GSAP entrance */}
+      {/* Modal Container */}
       <div
-        ref={modalRef}
-        className={`relative z-10 w-full sm:w-auto sm:${maxWidth} bg-white/95 dark:bg-slate-900/90 backdrop-blur-2xl text-left shadow-2xl border border-slate-200/80 dark:border-white/15 rounded-t-2xl sm:rounded-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col mx-0 sm:mx-4 transition-colors`}
+        className={`relative z-10 w-full sm:w-auto sm:${maxWidth} bg-white/95 dark:bg-slate-900/90 backdrop-blur-2xl text-left shadow-2xl border border-slate-200/80 dark:border-white/15 rounded-t-2xl sm:rounded-2xl max-h-[92vh] sm:max-h-[85vh] flex flex-col mx-0 sm:mx-4 transition-all duration-200 ease-out transform ${
+          active ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-3'
+        }`}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-white/10 px-5 py-4 shrink-0">
@@ -87,7 +111,7 @@ export default function Modal({
           </div>
           <button
             type="button"
-            onClick={handleClose}
+            onClick={() => onClose?.()}
             className="rounded-lg p-1.5 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition-smooth shrink-0 cursor-pointer"
           >
             <X className="h-5 w-5" />
@@ -95,8 +119,11 @@ export default function Modal({
         </div>
 
         {/* Scrollable Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1" data-lenis-prevent>{children}</div>
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1" data-lenis-prevent>
+          {children}
+        </div>
       </div>
-    </div>
+    </div>,
+    portalRoot
   );
 }

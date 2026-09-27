@@ -4,8 +4,9 @@ const supabase = require('../config/db');
 
 const requireAuth = async (req, res, next) => {
   try {
-    // We expect the access_token in a cookie
-    const token = req.cookies?.access_token;
+    // We accept access_token from cookie or Authorization Bearer header
+    const authHeader = req.headers?.authorization;
+    const token = req.cookies?.access_token || (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null);
     
     if (!token) {
       return errorResponse(res, 401, 'Unauthorized - No token provided');
@@ -32,15 +33,24 @@ const requireAuth = async (req, res, next) => {
       return errorResponse(res, 401, 'Unauthorized - Account is deactivated');
     }
 
-    // Attach user to request
+    // Super admin detection based on database role
+    const isMasterAdmin = user.role === 'super_admin' || (user.role === 'admin' && !user.ward_area);
+
+    let effectiveRole = isMasterAdmin ? 'super_admin' : user.role;
+    if (!isMasterAdmin && (user.role === 'branch_admin' || (user.role === 'admin' && user.ward_area && !['ALL', 'HQ', 'Delhi / Ncr', 'Delhi/NCR', 'Delhi'].includes(user.ward_area)))) {
+      effectiveRole = 'branch_admin';
+    }
+    const branchId = isMasterAdmin ? null : (user.branch_id || user.ward_area);
+
     req.user = {
       id: user.id,
       name: user.name,
       email: user.email,
       phone: user.phone,
-      role: user.role,
+      role: effectiveRole,
       head_office_id: user.head_office_id,
-      branch_id: user.branch_id,
+      branch_id: branchId,
+      ward_area: user.ward_area,
     };
     
     next();

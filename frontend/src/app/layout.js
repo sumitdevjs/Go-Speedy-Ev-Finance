@@ -42,6 +42,7 @@ export default function RootLayout({ children }) {
             {children}
           </SmoothScroll>
         </ThemeProvider>
+        <div id="modal-portal-root" />
       </body>
     </html>
   );

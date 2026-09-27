@@ -10,8 +10,14 @@ router.use(requireAuth);
 // Anyone authenticated can access dropdown (e.g. staff selection, header filters)
 router.get('/dropdown', branchesController.getDropdown.bind(branchesController));
 
-// Branch overview
+// Branch dashboard — branch_admin gets their own ward's full dashboard
+router.get('/my-dashboard', branchesController.getMyDashboard.bind(branchesController));
+
+// Branch overview (lightweight)
 router.get('/:id/overview', branchesController.getOverview.bind(branchesController));
+
+// Full dashboard for a specific branch (super_admin / admin access)
+router.get('/:id/dashboard', branchesController.getDashboardById.bind(branchesController));
 
 // Listing and details
 router.get('/', branchesController.getAll.bind(branchesController));

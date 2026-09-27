@@ -9,12 +9,14 @@ import {
 import Header from '../../../../components/layout/Header';
 import Button from '../../../../components/ui/Button';
 import Input from '../../../../components/ui/Input';
+import Select from '../../../../components/ui/Select';
 import Table from '../../../../components/ui/Table';
 import Card from '../../../../components/ui/Card';
 import Modal from '../../../../components/ui/Modal';
 import Badge from '../../../../components/ui/Badge';
 import Spinner from '../../../../components/ui/Spinner';
 import api from '../../../../lib/api';
+import { useAuthStore } from '../../../../store/authStore';
 import { toast } from '../../../../lib/toast';
 import { confirmDialog } from '../../../../lib/confirmDialog';
 import { formatCurrency, formatDate } from '../../../../lib/constants';
@@ -43,11 +45,22 @@ export default function ModelViewPage({ params }) {
   const [stockDate, setStockDate] = useState(new Date().toISOString().split('T')[0]);
   const [stockAdded, setStockAdded] = useState('');
   const [stockWard, setStockWard] = useState('');
+  const [stockBranchId, setStockBranchId] = useState('');
+  const [branches, setBranches] = useState([]);
   const [isStockSubmitting, setIsStockSubmitting] = useState(false);
+  const { selectedBranch } = useAuthStore();
+
+  useEffect(() => {
+    api.get('/api/branches/dropdown')
+      .then((res) => {
+        if (res.data?.success) setBranches(res.data.data || []);
+      })
+      .catch((err) => console.error('Failed to load branches:', err));
+  }, []);
 
   useEffect(() => {
     fetchModel();
-  }, [id]);
+  }, [id, selectedBranch]);
 
   const fetchModel = async () => {
     try {
@@ -155,18 +168,21 @@ export default function ModelViewPage({ params }) {
       toast.error('Please enter a valid stock quantity');
       return;
     }
-    if (!stockWard.trim()) {
-      toast.error('Ward/Area is required');
+    if (!stockBranchId) {
+      toast.error('Please select the target Ward / Branch');
       return;
     }
+    const chosenBranch = branches.find((b) => b.id === stockBranchId);
     try {
       setIsStockSubmitting(true);
       await api.post(`/api/models/${id}/stock`, {
         date: stockDate,
         stock_added: Number(stockAdded),
-        ward_area: stockWard.trim(),
+        branch_id: chosenBranch?.id || stockBranchId,
+        ward_no: chosenBranch?.ward_no || null,
+        ward_area: chosenBranch ? (chosenBranch.ward_no ? `Ward ${chosenBranch.ward_no}: ${chosenBranch.name}` : chosenBranch.name) : 'General',
       });
-      toast.success(`Successfully added ${stockAdded} stock`);
+      toast.success(`Successfully allocated ${stockAdded} EVs to ${chosenBranch?.name || 'selected ward'}`);
       setIsAddStockOpen(false);
       setStockAdded('');
       fetchModel();
@@ -398,6 +414,7 @@ export default function ModelViewPage({ params }) {
                   setStockDate(new Date().toISOString().split('T')[0]);
                   setStockAdded('');
                   setStockWard(model.ward || 'Delhi Central');
+                  setStockBranchId(selectedBranch?.id || (branches.length === 1 ? branches[0].id : ''));
                   setIsAddStockOpen(true);
                 }}>
                   Add New Stock
@@ -434,9 +451,24 @@ export default function ModelViewPage({ params }) {
         isOpen={isAddStockOpen}
         onClose={() => setIsAddStockOpen(false)}
         title={`Add Stock to ${model?.name}`}
-        subtitle="Log new incoming stock for this EV model"
+        subtitle="Log new incoming stock and allocate it strictly to a specific municipal ward"
       >
         <form onSubmit={handleStockSubmit} className="space-y-4" autoComplete="off">
+          <Select
+            label="Target Ward / Branch"
+            value={stockBranchId}
+            onChange={(e) => setStockBranchId(e.target.value)}
+            disabled={branches.length === 1}
+            required
+          >
+            <option value="" disabled>-- Select Municipal Ward / Branch --</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.ward_no ? `Ward ${b.ward_no}: ${b.name}` : b.name} {b.ward_area ? `(${b.ward_area})` : ''}
+              </option>
+            ))}
+          </Select>
+
           <Input
             label="Date Received"
             type="date"
@@ -445,22 +477,25 @@ export default function ModelViewPage({ params }) {
             required
           />
           <Input
-            label="Quantity Added"
+            label="Quantity Added (EV Scooters)"
             type="number"
             min={1}
-            placeholder="e.g. 5"
+            placeholder="e.g. 10"
             value={stockAdded}
             onChange={(e) => setStockAdded(e.target.value)}
             required
           />
-          <Input
-            label="Ward / Area"
-            placeholder="e.g. Okhla Depot"
-            value={stockWard}
-            onChange={(e) => setStockWard(e.target.value)}
-            required
-          />
-          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+
+          {stockBranchId && (
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 flex items-start gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+              <span>
+                These <strong>{stockAdded || '0'} EV scooters</strong> will be allocated <strong>strictly to {branches.find((b) => b.id === stockBranchId)?.name || 'this ward'}</strong>. Other wards will not share or deplete this inventory.
+              </span>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
             <Button
               variant="outline"
               size="md"

@@ -14,6 +14,8 @@ import {
   Clock,
   Phone,
   Zap,
+  MapPin,
+  Layers,
 } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Card from '../../../components/ui/Card';
@@ -25,74 +27,24 @@ import { formatCurrency, formatDate } from '../../../lib/constants';
 import { useAuthStore } from '../../../store/authStore';
 import StaffDashboard from '../../../components/staff/StaffDashboard';
 import HoDashboard from '../../../components/ho/HoDashboard';
+import BranchDashboard from '../../../components/branch/BranchDashboard';
 import SustainabilityBanner from '../../../components/dashboard/SustainabilityBanner';
 import { gsap, animateCounter, staggerFadeIn } from '../../../lib/gsap';
 
 export default function DashboardPage() {
   const { role } = useAuthStore();
-  const [adminViewMode, setAdminViewMode] = useState('operations'); // 'operations' | 'ho_zonal'
 
   if (role === 'staff') {
     return <StaffDashboard />;
   }
 
-  if (role === 'ho_admin') {
-    return <HoDashboard />;
+  // Branch-level admins/managers only see their own ward data
+  if (role === 'branch_admin') {
+    return <BranchDashboard />;
   }
 
-  // Super Admin / Admin: Can view Operations AdminDashboard or toggle to HoDashboard (Head Office Zonal View)
-  return (
-    <div className="relative">
-      {/* Top Perspective Switcher for Super Admin / Admin */}
-      <div className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-2.5 flex items-center justify-between transition-colors">
-        <div className="flex items-center gap-2.5">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 hidden xs:inline">
-            Executive Perspective:
-          </span>
-          <div className="inline-flex p-1 rounded-xl bg-slate-200/70 dark:bg-slate-800 border border-slate-300/60 dark:border-slate-700">
-            <button
-              type="button"
-              id="btn-perspective-ops"
-              onClick={() => setAdminViewMode('operations')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                adminViewMode === 'operations'
-                  ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Operations Overview
-            </button>
-            <button
-              type="button"
-              id="btn-perspective-ho"
-              onClick={() => setAdminViewMode('ho_zonal')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                adminViewMode === 'ho_zonal'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400'
-              }`}
-            >
-              <span>Head Office Command</span>
-              <span className={`px-1.5 py-0.2 rounded text-[10px] font-black ${
-                adminViewMode === 'ho_zonal' ? 'bg-white/20 text-white' : 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
-              }`}>
-                HO
-              </span>
-            </button>
-          </div>
-        </div>
-
-        <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="hidden sm:inline">
-            {adminViewMode === 'ho_zonal' ? 'Zonal HO Governance Active' : 'Ward Fleet & Counter Desk Monitoring'}
-          </span>
-        </div>
-      </div>
-
-      {adminViewMode === 'ho_zonal' ? <HoDashboard /> : <AdminDashboard />}
-    </div>
-  );
+  // Normal admin / super_admin branch & wards dashboard
+  return <AdminDashboard />;
 }
 
 function AdminDashboard() {
@@ -106,6 +58,7 @@ function AdminDashboard() {
   });
   const [overdueTenants, setOverdueTenants] = useState([]);
   const [recentRentals, setRecentRentals] = useState([]);
+  const [wardFleet, setWardFleet] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -161,6 +114,15 @@ function AdminDashboard() {
 
       setOverdueTenants(overdue.slice(0, 6));
       setRecentRentals(rentals.slice(0, 5));
+
+      // Fetch live Ward Fleet Distribution
+      try {
+        const wbRes = await api.get('/api/models/ward-breakdown');
+        if (wbRes.data?.success) {
+          const wb = wbRes.data.data || [];
+          setWardFleet(wb.filter((w) => w.total_stock > 0));
+        }
+      } catch (_) {}
     } catch (err) {
       console.error('Error loading dashboard data:', err);
     } finally {
@@ -216,6 +178,13 @@ function AdminDashboard() {
               <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium mt-1">
                 Ready for deployment
               </p>
+              <Link
+                href="/models?tab=ward_breakdown"
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline mt-1"
+              >
+                <span>View Ward Breakdown</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
             </div>
 
             <div className="relative h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
@@ -313,6 +282,62 @@ function AdminDashboard() {
             </div>
           </Link>
         </div>
+
+        {/* Live Delhi Ward Fleet Distribution */}
+        {!selectedBranch && wardFleet.length > 0 && (
+          <div className="p-5 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-emerald-500" />
+                  <span>Ward EV Fleet Distribution (Live)</span>
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Real-time stock readiness across active Delhi municipal wards
+                </p>
+              </div>
+              <Link
+                href="/models?tab=ward_breakdown"
+                className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+              >
+                <span>View All 46 Wards</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+              {wardFleet.map((w) => (
+                <Link
+                  key={w.id}
+                  href="/models?tab=ward_breakdown"
+                  className="p-3.5 rounded-xl border border-slate-200/80 dark:border-white/5 bg-slate-50/80 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all flex flex-col justify-between group"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-blue-500 uppercase">
+                        Ward #{w.ward_no}
+                      </span>
+                      <p className="text-sm font-black text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors">
+                        {w.name}
+                      </p>
+                      <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                        <MapPin className="w-3 h-3" />
+                        <span>{w.ward_area || 'Delhi'}</span>
+                      </p>
+                    </div>
+                    <span className="text-xs font-black text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                      {w.total_stock} EVs
+                    </span>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-slate-200/60 dark:border-white/5 text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    {w.models.filter((m) => m.stock > 0).map((m) => `${m.name}: ${m.stock}`).join(' • ') || 'Allocated stock ready'}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Overdue Priority Alert Card */}

@@ -298,25 +298,42 @@ export default function StaffPage() {
     {
       header: 'System Role',
       key: 'role',
-      render: (row) => <Badge status={row.role} size="sm" />,
+      render: (row) => {
+        const isMaster = row.role === 'super_admin' || (row.role === 'admin' && !row.ward_area);
+        if (isMaster) {
+          return <Badge status="Super Admin" variant="purple" size="sm" />;
+        }
+        if (row.role === 'staff' || row.display_role === 'Staff') {
+          return <Badge status="Staff" variant="slate" size="sm" />;
+        }
+        return <Badge status="Ward Admin" variant="blue" size="sm" />;
+      },
     },
     {
       header: 'Assigned Branch / Ward',
       key: 'branch',
       render: (row) => {
+        const isMaster = row.role === 'super_admin' || (row.role === 'admin' && !row.ward_area);
+        if (isMaster) {
+          return (
+            <div className="flex items-center gap-1.5 font-semibold text-xs text-indigo-400">
+              <MapPin className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+              <span>All Wards (Moti Nagar Head Office)</span>
+            </div>
+          );
+        }
         const branchLabel = row.branches
           ? (row.branches.ward_no ? `Ward ${row.branches.ward_no}: ${row.branches.name}` : row.branches.name)
-          : (row.ward_area || 'Global / Unassigned');
-        const hoLabel = row.head_offices?.name || null;
+          : (row.ward_area ? `${row.ward_area} Ward` : 'General Ward');
         return (
           <div>
             <div className="flex items-center gap-1.5 font-semibold text-xs text-slate-800 dark:text-slate-200">
               <MapPin className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
               <span>{branchLabel}</span>
             </div>
-            {hoLabel && (
+            {row.branches?.ward_area && (
               <p className="text-[11px] text-slate-500 dark:text-slate-400 pl-5">
-                {hoLabel}
+                {row.branches.ward_area}
               </p>
             )}
           </div>

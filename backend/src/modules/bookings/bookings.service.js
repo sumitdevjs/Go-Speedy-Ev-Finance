@@ -9,8 +9,13 @@ class BookingsService {
 
     let queryBuilder = supabase
       .from('bookings')
-      .select('*, ev_models(name, company), users!bookings_created_by_fkey(name)', { count: 'exact' })
-      .eq('status', 'pending');
+      .select('*, ev_models(name, company), users!bookings_created_by_fkey(name)', { count: 'exact' });
+
+    if (query.status && query.status !== 'all') {
+      queryBuilder = queryBuilder.eq('status', query.status);
+    } else if (!query.status) {
+      queryBuilder = queryBuilder.eq('status', 'pending');
+    }
 
     if (req) {
       queryBuilder = applyScope(queryBuilder, req);
@@ -34,7 +39,7 @@ class BookingsService {
           const bMap = new Map((bList || []).map(b => [b.id, b]));
           data.forEach(b => { if (b.branch_id) b.branch = bMap.get(b.branch_id) || null; });
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const meta = getPaginationMeta(count, page, limit);
@@ -157,7 +162,7 @@ class BookingsService {
         .from('ev_models')
         .update({ stock_count: model.stock_count })
         .eq('id', tenantData.ev_model_id);
-        
+
       if (error.code === '23505') {
         console.error('[convertBooking] Unique constraint violation:', error);
         throw new Error('Unique constraint violation: a record with this value already exists.');
@@ -176,9 +181,9 @@ class BookingsService {
       .single();
 
     if (error) {
-       // Check if no rows were updated (meaning it wasn't pending)
-       if(error.code === 'PGRST116') throw new Error('Booking not found or not pending');
-       throw error;
+      // Check if no rows were updated (meaning it wasn't pending)
+      if (error.code === 'PGRST116') throw new Error('Booking not found or not pending');
+      throw error;
     }
     return data;
   }
@@ -192,8 +197,8 @@ class BookingsService {
       .single();
 
     if (error) {
-       if(error.code === 'PGRST116') throw new Error('Booking not found');
-       throw error;
+      if (error.code === 'PGRST116') throw new Error('Booking not found');
+      throw error;
     }
     return data;
   }

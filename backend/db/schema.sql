@@ -1,6 +1,6 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- GO SPEEDY EV FINANCE SCHEME — FULL SCHEMA
--- Single cumulative migration file. Update in place. Re-run on fresh DB.
+-- GO SPEEDY EV FINANCE SCHEME — FULL SCHEMA & PRODUCTION SEED
+-- Single cumulative schema file. Update in place. Re-run on fresh DB.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- Enable the pg_trgm extension for ILIKE search indices (gin_trgm_ops)
@@ -26,12 +26,17 @@ CREATE TABLE IF NOT EXISTS branches (
   name            TEXT NOT NULL,
   code            TEXT UNIQUE NOT NULL,
   ward_area       TEXT,
+  contact_person  TEXT,
+  phone           VARCHAR(20),
   address         TEXT,
-  phone           VARCHAR(15),
+  status_label    TEXT,
   is_active       BOOLEAN NOT NULL DEFAULT true,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS contact_person TEXT;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS status_label TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_branches_ho ON branches(head_office_id);
 CREATE INDEX IF NOT EXISTS idx_branches_code ON branches(code);
@@ -42,23 +47,31 @@ CREATE TABLE IF NOT EXISTS users (
   head_office_id           UUID REFERENCES head_offices(id),
   branch_id                UUID REFERENCES branches(id),
   name                     TEXT NOT NULL,
-  phone                    VARCHAR(10) UNIQUE CHECK (phone IS NULL OR phone ~ '^[0-9]{10}$'),                  -- NULL for OAuth users until updated
+  phone                    VARCHAR(10) UNIQUE CHECK (phone IS NULL OR phone ~ '^[0-9]{10}$'),
   email                    TEXT UNIQUE,
-  password_hash            TEXT,                         -- NULL for OAuth users
-  oauth_provider           TEXT,                         -- 'google', etc.
-  oauth_id                 TEXT,                         -- Google profile ID
+  password_hash            TEXT,
+  oauth_provider           TEXT,
+  oauth_id                 TEXT,
   role                     TEXT NOT NULL
                              CHECK (role IN ('super_admin', 'ho_admin', 'branch_admin', 'staff', 'admin')),
   ward_area                TEXT,
   is_active                BOOLEAN NOT NULL DEFAULT true,
-  refresh_token_hash       TEXT,                         -- bcrypt hash; NULL = logged out
+  refresh_token_hash       TEXT,
   refresh_token_expires_at TIMESTAMPTZ,
-  reset_otp_hash           TEXT,                         -- bcrypt hash of 6-digit reset OTP
-  reset_otp_expires_at     TIMESTAMPTZ,                  -- 10-minute expiry for reset OTP
+  reset_otp_hash           TEXT,
+  reset_otp_expires_at     TIMESTAMPTZ,
   created_by               UUID REFERENCES users(id),
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Ensure columns exist if table was already created earlier
+ALTER TABLE users ADD COLUMN IF NOT EXISTS head_office_id UUID REFERENCES head_offices(id);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ward_area TEXT;
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check 
+  CHECK (role IN ('super_admin', 'ho_admin', 'branch_admin', 'staff', 'admin'));
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id);
 CREATE INDEX IF NOT EXISTS idx_users_branch ON users(branch_id);
@@ -81,6 +94,10 @@ CREATE TABLE IF NOT EXISTS ev_models (
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Ensure columns exist if table was already created earlier
+ALTER TABLE ev_models ADD COLUMN IF NOT EXISTS head_office_id UUID REFERENCES head_offices(id);
+ALTER TABLE ev_models ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id);
+
 CREATE INDEX IF NOT EXISTS idx_ev_models_branch ON ev_models(branch_id);
 
 -- ── TABLE 3: old_evs ─────────────────────────────────────────────────────────
@@ -89,7 +106,7 @@ CREATE TABLE IF NOT EXISTS old_evs (
   head_office_id          UUID REFERENCES head_offices(id),
   branch_id               UUID REFERENCES branches(id),
   original_ev_model_id    UUID REFERENCES ev_models(id),
-  returned_from_tenant_id UUID, -- References tenants(id), but defined later to avoid circular dependency
+  returned_from_tenant_id UUID,
   chassis_no              TEXT,
   motor_no                TEXT,
   controller_no           TEXT,
@@ -99,6 +116,10 @@ CREATE TABLE IF NOT EXISTS old_evs (
   status                  TEXT DEFAULT 'available' CHECK (status IN ('available', 'rented', 'sold')),
   created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Ensure columns exist if table was already created earlier
+ALTER TABLE old_evs ADD COLUMN IF NOT EXISTS head_office_id UUID REFERENCES head_offices(id);
+ALTER TABLE old_evs ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id);
 
 CREATE INDEX IF NOT EXISTS idx_old_evs_branch ON old_evs(branch_id);
 
@@ -122,7 +143,7 @@ CREATE TABLE IF NOT EXISTS tenants (
   has_pending_docs BOOLEAN NOT NULL DEFAULT false,
   rent_agreement_signed BOOLEAN NOT NULL DEFAULT false,
 
-  -- Document storage paths (opaque UUIDs — not public URLs)
+  -- Document storage paths
   aadhar_path           TEXT,
   pan_path              TEXT,
   cheque_path           TEXT,
@@ -146,7 +167,7 @@ CREATE TABLE IF NOT EXISTS tenants (
   date_of_delivery DATE,
 
   -- Financial
-  total_price         NUMERIC(12,2),               -- snapshot of ev_models.total_price at time of rental
+  total_price         NUMERIC(12,2),
   booking_amount      NUMERIC(12,2) DEFAULT 0 CHECK (booking_amount >= 0),
   downpayment_paid    NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (downpayment_paid >= 0),
   downpayment_mode    TEXT CHECK (downpayment_mode IS NULL OR
@@ -167,11 +188,10 @@ CREATE TABLE IF NOT EXISTS tenants (
   -- Contract timeline
   start_date        DATE,
   total_months      INTEGER DEFAULT 24,
-  expected_end_date DATE,                          -- computed: start_date + 24 months
+  expected_end_date DATE,
 
-  -- JSONB: references × 3  [{category, name, area, phone}]
+  -- JSONB references & guarantors
   "references"   JSONB NOT NULL DEFAULT '[]',
-  -- JSONB: guarantors × 2  [{gender, name, address, phone}]
   guarantors   JSONB NOT NULL DEFAULT '[]',
 
   created_by   UUID REFERENCES users(id),
@@ -196,34 +216,32 @@ CREATE TABLE IF NOT EXISTS tenants (
   rider_insurance_idv      NUMERIC(12,2),
   rider_insurance_start    DATE,
 
-  -- AMC (Annual Maintenance Contract)
+  -- AMC
   amc_amount               NUMERIC(12,2),
   amc_start_date           DATE,
   amc_expire_date          DATE,
   amc_service_log          JSONB NOT NULL DEFAULT '[]',
-  -- Each entry: { date, what_change, old_serial_no, new_serial_no, cost }
 
-  -- Buyback / Early Exit
+  -- Buyback
   buyback_amount           NUMERIC(12,2),
 
-  -- Financial sanity checks
   CONSTRAINT chk_booking_lte_price
     CHECK (booking_amount IS NULL OR total_price IS NULL OR booking_amount <= total_price),
   CONSTRAINT chk_dp_lte_contract
     CHECK (downpayment_paid <= COALESCE(total_price,0) - COALESCE(booking_amount,0))
 );
 
--- Unique partial indexes: enforced only when value is present
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_chassis
-    ON tenants(chassis_no) WHERE chassis_no IS NOT NULL;
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_motor
-    ON tenants(motor_no) WHERE motor_no IS NOT NULL;
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_controller
-    ON tenants(controller_no) WHERE controller_no IS NOT NULL;
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_charger
-    ON tenants(charger_no) WHERE charger_no IS NOT NULL;
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_battery
-    ON tenants(battery_no) WHERE battery_no IS NOT NULL;
+-- Ensure columns exist if table was already created earlier
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS head_office_id UUID REFERENCES head_offices(id);
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id);
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS late_fee_daily_rate NUMERIC(8,2) NOT NULL DEFAULT 50.00;
+
+-- Unique partial indexes
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_chassis    ON tenants(chassis_no) WHERE chassis_no IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_motor      ON tenants(motor_no) WHERE motor_no IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_controller ON tenants(controller_no) WHERE controller_no IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_charger    ON tenants(charger_no) WHERE charger_no IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_battery    ON tenants(battery_no) WHERE battery_no IS NOT NULL;
 
 -- Query indexes
 CREATE INDEX IF NOT EXISTS idx_tenants_model     ON tenants(ev_model_id);
@@ -246,12 +264,17 @@ CREATE TABLE IF NOT EXISTS payments (
   late_fee_paid      NUMERIC(8,2) NOT NULL DEFAULT 0.00,
   is_penalty_waiver  BOOLEAN NOT NULL DEFAULT false,
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
-  -- No UNIQUE on (tenant_id, payment_date): multiple payments per day are allowed
 );
 
-CREATE INDEX IF NOT EXISTS idx_payments_tenant   ON payments(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_payments_branch   ON payments(branch_id);
-CREATE INDEX IF NOT EXISTS idx_payments_date     ON payments(payment_date);
+-- Ensure columns exist if table was already created earlier
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS head_office_id UUID REFERENCES head_offices(id);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS late_fee_paid NUMERIC(8,2) NOT NULL DEFAULT 0.00;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS is_penalty_waiver BOOLEAN NOT NULL DEFAULT false;
+
+CREATE INDEX IF NOT EXISTS idx_payments_tenant    ON payments(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_payments_branch    ON payments(branch_id);
+CREATE INDEX IF NOT EXISTS idx_payments_date      ON payments(payment_date);
 CREATE INDEX IF NOT EXISTS idx_payments_collector ON payments(collected_by);
 
 -- ── TABLE 6: bookings ───────────────────────────────────────────────────────
@@ -260,7 +283,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   head_office_id  UUID REFERENCES head_offices(id),
   branch_id       UUID REFERENCES branches(id),
   ev_model_id     UUID REFERENCES ev_models(id),
-  model_name_raw  TEXT,                           -- if model not yet in ev_models
+  model_name_raw  TEXT,
   name            TEXT NOT NULL,
   phone           VARCHAR(10) UNIQUE CHECK (phone IS NULL OR phone ~ '^[0-9]{10}$'),
   aadhar_path     TEXT,
@@ -276,6 +299,10 @@ CREATE TABLE IF NOT EXISTS bookings (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Ensure columns exist if table was already created earlier
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS head_office_id UUID REFERENCES head_offices(id);
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id);
+
 CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status);
 CREATE INDEX IF NOT EXISTS idx_bookings_branch ON bookings(branch_id);
 
@@ -287,7 +314,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   action      TEXT NOT NULL,
   entity_type TEXT NOT NULL,
   entity_id   UUID,
-  changes     JSONB,                              -- {field: [old, new]} — no secrets ever
+  changes     JSONB,
   ip_address  TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -297,120 +324,13 @@ CREATE INDEX IF NOT EXISTS idx_audit_entity  ON audit_logs(entity_type, entity_i
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
 
 -- ── ROW LEVEL SECURITY ───────────────────────────────────────────────────────
--- Enable RLS on all tables. Since our backend uses the SUPABASE_SERVICE_ROLE_KEY,
--- it bypasses RLS completely. By not providing any policies, we effectively block
--- all access via the anonymous key, securing the database from public clients.
-
 ALTER TABLE head_offices ENABLE ROW LEVEL SECURITY;
-ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ev_models ENABLE ROW LEVEL SECURITY;
-ALTER TABLE old_evs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE branches     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ev_models    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE old_evs      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tenants      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bookings     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs   ENABLE ROW LEVEL SECURITY;
 
--- ── SEED DATA ───────────────────────────────────────────────────────────────
--- 1. Pre-Seed Head Offices
-INSERT INTO head_offices (name, code, city, state) VALUES
-  ('Delhi Head Office', 'DEL-HO', 'New Delhi', 'Delhi'),
-  ('Noida Head Office', 'NOI-HO', 'Noida', 'Uttar Pradesh'),
-  ('Gurgaon Head Office', 'GGN-HO', 'Gurugram', 'Haryana')
-ON CONFLICT (code) DO NOTHING;
-
--- 2. Pre-Seed all 46 Delhi Wards from official ward list
-DO $$
-DECLARE
-  v_delhi_id UUID;
-  v_noida_id UUID;
-  v_ggn_id UUID;
-BEGIN
-  SELECT id INTO v_delhi_id FROM head_offices WHERE code = 'DEL-HO';
-  SELECT id INTO v_noida_id FROM head_offices WHERE code = 'NOI-HO';
-  SELECT id INTO v_ggn_id FROM head_offices WHERE code = 'GGN-HO';
-
-  -- Delhi Wards 1 to 46
-  INSERT INTO branches (head_office_id, ward_no, name, code, ward_area) VALUES
-    (v_delhi_id, 1,  'Rohini', 'DEL-WD-01', 'North West Delhi'),
-    (v_delhi_id, 2,  'Saroop Nagar', 'DEL-WD-02', 'North Delhi'),
-    (v_delhi_id, 3,  'Civil Line', 'DEL-WD-03', 'North Delhi'),
-    (v_delhi_id, 4,  'Pitam Pura', 'DEL-WD-04', 'North West Delhi'),
-    (v_delhi_id, 5,  'Model Town', 'DEL-WD-05', 'North Delhi'),
-    (v_delhi_id, 6,  'Shakti Nagar', 'DEL-WD-06', 'North Delhi'),
-    (v_delhi_id, 7,  'Tri Nagar', 'DEL-WD-07', 'North West Delhi'),
-    (v_delhi_id, 8,  'Shakur Basti', 'DEL-WD-08', 'North West Delhi'),
-    (v_delhi_id, 9,  'Punjabi Bagh', 'DEL-WD-09', 'West Delhi'),
-    (v_delhi_id, 10, 'Guru Harkrishan Nagar', 'DEL-WD-10', 'West Delhi'),
-    (v_delhi_id, 11, 'Chander Vihar', 'DEL-WD-11', 'West Delhi'),
-    (v_delhi_id, 12, 'Dev Nagar', 'DEL-WD-12', 'Central Delhi'),
-    (v_delhi_id, 13, 'Rajinder Nagar', 'DEL-WD-13', 'Central Delhi'),
-    (v_delhi_id, 14, 'Connaught Place', 'DEL-WD-14', 'Central Delhi'),
-    (v_delhi_id, 15, 'Ramesh Nagar', 'DEL-WD-15', 'West Delhi'),
-    (v_delhi_id, 16, 'Tagore Garden', 'DEL-WD-16', 'West Delhi'),
-    (v_delhi_id, 17, 'Raghubir Nagar', 'DEL-WD-17', 'West Delhi'),
-    (v_delhi_id, 18, 'Rajouri Garden', 'DEL-WD-18', 'West Delhi'),
-    (v_delhi_id, 19, 'Hari Nagar', 'DEL-WD-19', 'West Delhi'),
-    (v_delhi_id, 20, 'Fateh Nagar', 'DEL-WD-20', 'West Delhi'),
-    (v_delhi_id, 21, 'Khayala', 'DEL-WD-21', 'West Delhi'),
-    (v_delhi_id, 22, 'Sham Nagar', 'DEL-WD-22', 'West Delhi'),
-    (v_delhi_id, 23, 'Vishnu Garden', 'DEL-WD-23', 'West Delhi'),
-    (v_delhi_id, 24, 'Ravi Nagar', 'DEL-WD-24', 'West Delhi'),
-    (v_delhi_id, 25, 'Tilak Nagar', 'DEL-WD-25', 'West Delhi'),
-    (v_delhi_id, 26, 'Sant Garh', 'DEL-WD-26', 'West Delhi'),
-    (v_delhi_id, 27, 'Tilak Vihar', 'DEL-WD-27', 'West Delhi'),
-    (v_delhi_id, 28, 'Guru Nanak Nagar', 'DEL-WD-28', 'West Delhi'),
-    (v_delhi_id, 29, 'Krishna Park', 'DEL-WD-29', 'West Delhi'),
-    (v_delhi_id, 30, 'Vikas Puri', 'DEL-WD-30', 'West Delhi'),
-    (v_delhi_id, 31, 'Uttam Nagar', 'DEL-WD-31', 'West Delhi'),
-    (v_delhi_id, 32, 'Janak Puri', 'DEL-WD-32', 'West Delhi'),
-    (v_delhi_id, 33, 'Shiv Nagar', 'DEL-WD-33', 'West Delhi'),
-    (v_delhi_id, 34, 'Sarita Vihar', 'DEL-WD-34', 'South East Delhi'),
-    (v_delhi_id, 35, 'Lajpat Nagar', 'DEL-WD-35', 'South Delhi'),
-    (v_delhi_id, 36, 'Safdarjung Enclave', 'DEL-WD-36', 'South Delhi'),
-    (v_delhi_id, 37, 'Malviya Nagar', 'DEL-WD-37', 'South Delhi'),
-    (v_delhi_id, 38, 'Greater Kailash', 'DEL-WD-38', 'South Delhi'),
-    (v_delhi_id, 39, 'Kalka Ji', 'DEL-WD-39', 'South Delhi'),
-    (v_delhi_id, 40, 'Jangpura', 'DEL-WD-40', 'South East Delhi'),
-    (v_delhi_id, 41, 'Navin Shahdara', 'DEL-WD-41', 'East Delhi'),
-    (v_delhi_id, 42, 'Dilshad Garden', 'DEL-WD-42', 'East Delhi'),
-    (v_delhi_id, 43, 'Vivek Vihar', 'DEL-WD-43', 'East Delhi'),
-    (v_delhi_id, 44, 'Geeta Colony', 'DEL-WD-44', 'East Delhi'),
-    (v_delhi_id, 45, 'Khureji Khas', 'DEL-WD-45', 'East Delhi'),
-    (v_delhi_id, 46, 'Preet Vihar', 'DEL-WD-46', 'East Delhi')
-  ON CONFLICT (code) DO NOTHING;
-
-  -- Noida Starter Branches
-  INSERT INTO branches (head_office_id, ward_no, name, code, ward_area) VALUES
-    (v_noida_id, 101, 'Noida Sector 62', 'NOI-BR-01', 'Sector 62 Institutional Area'),
-    (v_noida_id, 102, 'Noida Sector 18', 'NOI-BR-02', 'Sector 18 Commercial Market')
-  ON CONFLICT (code) DO NOTHING;
-
-  -- Gurgaon Starter Branches
-  INSERT INTO branches (head_office_id, ward_no, name, code, ward_area) VALUES
-    (v_ggn_id, 201, 'Cyber City', 'GGN-BR-01', 'DLF Cyber City Phase II'),
-    (v_ggn_id, 202, 'MG Road', 'GGN-BR-02', 'MG Road Commercial Hub')
-  ON CONFLICT (code) DO NOTHING;
-
-  -- 3. Initial Admin & Staff accounts
-  DECLARE
-    v_default_branch_id UUID;
-  BEGIN
-    SELECT id INTO v_default_branch_id FROM branches WHERE code = 'DEL-WD-01';
-
-    INSERT INTO users (name, phone, email, password_hash, role, head_office_id, branch_id)
-    VALUES 
-      ('Super Admin', '9999999999', 'admin@gmail.com', '$2b$10$fKOlQbdfyEot8hJ7XCVS4OsmGs9XBQ6kMh/D14gRIbNb8gqRS6uwy', 'super_admin', v_delhi_id, v_default_branch_id)
-    ON CONFLICT (phone) DO UPDATE 
-      SET head_office_id = EXCLUDED.head_office_id,
-          branch_id = EXCLUDED.branch_id,
-          role = 'super_admin';
-
-    INSERT INTO users (name, phone, email, password_hash, role, head_office_id, branch_id)
-    VALUES 
-      ('Staff Operator', '8888888888', 'staff@gmail.com', '$2b$10$o7UwqcrmmbaWNeHFJTPq0et8XQg8FbI0ThBKynWyafv5JwWCdGFfW', 'staff', v_delhi_id, v_default_branch_id)
-    ON CONFLICT (phone) DO UPDATE 
-      SET head_office_id = EXCLUDED.head_office_id,
-          branch_id = EXCLUDED.branch_id;
-  END;
-END $$;

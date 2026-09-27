@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import api from '../lib/api';
 
+const isMasterSuperAdmin = (u) => {
+  if (!u) return false;
+  return u.role === 'super_admin' || (u.role === 'admin' && !u.ward_area);
+};
+
 export const useAuthStore = create((set, get) => ({
   user: null,
   role: null,
@@ -10,12 +15,12 @@ export const useAuthStore = create((set, get) => ({
   selectedBranch: null, // null means "All Wards (Global Master)" for super admin
 
   setUser: (user) => {
-    const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'admin';
-    const initialBranch = isSuperAdmin ? null : (user?.branch || null);
+    const isSuperAdmin = isMasterSuperAdmin(user);
+    const initialBranch = isSuperAdmin ? null : (user?.branch || (user?.ward_area ? { id: user.ward_area, name: user.ward_area } : null));
 
     set({
       user,
-      role: user?.role || null,
+      role: isSuperAdmin ? 'super_admin' : (user?.role === 'admin' ? 'branch_admin' : user?.role),
       isLoggedIn: !!user,
       isLoading: false,
       hasCheckedAuth: true,
@@ -24,6 +29,11 @@ export const useAuthStore = create((set, get) => ({
   },
 
   setSelectedBranch: (branch) => {
+    const state = get();
+    // Non-super-admins cannot switch away from their assigned ward
+    if (!isMasterSuperAdmin(state.user)) {
+      return;
+    }
     set({ selectedBranch: branch });
     if (typeof window !== 'undefined') {
       if (branch) {
@@ -42,7 +52,7 @@ export const useAuthStore = create((set, get) => ({
       const res = await api.get(`/api/auth/me?t=${Date.now()}`);
       if (res.data?.success && res.data?.data?.user) {
         const user = res.data.data.user;
-        const isSuperAdmin = user.role === 'super_admin' || user.role === 'admin';
+        const isSuperAdmin = isMasterSuperAdmin(user);
         
         let storedBranch = null;
         if (typeof window !== 'undefined' && isSuperAdmin) {
@@ -54,11 +64,15 @@ export const useAuthStore = create((set, get) => ({
           }
         }
 
-        const activeBranch = isSuperAdmin ? storedBranch : (user.branch || null);
+        const activeBranch = isSuperAdmin 
+          ? storedBranch 
+          : (user.branch || (user.ward_area ? { id: user.ward_area, name: user.ward_area } : null));
+
+        const effectiveRole = isSuperAdmin ? 'super_admin' : (user.role === 'admin' ? 'branch_admin' : user.role);
 
         set({
-          user,
-          role: user.role,
+          user: { ...user, role: effectiveRole },
+          role: effectiveRole,
           selectedBranch: activeBranch,
           isLoggedIn: true,
           isLoading: false,
@@ -85,7 +99,7 @@ export const useAuthStore = create((set, get) => ({
       const res = await api.post('/api/auth/login', { email: identifier, password });
       if (res.data?.success) {
         const user = res.data.data.user;
-        const isSuperAdmin = user.role === 'super_admin' || user.role === 'admin';
+        const isSuperAdmin = isMasterSuperAdmin(user);
         
         let storedBranch = null;
         if (typeof window !== 'undefined' && isSuperAdmin) {
@@ -97,10 +111,16 @@ export const useAuthStore = create((set, get) => ({
           }
         }
 
+        const activeBranch = isSuperAdmin 
+          ? storedBranch 
+          : (user.branch || (user.ward_area ? { id: user.ward_area, name: user.ward_area } : null));
+
+        const effectiveRole = isSuperAdmin ? 'super_admin' : (user.role === 'admin' ? 'branch_admin' : user.role);
+
         set({
-          user,
-          role: user.role,
-          selectedBranch: isSuperAdmin ? storedBranch : (user.branch || null),
+          user: { ...user, role: effectiveRole },
+          role: effectiveRole,
+          selectedBranch: activeBranch,
           isLoggedIn: true,
           isLoading: false,
         });

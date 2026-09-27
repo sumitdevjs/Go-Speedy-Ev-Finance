@@ -29,21 +29,35 @@ const createStaffSchema = z.object({
   phone: phoneSchema,
   email: emailSchema,
   password: passwordSchema,
-  role: z.enum(['admin', 'staff']),
-  ward_area: z.string().optional(),
+  role: z.enum(['admin', 'staff', 'super_admin', 'ho_admin', 'branch_admin']).optional().default('staff'),
+  ward_area: z.string().optional().nullable(),
+  branch_id: z.string().optional().nullable(),
+  head_office_id: z.string().optional().nullable(),
 });
 
 const updateStaffSchema = z.object({
   name: z.string().min(1).optional(),
   phone: phoneSchema.optional(),
   email: emailSchema,
-  role: z.enum(['admin', 'staff']).optional(),
-  ward_area: z.string().optional(),
+  role: z.enum(['admin', 'staff', 'super_admin', 'ho_admin', 'branch_admin']).optional(),
+  ward_area: z.string().optional().nullable(),
+  branch_id: z.string().optional().nullable(),
+  head_office_id: z.string().optional().nullable(),
 });
 
 const validateBody = (schema) => (req, res, next) => {
-  schema.parse(req.body);
-  next();
+  try {
+    req.body = schema.parse(req.body);
+    next();
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: err.errors.map(e => e.message).join(', '),
+      });
+    }
+    next(err);
+  }
 };
 
 /**

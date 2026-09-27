@@ -42,6 +42,30 @@ class BranchesController {
     }
   }
 
+  async getMyDashboard(req, res) {
+    try {
+      const branchId = req.user?.branch_id || req.user?.ward_area || req.user?.branch?.id;
+      if (!branchId) {
+        return errorResponse(res, 400, 'No branch associated with your account');
+      }
+      const data = await branchesService.getBranchDashboard(branchId);
+      return successResponse(res, 200, data, 'Branch dashboard retrieved');
+    } catch (error) {
+      console.error('[BranchesController.getMyDashboard]', error);
+      return errorResponse(res, 500, error.message || 'Failed to fetch branch dashboard');
+    }
+  }
+
+  async getDashboardById(req, res) {
+    try {
+      const data = await branchesService.getBranchDashboard(req.params.id);
+      return successResponse(res, 200, data, 'Branch dashboard retrieved');
+    } catch (error) {
+      console.error('[BranchesController.getDashboardById]', error);
+      return errorResponse(res, 500, error.message || 'Failed to fetch branch dashboard');
+    }
+  }
+
   async create(req, res) {
     try {
       const { head_office_id, ward_no, name, code, ward_area, address, phone, contact_person, status_label } = req.body;

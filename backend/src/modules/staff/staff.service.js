@@ -5,6 +5,8 @@ const { getPaginationOptions, getPaginationMeta } = require('../../utils/paginat
 const { buildSearchFilter } = require('../../utils/searchFilter');
 const { applyScope, resolveCreateScope } = require('../../middleware/scope');
 
+const { ALL_WARDS } = require('../branches/delhiWardsData');
+
 class StaffService {
   async getAllStaff(query = {}, req = null) {
     const { page, limit, offset } = getPaginationOptions(query);
@@ -16,6 +18,13 @@ class StaffService {
 
     if (req) {
       queryBuilder = applyScope(queryBuilder, req);
+      // If caller is branch_admin or staff, isolate to their own ward!
+      if (req.user?.role === 'branch_admin' || req.user?.role === 'staff') {
+        const userWard = req.user.ward_area || req.user.branch_id;
+        if (userWard) {
+          queryBuilder = queryBuilder.ilike('ward_area', `%${userWard}%`);
+        }
+      }
     }
 
     if (query.search) {
@@ -34,20 +43,41 @@ class StaffService {
 
     // Safely batch-resolve branch & head office info if present
     if (data && data.length > 0) {
-      try {
-        const branchIds = [...new Set(data.map(u => u.branch_id).filter(Boolean))];
-        if (branchIds.length > 0) {
-          const { data: bList } = await supabase.from('branches').select('id, name, code, ward_no').in('id', branchIds);
-          const bMap = new Map((bList || []).map(b => [b.id, b]));
-          data.forEach(u => { if (u.branch_id) u.branches = bMap.get(u.branch_id) || null; });
+      data.forEach(u => {
+        const isMaster = u.role === 'super_admin' || (u.role === 'admin' && !u.ward_area);
+        if (isMaster) {
+          u.display_role = 'Super Admin';
+          u.role = 'super_admin';
+        } else if (u.role === 'branch_admin' || (u.role === 'admin' && u.ward_area)) {
+          u.display_role = 'Ward Admin';
+          u.role = 'branch_admin';
+        } else if (u.role === 'staff') {
+          u.display_role = 'Staff';
+        } else {
+          u.display_role = 'Ward Admin';
+          u.role = 'branch_admin';
         }
-        const hoIds = [...new Set(data.map(u => u.head_office_id).filter(Boolean))];
-        if (hoIds.length > 0) {
-          const { data: hoList } = await supabase.from('head_offices').select('id, name, code').in('id', hoIds);
-          const hoMap = new Map((hoList || []).map(h => [h.id, h]));
-          data.forEach(u => { if (u.head_office_id) u.head_offices = hoMap.get(u.head_office_id) || null; });
+
+        // Match ward_area to official Delhi Ward data
+        if (u.ward_area) {
+          const s = String(u.ward_area).trim().toLowerCase();
+          const sNorm = s.replace(/[^a-z0-9]/g, '');
+          const matched = ALL_WARDS.find(w =>
+            w.name.toLowerCase() === s ||
+            w.name.toLowerCase().replace(/[^a-z0-9]/g, '') === sNorm ||
+            (w.ward_area && w.ward_area.toLowerCase().includes(s))
+          );
+          if (matched) {
+            u.branches = {
+              id: matched.id,
+              name: matched.name,
+              code: matched.code,
+              ward_no: matched.ward_no,
+              ward_area: matched.ward_area,
+            };
+          }
         }
-      } catch (e) {}
+      });
     }
 
     const meta = getPaginationMeta(count, page, limit);
@@ -72,18 +102,32 @@ class StaffService {
       email: email || null,
       password_hash,
       role: role || 'staff',
-      ward_area,
+      ward_area: ward_area || assignedBranchId || null,
       is_active: true,
       created_by: createdBy
     };
     if (assignedBranchId) insertPayload.branch_id = assignedBranchId;
     if (assignedHoId) insertPayload.head_office_id = assignedHoId;
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('users')
       .insert([insertPayload])
       .select('*')
       .single();
+
+    // Fallback if branch_id / head_office_id columns do not exist yet in DB schema
+    if (error && (error.code === '42703' || error.message?.includes('branch_id'))) {
+      delete insertPayload.branch_id;
+      delete insertPayload.head_office_id;
+      insertPayload.ward_area = ward_area || assignedBranchId || null;
+      const retry = await supabase
+        .from('users')
+        .insert([insertPayload])
+        .select('*')
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       if (error.code === '23505') throw new Error('Phone or email already exists');
@@ -94,35 +138,47 @@ class StaffService {
   }
 
   async updateStaff(id, updates, requestingUserId) {
-    // Mirrors the self-deactivate guard below: an admin can still edit their own
-    // name/phone/email, just not their own role — otherwise a solo admin could
-    // accidentally demote themselves out of the admin console.
     if (requestingUserId && id === requestingUserId && 'role' in updates) {
       throw new Error('Cannot change your own role');
     }
 
-    // Fetch the pre-update row so the audit log can show a real before → after
-    // diff instead of just dumping the new request body.
-    const { data: before, error: fetchError } = await supabase
+    const { data: before } = await supabase
       .from('users')
-      .select('name, phone, email, role, ward_area, branch_id, head_office_id, is_active')
+      .select('*')
       .eq('id', id)
       .single();
-    if (fetchError) throw fetchError;
 
-    const { data, error } = await supabase
+    let cleanUpdates = { ...updates };
+    let { data, error } = await supabase
       .from('users')
-      .update(updates)
+      .update(cleanUpdates)
       .eq('id', id)
-      .select('id, name, phone, email, role, ward_area, branch_id, head_office_id, is_active')
+      .select('*')
       .single();
+
+    // Fallback if branch_id/head_office_id column doesn't exist
+    if (error && (error.code === '42703' || error.message?.includes('branch_id'))) {
+      if (cleanUpdates.branch_id) {
+        cleanUpdates.ward_area = cleanUpdates.branch_id;
+      }
+      delete cleanUpdates.branch_id;
+      delete cleanUpdates.head_office_id;
+      const retry = await supabase
+        .from('users')
+        .update(cleanUpdates)
+        .eq('id', id)
+        .select('*')
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       if (error.code === '23505') throw new Error('Phone or email already exists');
       throw error;
     }
 
-    const diff = buildDiff(before, updates);
+    const diff = buildDiff(before || {}, updates);
     return { data, diff };
   }
 

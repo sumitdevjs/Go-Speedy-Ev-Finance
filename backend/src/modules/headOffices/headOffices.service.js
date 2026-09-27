@@ -200,7 +200,7 @@ class HeadOfficesService {
         ward_no: b.ward_no,
         ward_area: b.ward_area || b.name,
         contact_person: b.contact_person || 'Assigned Officer',
-        phone: b.phone || '9873730737',
+        phone: b.phone || '',
         address: b.address || 'Delhi NCT',
         is_active: b.is_active !== false,
         stock_count: wardStock,

@@ -122,7 +122,7 @@ class RentalsService {
     return { ...tenant, computed_balance: balance, total_paid: totalPaid };
   }
 
-  async createRental(tenantData, createdBy) {
+  async createRental(tenantData, createdBy, req = null) {
     // Sanitize empty strings to undefined so they are inserted as NULL in DB
     Object.keys(tenantData).forEach(key => {
       if (tenantData[key] === '') {
