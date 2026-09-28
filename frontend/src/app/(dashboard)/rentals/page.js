@@ -191,11 +191,11 @@ export default function RentalsListPage() {
               variant="primary"
               size="sm"
               icon={Plus}
-              className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-3 xs:py-1.5"
+              className="h-8.5 px-2.5 sm:px-3 text-xs font-bold shrink-0"
               title="Issue New Rental"
             >
               <span className="hidden sm:inline">Issue New Rental</span>
-              <span className="hidden xs:inline sm:hidden">New</span>
+              <span className="sm:hidden">New Rental</span>
             </Button>
           </Link>
         }

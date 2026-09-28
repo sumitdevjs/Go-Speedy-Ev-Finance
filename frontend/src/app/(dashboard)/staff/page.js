@@ -414,11 +414,11 @@ export default function StaffPage() {
             size="sm"
             icon={Plus}
             onClick={() => setIsAddModalOpen(true)}
-            className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-3 xs:py-1.5"
+            className="h-8.5 px-2.5 sm:px-3 text-xs font-bold shrink-0"
             title="Add New Staff"
           >
             <span className="hidden sm:inline">Add New Staff</span>
-            <span className="hidden xs:inline sm:hidden">Staff</span>
+            <span className="sm:hidden">Staff</span>
           </Button>
         }
       />

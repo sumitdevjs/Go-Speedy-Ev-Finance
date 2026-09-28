@@ -534,21 +534,24 @@ export default function ModelsPage() {
         action={
           <Button
             variant="primary"
-            size="md"
+            size="sm"
             icon={Plus}
             onClick={handleOpenAddModal}
+            className="h-8.5 px-2.5 sm:px-3.5 text-xs font-bold shrink-0"
+            title="Add New EV Model"
           >
-            Add New EV Model
+            <span className="hidden sm:inline">Add New EV Model</span>
+            <span className="sm:hidden">New Model</span>
           </Button>
         }
       />
 
-      <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
+      <div className="p-3.5 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap items-center gap-2 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl w-fit border border-slate-200/80 dark:border-white/10">
+        <div className="w-full sm:w-fit flex items-center gap-1.5 p-1 bg-slate-100/90 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-white/10 overflow-x-auto no-scrollbar scrollbar-none py-1">
           <button
             onClick={() => setActiveTab('new')}
-            className={`px-4 py-2 text-sm font-bold rounded-lg transition-all cursor-pointer ${
+            className={`shrink-0 whitespace-nowrap px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer ${
               activeTab === 'new' 
                 ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400' 
                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
@@ -558,21 +561,21 @@ export default function ModelsPage() {
           </button>
           <button
             onClick={() => setActiveTab('ward_breakdown')}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-lg transition-all cursor-pointer ${
+            className={`shrink-0 whitespace-nowrap flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer ${
               activeTab === 'ward_breakdown' 
                 ? 'bg-white dark:bg-slate-700 shadow-sm text-emerald-600 dark:text-emerald-400' 
                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
-            <Layers className="w-4 h-4" />
+            <Layers className="w-3.5 h-3.5" />
             <span>Ward-Wise Stock Matrix</span>
-            <span className="text-[10px] ml-1 bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-full font-black">
+            <span className="text-[10px] ml-1 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full font-black">
               {activeWardsCount} active
             </span>
           </button>
           <button
             onClick={() => setActiveTab('old')}
-            className={`px-4 py-2 text-sm font-bold rounded-lg transition-all cursor-pointer ${
+            className={`shrink-0 whitespace-nowrap px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer ${
               activeTab === 'old' 
                 ? 'bg-white dark:bg-slate-700 shadow-sm text-amber-600 dark:text-amber-400' 
                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
@@ -585,7 +588,7 @@ export default function ModelsPage() {
         {activeTab === 'new' ? (
           <>
             {/* Search & Filter Bar */}
-            <div className="gsap-filter-bar flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
+            <div className="gsap-filter-bar flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
               <SearchBar
                 value={search}
                 onChange={(val) => {
@@ -595,7 +598,7 @@ export default function ModelsPage() {
                 placeholder="Search model name, company or ward..."
                 className="w-full sm:max-w-md sm:flex-1 sm:min-w-0"
               />
-              <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-3">
+              <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2.5 sm:gap-3">
                 <Select
                   value={stockStatus}
                   onChange={(e) => { setStockStatus(e.target.value); setPage(1); }}
@@ -604,7 +607,7 @@ export default function ModelsPage() {
                     { value: 'in_stock', label: 'In Stock' },
                     { value: 'out_of_stock', label: 'Out of Stock' },
                   ]}
-                  className="w-full sm:w-48"
+                  className="w-full sm:w-44"
                 />
                 <Select
                   value={activeFilter}
@@ -614,17 +617,130 @@ export default function ModelsPage() {
                     { value: 'false', label: 'Cancelled Models' },
                     { value: '', label: 'All Models' },
                   ]}
-                  className="w-full sm:w-48"
+                  className="w-full sm:w-44"
                 />
               </div>
             </div>
 
-            <Table
-              columns={columns}
-              data={models}
-              loading={loading}
-              emptyText="No EV models registered yet. Click 'Add New EV Model' to add inventory."
-            />
+            {/* Desktop Table View */}
+            <div className="hidden md:block">
+              <Table
+                columns={columns}
+                data={models}
+                loading={loading}
+                emptyText="No EV models registered yet. Click 'Add New EV Model' to add inventory."
+              />
+            </div>
+
+            {/* Mobile Touch Cards View */}
+            <div className="block md:hidden space-y-3">
+              {loading ? (
+                <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800">
+                  <Spinner size="md" className="mx-auto text-blue-600 dark:text-blue-400" />
+                  <p className="mt-2 text-xs text-slate-500">Loading EV models...</p>
+                </div>
+              ) : models.length === 0 ? (
+                <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800">
+                  <Bike className="w-8 h-8 text-slate-400 mx-auto mb-2 opacity-50" />
+                  <p className="text-xs text-slate-500">No EV models found.</p>
+                </div>
+              ) : (
+                models.map((m) => {
+                  const isScoped = Boolean(selectedBranch);
+                  const branchStock = isScoped ? (m.ward_stock ?? 0) : null;
+                  const isOutOfStock = isScoped ? branchStock <= 0 : (m.available_stock || 0) <= 0;
+                  return (
+                    <div
+                      key={m.id}
+                      className="bg-white/95 dark:bg-slate-900/90 rounded-2xl border border-slate-200/80 dark:border-white/10 p-4 shadow-2xs space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="font-extrabold text-sm text-slate-900 dark:text-white leading-tight">
+                            {m.name}
+                          </h4>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            {m.company || 'Go Speedy'}
+                          </p>
+                        </div>
+                        <Badge
+                          status={m.is_active ? 'Active' : 'Cancelled'}
+                          variant={m.is_active ? 'emerald' : 'rose'}
+                          size="sm"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5 text-xs">
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-slate-400">Sticker Price</p>
+                          <p className="font-bold text-slate-800 dark:text-slate-200">
+                            {formatCurrency(m.price_per_unit || m.total_price)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-slate-400">Daily Rent</p>
+                          <p className="font-bold text-blue-600 dark:text-blue-400">
+                            {m.daily_rate ? `${formatCurrency(m.daily_rate)}/day` : 'N/A'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center gap-1.5">
+                          {isScoped ? (
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
+                              isOutOfStock
+                                ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                            }`}>
+                              {branchStock > 0 ? `${branchStock} In Stock` : 'Out of Stock'}
+                              <span className="text-[10px] text-slate-400 ml-1">
+                                ({selectedBranch.ward_no ? `W-${selectedBranch.ward_no}` : selectedBranch.name})
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                              {m.available_stock || 0} Total Units
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenAddStock(m)}
+                            className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition-colors"
+                            title="Add Stock"
+                          >
+                            <PackagePlus className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditClick(m)}
+                            className="p-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-colors"
+                            title="Edit"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleDeactivate(m)}
+                            className={`p-2 rounded-xl transition-colors ${
+                              m.is_active
+                                ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                                : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                            }`}
+                            title={m.is_active ? 'Cancel' : 'Activate'}
+                          >
+                            {m.is_active ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
 
             <Pagination
               currentPage={page}

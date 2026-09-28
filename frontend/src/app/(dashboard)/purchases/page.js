@@ -144,11 +144,17 @@ export default function PurchasesPage() {
   return (
     <div>
       <Header
-        title="Completed Purchases & Ownerships"
+        title="Purchases & Ownership"
         subtitle="Ledger of all vehicles fully paid and transferred to tenants"
         action={
           <Link href="/purchases/new">
-            <Button variant="primary" size="sm" icon={ShoppingBag}>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={ShoppingBag}
+              className="h-8.5 px-2.5 sm:px-3 text-xs font-bold shrink-0"
+              title="Purchase EV"
+            >
               <span className="hidden sm:inline">Purchase EV</span>
               <span className="sm:hidden">Buy</span>
             </Button>

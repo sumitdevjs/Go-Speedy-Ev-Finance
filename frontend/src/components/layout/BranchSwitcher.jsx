@@ -5,7 +5,7 @@ import { MapPin, Globe, ChevronDown, Check, Search, Building2 } from 'lucide-rea
 import { useAuthStore } from '../../store/authStore';
 import api from '../../lib/api';
 
-export default function BranchSwitcher() {
+export default function BranchSwitcher({ isMobileBar = false }) {
   const { user, role, selectedBranch, setSelectedBranch } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
   const [branches, setBranches] = useState([]);
@@ -62,6 +62,18 @@ export default function BranchSwitcher() {
       ? (user.branch.ward_no ? `Ward ${user.branch.ward_no}: ${user.branch.name}` : user.branch.name)
       : (user?.ward_area || 'Central Branch');
 
+    if (isMobileBar) {
+      return (
+        <div className="w-full flex items-center justify-between rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+          <div className="flex items-center gap-2 truncate">
+            <MapPin className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span className="truncate">{branchName}</span>
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600/80 dark:text-emerald-400/80 shrink-0">Assigned Ward</span>
+        </div>
+      );
+    }
+
     return (
       <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 shrink-0">
         <MapPin className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -85,7 +97,7 @@ export default function BranchSwitcher() {
 
   // Group branches by Head Office
   const grouped = filteredBranches.reduce((acc, b) => {
-    const hoName = b.head_offices?.name || 'Delhi Head Office';
+    const hoName = b.head_offices?.name || 'Moti Nagar Head Office';
     if (!acc[hoName]) acc[hoName] = [];
     acc[hoName].push(b);
     return acc;
@@ -93,31 +105,46 @@ export default function BranchSwitcher() {
 
   const currentLabel = selectedBranch
     ? (selectedBranch.ward_no ? `Ward ${selectedBranch.ward_no}: ${selectedBranch.name}` : selectedBranch.name)
-    : 'All Wards (Global)';
+    : 'All Wards (Global Master)';
 
   return (
-    <div className="relative shrink-0" ref={dropdownRef}>
+    <div className={`relative ${isMobileBar ? 'w-full' : 'shrink-0'}`} ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 rounded-lg bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-all cursor-pointer shadow-2xs"
+        className={isMobileBar
+          ? "w-full flex items-center justify-between rounded-xl bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200/90 dark:border-slate-700/80 px-3 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-2xs"
+          : "flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-all cursor-pointer shadow-2xs"
+        }
         title="Switch active branch/ward filter"
       >
-        {selectedBranch ? (
-          <MapPin className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-        ) : (
-          <Globe className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-        )}
-        <span className="truncate max-w-[110px] xs:max-w-[150px] sm:max-w-[200px]">
-          {currentLabel}
-        </span>
-        <ChevronDown className={`h-3 w-3 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate pr-1">
+          {selectedBranch ? (
+            <MapPin className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+          ) : (
+            <Globe className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+          )}
+          <span className={`truncate font-semibold ${isMobileBar ? 'text-slate-900 dark:text-white' : 'max-w-[130px] sm:max-w-[180px] lg:max-w-[220px]'}`}>
+            {currentLabel}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 shrink-0 text-slate-400">
+          {isMobileBar && (
+            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-1.5 py-0.5 rounded-md">
+              Switch
+            </span>
+          )}
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
       </button>
 
       {isOpen && (
         <div
           data-lenis-prevent
-          className="absolute left-0 sm:right-0 sm:left-auto mt-2 w-72 xs:w-84 max-h-[75vh] sm:max-h-[440px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+          className={isMobileBar
+            ? "absolute left-0 right-0 mt-1.5 w-full max-h-[65vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+            : "absolute left-0 sm:right-0 sm:left-auto mt-2 w-72 xs:w-84 max-h-[75vh] sm:max-h-[440px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+          }
           onWheel={(e) => e.stopPropagation()}
         >
           {/* Header & Search */}
