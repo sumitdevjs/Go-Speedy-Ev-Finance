@@ -647,8 +647,8 @@ export default function ModelsPage() {
               ) : (
                 models.map((m) => {
                   const isScoped = Boolean(selectedBranch);
-                  const branchStock = isScoped ? (m.ward_stock ?? 0) : null;
-                  const isOutOfStock = isScoped ? branchStock <= 0 : (m.available_stock || 0) <= 0;
+                  const stock = Number(m.stock_count ?? 0);
+                  const isOutOfStock = stock <= 0;
                   return (
                     <div
                       key={m.id}
@@ -670,71 +670,82 @@ export default function ModelsPage() {
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5 text-xs">
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5 text-xs">
                         <div>
                           <p className="text-[10px] uppercase font-bold text-slate-400">Sticker Price</p>
-                          <p className="font-bold text-slate-800 dark:text-slate-200">
-                            {formatCurrency(m.price_per_unit || m.total_price)}
+                          <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">
+                            {formatCurrency(m.total_price || m.price_per_unit)}
                           </p>
                         </div>
-                        <div>
-                          <p className="text-[10px] uppercase font-bold text-slate-400">Daily Rent</p>
-                          <p className="font-bold text-blue-600 dark:text-blue-400">
-                            {m.daily_rate ? `${formatCurrency(m.daily_rate)}/day` : 'N/A'}
-                          </p>
+                        <div className="text-right">
+                          <p className="text-[10px] uppercase font-bold text-slate-400">Stock Status</p>
+                          <Badge
+                            status={stock > 0 ? `${stock} in stock` : 'Out of stock'}
+                            variant={stock > 0 ? 'emerald' : 'rose'}
+                            size="sm"
+                          />
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-1">
-                        <div className="flex items-center gap-1.5">
-                          {isScoped ? (
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
-                              isOutOfStock
-                                ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                            }`}>
-                              {branchStock > 0 ? `${branchStock} In Stock` : 'Out of Stock'}
-                              <span className="text-[10px] text-slate-400 ml-1">
-                                ({selectedBranch.ward_no ? `W-${selectedBranch.ward_no}` : selectedBranch.name})
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {isScoped ? (
+                              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                                {selectedBranch.ward_no ? `Ward ${selectedBranch.ward_no}: ${selectedBranch.name}` : selectedBranch.name}
                               </span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                              {m.available_stock || 0} Total Units
-                            </span>
-                          )}
+                            ) : (
+                              <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20">
+                                Total Global Fleet: {stock} Units
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenAddStock(m)}
+                              className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition-colors"
+                              title="Add Stock"
+                            >
+                              <PackagePlus className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleEditClick(m)}
+                              className="p-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-colors"
+                              title="Edit"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleDeactivate(m)}
+                              className={`p-2 rounded-xl transition-colors ${
+                                m.is_active
+                                  ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                                  : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                              }`}
+                              title={m.is_active ? 'Cancel' : 'Activate'}
+                            >
+                              {m.is_active ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenAddStock(m)}
-                            className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition-colors"
-                            title="Add Stock"
-                          >
-                            <PackagePlus className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleEditClick(m)}
-                            className="p-2 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 transition-colors"
-                            title="Edit"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleDeactivate(m)}
-                            className={`p-2 rounded-xl transition-colors ${
-                              m.is_active
-                                ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                                : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                            }`}
-                            title={m.is_active ? 'Cancel' : 'Activate'}
-                          >
-                            {m.is_active ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
-                          </button>
-                        </div>
+                        {/* When viewing All Wards (Global), show which wards hold stock */}
+                        {!isScoped && Array.isArray(m.ward_stock_summary) && m.ward_stock_summary.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {m.ward_stock_summary.map((ws, idx) => (
+                              <span
+                                key={idx}
+                                className="text-[10px] font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-200 dark:border-white/10"
+                              >
+                                {ws.ward_label}: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{ws.stock}</strong>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
