@@ -28,23 +28,25 @@ import { useAuthStore } from '../../../store/authStore';
 import StaffDashboard from '../../../components/staff/StaffDashboard';
 import HoDashboard from '../../../components/ho/HoDashboard';
 import BranchDashboard from '../../../components/branch/BranchDashboard';
-import SustainabilityBanner from '../../../components/dashboard/SustainabilityBanner';
+import DashboardFooter from '../../../components/layout/Footer';
 import { gsap, animateCounter, staggerFadeIn } from '../../../lib/gsap';
 
 export default function DashboardPage() {
   const { role } = useAuthStore();
+  const isSuperAdmin = role === 'super_admin' || role === 'admin';
 
-  if (role === 'staff') {
-    return <StaffDashboard />;
-  }
-
-  // Branch-level admins/managers only see their own ward data
-  if (role === 'branch_admin') {
-    return <BranchDashboard />;
-  }
-
-  // Normal admin / super_admin branch & wards dashboard
-  return <AdminDashboard />;
+  return (
+    <div className="flex-1 flex flex-col">
+      {role === 'staff' ? (
+        <StaffDashboard />
+      ) : role === 'branch_admin' ? (
+        <BranchDashboard />
+      ) : (
+        <AdminDashboard />
+      )}
+      {isSuperAdmin && <DashboardFooter />}
+    </div>
+  );
 }
 
 function AdminDashboard() {
@@ -65,26 +67,38 @@ function AdminDashboard() {
     fetchDashboardData();
   }, [selectedBranch]);
 
+  // Listen to branchChange event for instant reactive refetch
+  useEffect(() => {
+    const handleBranchChange = () => {
+      fetchDashboardData();
+    };
+    window.addEventListener('branchChange', handleBranchChange);
+    return () => window.removeEventListener('branchChange', handleBranchChange);
+  }, [selectedBranch]);
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
 
+      const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
+      const bQuery = `branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`;
+
       // Fetch Models for stock
-      const modelsRes = await api.get('/api/models/dropdown');
+      const modelsRes = await api.get(`/api/models/dropdown?${bQuery}`);
       const models = modelsRes.data?.data || [];
       const totalStock = models.filter(m => m.is_active).reduce((sum, m) => sum + (m.stock_count || 0), 0);
 
       // Fetch Used EVs for stock
-      const oldEvsRes = await api.get('/api/old-evs/available');
+      const oldEvsRes = await api.get(`/api/old-evs/available?${bQuery}`);
       const oldStock = oldEvsRes.data?.data?.length || 0;
 
       // Fetch Rentals (Active/Cancelled)
-      const rentalsRes = await api.get('/api/rentals?limit=10000');
+      const rentalsRes = await api.get(`/api/rentals?limit=10000&${bQuery}`);
       const rentals = rentalsRes.data?.data || [];
       const active = rentals.filter((r) => r.status === 'rented');
 
       // Fetch Purchases (Completed/Direct)
-      const purchasesRes = await api.get('/api/purchases?limit=10000');
+      const purchasesRes = await api.get(`/api/purchases?limit=10000&${bQuery}`);
       const purchases = purchasesRes.data?.data || [];
 
       const allTenants = [...rentals, ...purchases];
@@ -95,7 +109,7 @@ function AdminDashboard() {
         .sort((a, b) => b.computed_balance.daysOverdue - a.computed_balance.daysOverdue);
 
       // Fetch Payments
-      const paymentsRes = await api.get('/api/payments?limit=10000');
+      const paymentsRes = await api.get(`/api/payments?limit=10000&${bQuery}`);
       const payments = paymentsRes.data?.data || [];
 
       const totalPayments = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
@@ -117,7 +131,7 @@ function AdminDashboard() {
 
       // Fetch live Ward Fleet Distribution
       try {
-        const wbRes = await api.get('/api/models/ward-breakdown');
+        const wbRes = await api.get(`/api/models/ward-breakdown?${bQuery}`);
         if (wbRes.data?.success) {
           const wb = wbRes.data.data || [];
           setWardFleet(wb.filter((w) => w.total_stock > 0));
@@ -144,99 +158,99 @@ function AdminDashboard() {
   }, [loading, stats]);
 
   return (
-    <div className="min-h-screen">
+    <div className="w-full">
       <Header
         title="Operations Dashboard"
         subtitle="Delhi Fleet & Finance Monitoring"
       />
 
-      <div className="p-4 md:p-4 space-y-6 md:space-y-8 max-w-7xl mx-auto pb-6">
+      <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-6 pb-6">
         {/* KPI Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
           {/* Available Stock */}
-          <div className="gsap-admin-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all relative">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <div className="gsap-admin-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 sm:p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all relative overflow-hidden">
+            <div className="min-w-0 flex-1 pr-2.5">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
                 Available EV Stock
               </p>
-              <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1 flex items-baseline gap-2">
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-1 flex items-baseline gap-1.5 flex-wrap">
                 {loading ? <Spinner size="sm" /> : (
                   <>
-                    <span title="Brand New Stock">
+                    <span title="Brand New Stock" className="inline-flex items-baseline">
                       <span id="gsap-admin-stock-new">{stats.totalStock}</span>
-                      <span className="text-sm font-medium text-slate-500 ml-1">New</span>
+                      <span className="text-xs sm:text-sm font-semibold text-slate-500 ml-1">New</span>
                     </span>
-                    <span className="text-sm font-medium text-slate-300 dark:text-slate-600">|</span>
-                    <span title="Returned/Refurbished Stock" className="text-amber-600 dark:text-amber-500">
+                    <span className="text-xs sm:text-sm font-medium text-slate-300 dark:text-slate-600">|</span>
+                    <span title="Returned/Refurbished Stock" className="text-amber-600 dark:text-amber-500 inline-flex items-baseline">
                       <span id="gsap-admin-stock-old">{stats.oldStock}</span>
-                      <span className="text-sm font-medium text-amber-500/70 ml-1">Used</span>
+                      <span className="text-xs sm:text-sm font-semibold text-amber-500/70 ml-1">Used</span>
                     </span>
                   </>
                 )}
               </h3>
 
-              <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium mt-1">
+              <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium mt-1 truncate">
                 Ready for deployment
               </p>
               <Link
                 href="/models?tab=ward_breakdown"
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline mt-1"
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline mt-1 truncate max-w-full"
               >
-                <span>View Ward Breakdown</span>
-                <ArrowRight className="w-3 h-3" />
+                <span className="truncate">View Ward Breakdown</span>
+                <ArrowRight className="w-3 h-3 shrink-0" />
               </Link>
             </div>
 
-            <div className="relative h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-              <Bike className="h-6 w-6" />
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <Bike className="h-5 w-5 sm:h-5.5 sm:w-5.5" />
             </div>
           </div>
 
           {/* Active Tenants */}
-          <div className="gsap-admin-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <div className="gsap-admin-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 sm:p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all relative overflow-hidden">
+            <div className="min-w-0 flex-1 pr-2.5">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
                 Active Rentals
               </p>
-              <h3 id="gsap-admin-active" className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+              <h3 id="gsap-admin-active" className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-1 truncate">
                 {loading ? <Spinner size="sm" /> : `${stats.activeRentals} tenants`}
               </h3>
-              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1">Under rent-to-own</p>
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1 truncate">Under rent-to-own</p>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-              <Users className="h-6 w-6" />
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <Users className="h-5 w-5 sm:h-5.5 sm:w-5.5" />
             </div>
           </div>
 
           {/* Overdue Count */}
-          <div className="gsap-admin-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <div className="gsap-admin-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 sm:p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all relative overflow-hidden">
+            <div className="min-w-0 flex-1 pr-2.5">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
                 Overdue Accounts
               </p>
-              <h3 id="gsap-admin-overdue" className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
+              <h3 id="gsap-admin-overdue" className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400 mt-1 truncate">
                 {loading ? <Spinner size="sm" /> : `${stats.overdueCount} cases`}
               </h3>
-              <p className="text-[11px] text-rose-500 dark:text-rose-400 font-medium mt-1">1+ days payment lag</p>
+              <p className="text-[11px] text-rose-500 dark:text-rose-400 font-medium mt-1 truncate">1+ days payment lag</p>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-              <AlertTriangle className="h-6 w-6" />
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+              <AlertTriangle className="h-5 w-5 sm:h-5.5 sm:w-5.5" />
             </div>
           </div>
 
           {/* Total Collections */}
-          <div className="gsap-admin-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <div className="gsap-admin-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 sm:p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all relative overflow-hidden">
+            <div className="min-w-0 flex-1 pr-2.5">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
                 Total Collections
               </p>
-              <h3 id="gsap-admin-collections" className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+              <h3 id="gsap-admin-collections" className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-1 truncate">
                 {loading ? <Spinner size="sm" /> : formatCurrency(stats.totalCollections)}
               </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1">Recorded to date (not including GST)</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-1 truncate">Recorded to date (excl. GST)</p>
             </div>
-            <div className="h-12 w-12 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
-              <IndianRupee className="h-6 w-6" />
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
+              <IndianRupee className="h-5 w-5 sm:h-5.5 sm:w-5.5" />
             </div>
           </div>
         </div>
@@ -348,9 +362,10 @@ function AdminDashboard() {
               action={
                 <Link
                   href="/rentals?tab=overdue"
-                  className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 border border-rose-200 dark:border-rose-500/25 transition-all shadow-2xs active:scale-95 shrink-0"
                 >
-                  View All Overdue <ArrowRight className="w-3 h-3 ml-1" />
+                  <span>View All Overdue</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               }
             >
@@ -429,9 +444,10 @@ function AdminDashboard() {
               action={
                 <Link
                   href="/rentals"
-                  className="text-xs font-semibold text-blue-600 hover:text-blue-700 inline-flex items-center"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 border border-blue-200 dark:border-blue-500/25 transition-all shadow-2xs active:scale-95 shrink-0"
                 >
-                  View All <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                  <span>View All</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               }
             >
@@ -479,9 +495,6 @@ function AdminDashboard() {
             </Card>
           </div>
         </div>
-
-        {/* EV Sustainability Banner */}
-        <SustainabilityBanner />
       </div>
     </div>
   );

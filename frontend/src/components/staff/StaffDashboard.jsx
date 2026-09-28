@@ -141,40 +141,40 @@ export default function StaffDashboard() {
   });
 
   return (
-    <div className="min-h-screen">
+    <div className="w-full">
       {/* Staff Header */}
       <Header
         title="Operations Desk"
         subtitle={`Live Operational Queue • ${todayDateFormatted}`}
         action={
-          <div className="flex items-center gap-1.5 xs:gap-2">
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
             <Button
               variant="outline"
               size="sm"
               icon={User}
               onClick={() => setIsProfileModalOpen(true)}
               title="My Profile"
-              className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-2.5 xs:py-1.5"
+              className="h-9 px-3 sm:px-3.5 text-xs font-semibold shrink-0"
             >
-              <span className="hidden md:inline">My Profile</span>
+              <span className="hidden sm:inline">My Profile</span>
             </Button>
             <Link href="/rentals/new">
               <Button
                 variant="primary"
                 size="sm"
                 icon={PlusCircle}
-                className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-3 xs:py-1.5"
+                className="h-9 px-3 sm:px-3.5 text-xs font-bold shrink-0 shadow-xs"
                 title="Issue Rental"
               >
                 <span className="hidden sm:inline">Issue Rental</span>
-                <span className="hidden xs:inline sm:hidden">New</span>
+                <span className="sm:hidden">Rental</span>
               </Button>
             </Link>
           </div>
         }
       />
 
-      <div className="p-4 md:p-4 space-y-6 md:space-y-8 max-w-7xl mx-auto">
+      <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-6">
         {/* Welcome & Shift Status Banner */}
         <div className="rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-[#0d1527] dark:via-[#111e38] dark:to-[#0d1527] border border-slate-700/50 dark:border-white/10 p-5 md:p-6 text-white shadow-lg relative overflow-hidden">
           <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -296,82 +296,82 @@ export default function StaffDashboard() {
         {/* ── OPERATIONAL KPI METRICS ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
           {/* Available EVs */}
-          <div className="gsap-kpi-card rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 card-elevation shadow-xs flex flex-col justify-between">
+          <div className="gsap-kpi-card rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 card-elevation shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Available EVs
               </span>
-              <Bike className="w-4 h-4 text-blue-500" />
+              <Bike className="w-4 h-4 text-blue-500 shrink-0" />
             </div>
-            <div className="mt-2">
-              <h4 id="gsap-kpi-available" className="text-2xl font-black text-slate-900 dark:text-white">
+            <div className="mt-2 min-w-0">
+              <h4 id="gsap-kpi-available" className="text-2xl font-black text-slate-900 dark:text-white truncate">
                 {loading ? <Spinner size="sm" /> : stats.availableStock}
               </h4>
-              <p className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">Ready to dispatch</p>
+              <p className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5 truncate">Ready to dispatch</p>
             </div>
           </div>
 
           {/* Pending Bookings */}
-          <div className="gsap-kpi-card rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 card-elevation shadow-xs flex flex-col justify-between">
+          <div className="gsap-kpi-card rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 card-elevation shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Pending Bookings
               </span>
-              <CalendarCheck className="w-4 h-4 text-purple-500" />
+              <CalendarCheck className="w-4 h-4 text-purple-500 shrink-0" />
             </div>
-            <div className="mt-2">
-              <h4 id="gsap-kpi-pending" className="text-2xl font-black text-purple-600 dark:text-purple-400">
+            <div className="mt-2 min-w-0">
+              <h4 id="gsap-kpi-pending" className="text-2xl font-black text-purple-600 dark:text-purple-400 truncate">
                 {loading ? <Spinner size="sm" /> : stats.pendingBookingsCount}
               </h4>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">Awaiting contract</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 truncate">Awaiting contract</p>
             </div>
           </div>
 
           {/* Active Rentals */}
-          <div className="gsap-kpi-card rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 card-elevation shadow-xs flex flex-col justify-between">
+          <div className="gsap-kpi-card rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 card-elevation shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Active Rentals
               </span>
-              <Users className="w-4 h-4 text-emerald-500" />
+              <Users className="w-4 h-4 text-emerald-500 shrink-0" />
             </div>
-            <div className="mt-2">
-              <h4 id="gsap-kpi-rentals" className="text-2xl font-black text-slate-900 dark:text-white">
+            <div className="mt-2 min-w-0">
+              <h4 id="gsap-kpi-rentals" className="text-2xl font-black text-slate-900 dark:text-white truncate">
                 {loading ? <Spinner size="sm" /> : stats.activeRentalsCount}
               </h4>
-              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">Fleet on ground</p>
+              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5 truncate">Fleet on ground</p>
             </div>
           </div>
 
           {/* Overdue Accounts */}
-          <div className="gsap-kpi-card rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 card-elevation shadow-xs flex flex-col justify-between">
+          <div className="gsap-kpi-card rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 card-elevation shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Overdue Follow-ups
               </span>
-              <AlertTriangle className="w-4 h-4 text-rose-500" />
+              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
             </div>
-            <div className="mt-2">
-              <h4 id="gsap-kpi-overdue" className="text-2xl font-black text-rose-600 dark:text-rose-400">
+            <div className="mt-2 min-w-0">
+              <h4 id="gsap-kpi-overdue" className="text-2xl font-black text-rose-600 dark:text-rose-400 truncate">
                 {loading ? <Spinner size="sm" /> : stats.overdueCount}
               </h4>
-              <p className="text-[10px] text-rose-500 dark:text-rose-400 font-semibold mt-0.5">Need immediate call</p>
+              <p className="text-[10px] text-rose-500 dark:text-rose-400 font-semibold mt-0.5 truncate">Need immediate call</p>
             </div>
           </div>
 
           {/* Today's Collections */}
-          <div className="gsap-kpi-card rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 card-elevation shadow-xs flex flex-col justify-between col-span-2 sm:col-span-1">
+          <div className="gsap-kpi-card rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 card-elevation shadow-xs flex flex-col justify-between col-span-2 sm:col-span-1 overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Today&apos;s Cash Desk
               </span>
-              <IndianRupee className="w-4 h-4 text-teal-500" />
+              <IndianRupee className="w-4 h-4 text-teal-500 shrink-0" />
             </div>
-            <div className="mt-2">
-              <h4 id="gsap-kpi-cash" className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+            <div className="mt-2 min-w-0">
+              <h4 id="gsap-kpi-cash" className="text-2xl font-black text-emerald-600 dark:text-emerald-400 truncate">
                 {loading ? <Spinner size="sm" /> : formatCurrency(stats.todayCollections)}
               </h4>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">Logged today</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 truncate">Logged today</p>
             </div>
           </div>
         </div>
@@ -383,8 +383,12 @@ export default function StaffDashboard() {
             title="Pending Customer Bookings"
             subtitle="Walk-in tokens paid • Confirm and issue contract"
             action={
-              <Link href="/bookings" className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
-                All Bookings →
+              <Link
+                href="/bookings"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 border border-blue-200 dark:border-blue-500/25 transition-all shadow-2xs active:scale-95 shrink-0"
+              >
+                <span>All Bookings</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             }
           >
@@ -437,8 +441,12 @@ export default function StaffDashboard() {
             title="Overdue Accounts to Follow Up"
             subtitle="Immediate desk collection &amp; call queue"
             action={
-              <Link href="/rentals?overdue_days=1" className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline">
-                View All Overdue →
+              <Link
+                href="/rentals?overdue_days=1"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 border border-rose-200 dark:border-rose-500/25 transition-all shadow-2xs active:scale-95 shrink-0"
+              >
+                <span>View All</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             }
           >
@@ -497,8 +505,12 @@ export default function StaffDashboard() {
           title="Available EV Models on Ground"
           subtitle="Stock ready for immediate rental deployment"
           action={
-            <Link href="/models" className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
-              Inventory →
+            <Link
+              href="/models"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 border border-blue-200 dark:border-blue-500/25 transition-all shadow-2xs active:scale-95 shrink-0"
+            >
+              <span>View Inventory</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           }
         >

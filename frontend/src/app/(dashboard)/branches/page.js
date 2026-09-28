@@ -27,6 +27,7 @@ import Spinner from '../../../components/ui/Spinner';
 import Table from '../../../components/ui/Table';
 import Pagination from '../../../components/ui/Pagination';
 import api from '../../../lib/api';
+import { staggerFadeIn } from '../../../lib/gsap';
 import { useAuthStore } from '../../../store/authStore';
 
 export default function BranchesPage() {
@@ -64,6 +65,11 @@ export default function BranchesPage() {
 
   useEffect(() => {
     fetchHeadOffices();
+  }, []);
+
+  // One-time entrance animation for the filter chrome
+  useEffect(() => {
+    staggerFadeIn('.gsap-filter-bar', { y: 14, duration: 0.45, stagger: 0 });
   }, []);
 
   useEffect(() => {
@@ -311,7 +317,7 @@ export default function BranchesPage() {
               size="sm"
               icon={Plus}
               onClick={() => setIsCreateOpen(true)}
-              className="h-8.5 px-2.5 sm:px-3.5 text-xs font-bold shrink-0"
+              className="h-9 px-3 sm:px-4 text-xs font-bold shrink-0 shadow-xs"
               title="Add New Ward / Branch"
             >
               <span className="hidden sm:inline">Add New Ward / Branch</span>
@@ -321,61 +327,73 @@ export default function BranchesPage() {
         }
       />
 
-      <div className="p-3.5 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
+      <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* KPI / Insight Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
-          <Card className="p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3 border-l-4 border-l-blue-500">
-            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-              <Building2 className="h-4 w-4 sm:h-5 sm:w-5" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+          <Card className="p-3.5 sm:p-4.5 flex items-center gap-3 border-l-4 border-l-blue-500 overflow-hidden">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+              <Building2 className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 truncate">Total Wards</p>
-              <p className="text-sm sm:text-lg md:text-xl font-black text-slate-900 dark:text-white truncate">46 Delhi Wards</p>
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">Total Wards</p>
+              <div className="flex items-baseline gap-1.5 flex-wrap mt-0.5">
+                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">46</span>
+                <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">Delhi Wards</span>
+              </div>
             </div>
           </Card>
 
-          <Card className="p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3 border-l-4 border-l-emerald-500">
-            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
-              <UserCheck className="h-4 w-4 sm:h-5 sm:w-5" />
+          <Card className="p-3.5 sm:p-4.5 flex items-center gap-3 border-l-4 border-l-emerald-500 overflow-hidden">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+              <UserCheck className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 truncate">Assigned In-Charges</p>
-              <p className="text-sm sm:text-lg md:text-xl font-black text-slate-900 dark:text-white truncate">46 Candidates</p>
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">Assigned In-Charges</p>
+              <div className="flex items-baseline gap-1.5 flex-wrap mt-0.5">
+                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">46</span>
+                <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">Candidates</span>
+              </div>
             </div>
           </Card>
 
-          <Card className="p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3 border-l-4 border-l-purple-500">
-            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-purple-50 dark:bg-purple-950/50 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
-              <Award className="h-4 w-4 sm:h-5 sm:w-5" />
+          <Card className="p-3.5 sm:p-4.5 flex items-center gap-3 border-l-4 border-l-purple-500 overflow-hidden">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-purple-50 dark:bg-purple-950/50 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
+              <Award className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 truncate">Districts & Zones</p>
-              <p className="text-sm sm:text-lg md:text-xl font-black text-slate-900 dark:text-white truncate">5 Delhi Zones</p>
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">Districts & Zones</p>
+              <div className="flex items-baseline gap-1.5 flex-wrap mt-0.5">
+                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">5</span>
+                <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">Delhi Zones</span>
+              </div>
             </div>
           </Card>
 
-          <Card className="p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3 border-l-4 border-l-amber-500">
-            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
-              <MapPin className="h-4 w-4 sm:h-5 sm:w-5" />
+          <Card className="p-3.5 sm:p-4.5 flex items-center gap-3 border-l-4 border-l-amber-500 overflow-hidden">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+              <MapPin className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-xs font-medium text-slate-500 dark:text-slate-400 truncate">Head Offices</p>
-              <p className="text-sm sm:text-lg md:text-xl font-black text-slate-900 dark:text-white truncate">3 Regions</p>
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">Head Offices</p>
+              <div className="flex items-baseline gap-1.5 flex-wrap mt-0.5">
+                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">3</span>
+                <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">Regions</span>
+              </div>
             </div>
           </Card>
         </div>
 
         {/* Filters & Head Office Tabs */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="gsap-filter-bar flex flex-col lg:flex-row flex-wrap items-stretch lg:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
           {/* HO Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+          <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 lg:pb-0 scrollbar-thin">
             <button
               type="button"
               onClick={() => {
                 setSelectedHoFilter('');
                 setPage(1);
               }}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
                 selectedHoFilter === ''
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -391,7 +409,7 @@ export default function BranchesPage() {
                   setSelectedHoFilter(ho.id);
                   setPage(1);
                 }}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
                   selectedHoFilter === ho.id
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -403,7 +421,7 @@ export default function BranchesPage() {
           </div>
 
           {/* Search Box */}
-          <div className="relative w-full sm:w-80 shrink-0">
+          <div className="relative w-full lg:w-80 shrink-0">
             <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"

@@ -108,23 +108,23 @@ export default function BranchSwitcher({ isMobileBar = false }) {
     : 'All Wards (Global Master)';
 
   return (
-    <div className={`relative ${isMobileBar ? 'w-full' : 'shrink-0'}`} ref={dropdownRef}>
+    <div className={`relative ${isMobileBar ? 'w-full' : 'min-w-0 shrink'}`} ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={isMobileBar
-          ? "w-full flex items-center justify-between rounded-xl bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200/90 dark:border-slate-700/80 px-3 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-2xs"
-          : "flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-all cursor-pointer shadow-2xs"
+          ? "h-9 w-full flex items-center justify-between rounded-xl bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200/90 dark:border-slate-700/80 px-3 text-xs font-semibold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-2xs"
+          : "h-9 max-w-full flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 px-2.5 sm:px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-all cursor-pointer shadow-2xs"
         }
         title="Switch active branch/ward filter"
       >
-        <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate pr-1">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate pr-0.5">
           {selectedBranch ? (
             <MapPin className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
           ) : (
             <Globe className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
           )}
-          <span className={`truncate font-semibold ${isMobileBar ? 'text-slate-900 dark:text-white' : 'max-w-[130px] sm:max-w-[180px] lg:max-w-[220px]'}`}>
+          <span className={`truncate font-semibold ${isMobileBar ? 'text-slate-900 dark:text-white' : 'max-w-[110px] xs:max-w-[130px] sm:max-w-[150px] lg:max-w-[175px] xl:max-w-[210px]'}`}>
             {currentLabel}
           </span>
         </div>

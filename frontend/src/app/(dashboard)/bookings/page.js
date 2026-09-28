@@ -35,6 +35,7 @@ import { formatCurrency, formatDate } from '../../../lib/constants';
 import { staggerFadeIn } from '../../../lib/gsap';
 import { toast } from '../../../lib/toast';
 import { confirmDialog } from '../../../lib/confirmDialog';
+import { useAuthStore } from '../../../store/authStore';
 
 export default function BookingsPage() {
   const router = useRouter();
@@ -73,10 +74,25 @@ export default function BookingsPage() {
 
   // Convert Modal (Dedicated Mobile-friendly & Overflow-proof)
   const [convertBookingData, setConvertBookingData] = useState(null);
+  const { selectedBranch } = useAuthStore();
 
   useEffect(() => {
     fetchData();
-  }, [search, page, statusFilter]);
+  }, [search, page, statusFilter, selectedBranch]);
+
+  // Reset page when branch changes
+  useEffect(() => {
+    setPage(1);
+  }, [selectedBranch]);
+
+  // Listen to branchChange event for instant reactive refetch
+  useEffect(() => {
+    const handleBranchChange = () => {
+      fetchData();
+    };
+    window.addEventListener('branchChange', handleBranchChange);
+    return () => window.removeEventListener('branchChange', handleBranchChange);
+  }, [search, page, statusFilter, selectedBranch]);
 
   // Entrance animation for filter bar
   useEffect(() => {
@@ -94,9 +110,12 @@ export default function BookingsPage() {
         bookingsQuery += `&status=all`;
       }
 
+      const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
+      bookingsQuery += `&branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`;
+
       const [bookingsRes, modelsRes] = await Promise.all([
         api.get(bookingsQuery),
-        api.get('/api/models/dropdown'),
+        api.get(`/api/models/dropdown?branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`),
       ]);
 
       if (bookingsRes.data?.success) {
@@ -247,16 +266,19 @@ export default function BookingsPage() {
     {
       header: 'Booking Date',
       key: 'booking_date',
+      cellClassName: 'whitespace-nowrap',
       render: (row) => <span className="text-xs text-slate-500 dark:text-slate-400">{formatDate(row.booking_date)}</span>,
     },
     {
       header: 'Status',
       key: 'status',
+      cellClassName: 'whitespace-nowrap',
       render: (row) => <Badge status={row.status} size="sm" />,
     },
     {
       header: 'Actions',
       key: 'actions',
+      cellClassName: 'whitespace-nowrap',
       render: (row) => {
         if (row.status === 'pending') {
           return (
@@ -328,7 +350,7 @@ export default function BookingsPage() {
             size="sm"
             icon={Plus}
             onClick={() => setIsAddModalOpen(true)}
-            className="h-8.5 px-2.5 sm:px-3.5 text-xs font-bold shrink-0"
+            className="h-9 px-3 sm:px-4 text-xs font-bold shrink-0 shadow-xs"
             title="New Booking"
           >
             <span className="hidden sm:inline">+ New Booking</span>
@@ -337,9 +359,9 @@ export default function BookingsPage() {
         }
       />
 
-      <div className="p-3.5 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
+      <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Filter bar: Search + Status Filter Pills */}
-        <div className="gsap-filter-bar flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white/95 dark:bg-slate-900/80 backdrop-blur-xl p-3 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs transition-colors">
+        <div className="gsap-filter-bar flex flex-col md:flex-row flex-wrap items-stretch md:items-center justify-between gap-3 bg-white/95 dark:bg-slate-900/80 backdrop-blur-xl p-3 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs transition-colors">
           <SearchBar
             value={search}
             onChange={(val) => {
@@ -347,11 +369,11 @@ export default function BookingsPage() {
               setPage(1);
             }}
             placeholder="Search customer name or phone..."
-            className="w-full md:max-w-sm"
+            className="w-full md:max-w-sm md:flex-1 min-w-0"
           />
 
           {/* Status filter tabs for 1-tap mobile filtering */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+          <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 md:pb-0 scrollbar-thin shrink-0">
             {[
               { id: 'all', label: 'All' },
               { id: 'pending', label: 'Pending' },

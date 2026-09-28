@@ -18,6 +18,8 @@ const Select = forwardRef(function Select(
 ) {
   const selectId = id || name;
 
+  const hasEmptyOption = options.some((opt) => opt.value === '');
+
   return (
     <div className="w-full">
       {label && (
@@ -44,7 +46,7 @@ const Select = forwardRef(function Select(
             children
           ) : (
             <>
-              {placeholder && (
+              {placeholder && !hasEmptyOption && (
                 <option value="" disabled className="dark:bg-slate-900">
                   {placeholder}
                 </option>

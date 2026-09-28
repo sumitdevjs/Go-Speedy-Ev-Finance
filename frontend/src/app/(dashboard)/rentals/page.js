@@ -36,6 +36,20 @@ export default function RentalsListPage() {
     fetchRentals();
   }, [search, statusFilter, overdueFilter, insuranceFilter, page, showCancelled, selectedBranch]);
 
+  // Reset page when branch changes
+  useEffect(() => {
+    setPage(1);
+  }, [selectedBranch]);
+
+  // Listen to branchChange event for instant reactive refetch
+  useEffect(() => {
+    const handleBranchChange = () => {
+      fetchRentals();
+    };
+    window.addEventListener('branchChange', handleBranchChange);
+    return () => window.removeEventListener('branchChange', handleBranchChange);
+  }, [search, statusFilter, overdueFilter, insuranceFilter, page, showCancelled, selectedBranch]);
+
   // One-time entrance for the header/filter chrome when the page first mounts.
   useEffect(() => {
     staggerFadeIn('.gsap-filter-bar', { y: 14, duration: 0.45, stagger: 0 });
@@ -44,7 +58,7 @@ export default function RentalsListPage() {
   const fetchRentals = async () => {
     try {
       setLoading(true);
-      let query = `/api/rentals?page=${page}&limit=15&_t=${Date.now()}`;
+      let query = `/api/rentals?page=${page}&limit=15`;
       if (search) query += `&search=${encodeURIComponent(search)}`;
       if (showCancelled) {
         query += `&status=cancelled`;
@@ -56,6 +70,9 @@ export default function RentalsListPage() {
       }
       if (overdueFilter) query += `&overdue_days=${overdueFilter}`;
       if (insuranceFilter) query += `&insurance_status=${insuranceFilter}`;
+
+      const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
+      query += `&branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`;
 
       const res = await api.get(query);
       if (res.data?.success) {
@@ -145,16 +162,21 @@ export default function RentalsListPage() {
     {
       header: 'Contract Status',
       key: 'status',
+      cellClassName: 'whitespace-nowrap',
       render: (row) => <Badge status={row.status} size="sm" />,
     },
     {
       header: 'Pending Docs',
       key: 'has_pending_docs',
+      cellClassName: 'whitespace-nowrap',
       render: (row) =>
         row.has_pending_docs ? (
           <Badge status="Docs Pending" variant="amber" size="sm" />
         ) : (
-          <span className="text-xs text-emerald-600 font-medium">Verified</span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold tracking-wider uppercase text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.6)] shrink-0" />
+            Verified
+          </span>
         ),
     },
     {
@@ -191,7 +213,7 @@ export default function RentalsListPage() {
               variant="primary"
               size="sm"
               icon={Plus}
-              className="h-8.5 px-2.5 sm:px-3 text-xs font-bold shrink-0"
+              className="h-9 px-3 sm:px-3.5 text-xs font-bold shrink-0 shadow-xs"
               title="Issue New Rental"
             >
               <span className="hidden sm:inline">Issue New Rental</span>
@@ -201,9 +223,9 @@ export default function RentalsListPage() {
         }
       />
 
-      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+      <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Filters and Search Bar */}
-        <div className="gsap-filter-bar flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 md:gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
+        <div className="gsap-filter-bar flex flex-col xl:flex-row flex-wrap items-stretch xl:items-center justify-between gap-3 sm:gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
           <SearchBar
             value={search}
             onChange={(val) => {
@@ -211,14 +233,14 @@ export default function RentalsListPage() {
               setPage(1);
             }}
             placeholder="Search tenant name or phone..."
-            className="w-full sm:max-w-md md:flex-1 md:min-w-0"
+            className="w-full xl:max-w-md xl:flex-1 min-w-0"
           />
 
-          <div className="grid grid-cols-2 md:flex md:flex-wrap md:shrink-0 items-center gap-2 md:gap-3 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full xl:w-auto shrink-0">
             <Button
               variant={showCancelled ? 'primary' : 'outline'}
               size="sm"
-              className="col-span-2 md:col-span-1 w-full md:w-auto justify-center"
+              className="flex-1 sm:flex-initial justify-center"
               onClick={() => {
                 setShowCancelled(!showCancelled);
                 setPage(1);
@@ -233,7 +255,7 @@ export default function RentalsListPage() {
                 setStatusFilter(e.target.value);
                 setPage(1);
               }}
-              className="w-full md:w-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
+              className="flex-1 sm:flex-initial rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
             >
               <option value="" className="dark:bg-slate-900">All Document Statuses</option>
               <option value="pending_docs" className="dark:bg-slate-900">Pending Documents</option>
@@ -246,7 +268,7 @@ export default function RentalsListPage() {
                 setInsuranceFilter(e.target.value);
                 setPage(1);
               }}
-              className="w-full md:w-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
+              className="flex-1 sm:flex-initial rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
             >
               <option value="" className="dark:bg-slate-900">All Insurance</option>
               <option value="scooty_expired" className="dark:bg-slate-900">Scooty Ins. Expired</option>
@@ -261,7 +283,7 @@ export default function RentalsListPage() {
                 setOverdueFilter(e.target.value);
                 setPage(1);
               }}
-              className={`w-full md:w-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors ${showCancelled ? 'col-span-2 md:col-span-1' : 'col-span-1'}`}
+              className="flex-1 sm:flex-initial rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
             >
               <option value="" className="dark:bg-slate-900">Overdue Filter: All</option>
               <option value="1" className="dark:bg-slate-900">1+ Days Overdue</option>

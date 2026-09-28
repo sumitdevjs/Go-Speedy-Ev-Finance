@@ -152,7 +152,7 @@ export default function BranchDashboard() {
   });
 
   return (
-    <div className="min-h-screen">
+    <div className="w-full">
       {/* Header */}
       <Header
         title={branch ? `${branch.name}` : 'Ward Dashboard'}
@@ -160,34 +160,34 @@ export default function BranchDashboard() {
           ? `Ward ${branch.ward_no || '—'} · ${branch.ward_area || branch.address || 'Delhi'}`
           : `Branch Operations · ${todayDateFormatted}`}
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
             <Button
               variant="outline"
               size="sm"
               icon={User}
               onClick={() => setIsProfileModalOpen(true)}
-              className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-2.5 xs:py-1.5"
+              className="h-9 px-3 sm:px-3.5 text-xs font-semibold shrink-0"
               title="My Profile"
             >
-              <span className="hidden md:inline">My Profile</span>
+              <span className="hidden sm:inline">My Profile</span>
             </Button>
             <Link href="/rentals/new">
               <Button
                 variant="primary"
                 size="sm"
                 icon={PlusCircle}
-                className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-3 xs:py-1.5"
+                className="h-9 px-3 sm:px-3.5 text-xs font-bold shrink-0 shadow-xs"
                 title="Issue Rental"
               >
                 <span className="hidden sm:inline">Issue Rental</span>
-                <span className="hidden xs:inline sm:hidden">New</span>
+                <span className="sm:hidden">Rental</span>
               </Button>
             </Link>
           </div>
         }
       />
 
-      <div className="p-4 md:p-4 space-y-6 md:space-y-8 max-w-7xl mx-auto pb-8">
+      <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-6 pb-8">
 
         {/* ── WARD IDENTITY BANNER ── */}
         <div className="rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-[#0d1527] dark:via-[#111e38] dark:to-[#0d1527] border border-slate-700/50 dark:border-white/10 p-5 md:p-6 text-white shadow-lg relative overflow-hidden">
@@ -256,86 +256,86 @@ export default function BranchDashboard() {
         {/* ── 4 KPI STAT CARDS ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
           {/* Stock */}
-          <div className="gsap-branch-kpi lg:col-span-1 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between">
+          <div className="gsap-branch-kpi lg:col-span-1 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">EV Stock</span>
-              <Bike className="w-4 h-4 text-blue-500" />
+              <Bike className="w-4 h-4 text-blue-500 shrink-0" />
             </div>
-            <div className="mt-2">
-              <h4 id="gsap-branch-stock" className="text-2xl font-black text-slate-900 dark:text-white">
+            <div className="mt-2 min-w-0">
+              <h4 id="gsap-branch-stock" className="text-2xl font-black text-slate-900 dark:text-white truncate">
                 {loading ? <Spinner size="sm" /> : summary.totalStock}
               </h4>
-              <p className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">Ready to deploy</p>
+              <p className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5 truncate">Ready to deploy</p>
             </div>
           </div>
 
           {/* Active Rentals */}
-          <div className="gsap-branch-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between">
+          <div className="gsap-branch-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Active</span>
-              <Users className="w-4 h-4 text-emerald-500" />
+              <Users className="w-4 h-4 text-emerald-500 shrink-0" />
             </div>
-            <div className="mt-2">
-              <h4 id="gsap-branch-active" className="text-2xl font-black text-slate-900 dark:text-white">
+            <div className="mt-2 min-w-0">
+              <h4 id="gsap-branch-active" className="text-2xl font-black text-slate-900 dark:text-white truncate">
                 {loading ? <Spinner size="sm" /> : summary.activeRentals}
               </h4>
-              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">On rent-to-own</p>
+              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5 truncate">On rent-to-own</p>
             </div>
           </div>
 
           {/* Overdue */}
-          <div className="gsap-branch-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between">
+          <div className="gsap-branch-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Overdue</span>
-              <AlertTriangle className="w-4 h-4 text-rose-500" />
+              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
             </div>
-            <div className="mt-2">
-              <h4 id="gsap-branch-overdue" className="text-2xl font-black text-rose-600 dark:text-rose-400">
+            <div className="mt-2 min-w-0">
+              <h4 id="gsap-branch-overdue" className="text-2xl font-black text-rose-600 dark:text-rose-400 truncate">
                 {loading ? <Spinner size="sm" /> : summary.overdueCount}
               </h4>
-              <p className="text-[10px] text-rose-500 dark:text-rose-400 font-semibold mt-0.5">Need follow-up</p>
+              <p className="text-[10px] text-rose-500 dark:text-rose-400 font-semibold mt-0.5 truncate">Need follow-up</p>
             </div>
           </div>
 
           {/* Bookings */}
-          <div className="gsap-branch-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between">
+          <div className="gsap-branch-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Bookings</span>
-              <CalendarCheck className="w-4 h-4 text-purple-500" />
+              <CalendarCheck className="w-4 h-4 text-purple-500 shrink-0" />
             </div>
-            <div className="mt-2">
-              <h4 className="text-2xl font-black text-purple-600 dark:text-purple-400">
+            <div className="mt-2 min-w-0">
+              <h4 className="text-2xl font-black text-purple-600 dark:text-purple-400 truncate">
                 {loading ? <Spinner size="sm" /> : summary.pendingBookings}
               </h4>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">Pending convert</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 truncate">Pending convert</p>
             </div>
           </div>
 
           {/* Staff */}
-          <div className="gsap-branch-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between">
+          <div className="gsap-branch-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Staff</span>
-              <ShieldCheck className="w-4 h-4 text-slate-500" />
+              <ShieldCheck className="w-4 h-4 text-slate-500 shrink-0" />
             </div>
-            <div className="mt-2">
-              <h4 id="gsap-branch-staff" className="text-2xl font-black text-slate-900 dark:text-white">
+            <div className="mt-2 min-w-0">
+              <h4 id="gsap-branch-staff" className="text-2xl font-black text-slate-900 dark:text-white truncate">
                 {loading ? <Spinner size="sm" /> : summary.staffCount}
               </h4>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">Active members</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 truncate">Active members</p>
             </div>
           </div>
 
           {/* Total Collections */}
-          <div className="gsap-branch-kpi col-span-2 sm:col-span-1 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between">
+          <div className="gsap-branch-kpi col-span-2 sm:col-span-1 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Collected</span>
-              <IndianRupee className="w-4 h-4 text-teal-500" />
+              <IndianRupee className="w-4 h-4 text-teal-500 shrink-0" />
             </div>
-            <div className="mt-2">
-              <h4 id="gsap-branch-total" className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+            <div className="mt-2 min-w-0">
+              <h4 id="gsap-branch-total" className="text-xl font-black text-emerald-600 dark:text-emerald-400 truncate">
                 {loading ? <Spinner size="sm" /> : formatCurrency(summary.totalCollections)}
               </h4>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">All time</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 truncate">All time</p>
             </div>
           </div>
         </div>
@@ -425,8 +425,12 @@ export default function BranchDashboard() {
             title="Overdue Accounts — Your Ward"
             subtitle="Sorted by days overdue — immediate follow-up needed"
             action={
-              <Link href="/rentals?overdue_days=1" className="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:underline">
-                View All →
+              <Link
+                href="/rentals?overdue_days=1"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 border border-rose-200 dark:border-rose-500/25 transition-all shadow-2xs active:scale-95 shrink-0"
+              >
+                <span>View All</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             }
           >
@@ -481,8 +485,12 @@ export default function BranchDashboard() {
             title="Recent Rentals — Your Ward"
             subtitle="Latest contracts registered in this branch"
             action={
-              <Link href="/rentals" className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
-                All Rentals →
+              <Link
+                href="/rentals"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 border border-blue-200 dark:border-blue-500/25 transition-all shadow-2xs active:scale-95 shrink-0"
+              >
+                <span>All Rentals</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             }
           >
@@ -557,8 +565,12 @@ export default function BranchDashboard() {
             title="Recent Payments — Your Ward"
             subtitle="Last 6 payment transactions recorded"
             action={
-              <Link href="/rentals" className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
-                View All →
+              <Link
+                href="/rentals"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 border border-blue-200 dark:border-blue-500/25 transition-all shadow-2xs active:scale-95 shrink-0"
+              >
+                <span>View All</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             }
           >

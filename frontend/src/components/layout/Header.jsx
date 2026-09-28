@@ -32,14 +32,18 @@ export default function Header({
     }
   };
 
-  const showSwitcher = !hideBranchSwitcher && !backHref && !onBack;
+  const isSuperAdmin = role === 'super_admin' || role === 'admin';
+  const isHoAdmin = role === 'ho_admin';
+  const canSwitch = isSuperAdmin || isHoAdmin;
+
+  const showSwitcher = !hideBranchSwitcher && !backHref && !onBack && canSwitch;
 
   return (
     <header className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 sticky top-0 z-30 transition-colors">
-      {/* Primary Bar: Hamburger, Back, Page Title, ThemeToggle, Action */}
-      <div className="h-[54px] sm:h-[64px] md:h-[72px] px-2.5 xs:px-3.5 sm:px-5 md:px-6 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 xs:gap-2.5 sm:gap-3 min-w-0 flex-1">
-          {/* Hamburger Menu Toggle — only on mobile/tablet */}
+      {/* Primary Bar: Hamburger, Back, Page Title, BranchSwitcher, ThemeToggle, Action */}
+      <div className="h-[56px] sm:h-[64px] md:h-[68px] px-2.5 xs:px-3.5 sm:px-5 md:px-6 flex items-center justify-between gap-2.5 sm:gap-3 md:gap-4 overflow-hidden">
+        <div className="flex items-center gap-2 xs:gap-2.5 sm:gap-3 min-w-0 flex-1 overflow-hidden">
+          {/* Hamburger Menu Toggle — only on mobile/tablet (< lg) */}
           <button
             type="button"
             onClick={toggle}
@@ -63,28 +67,29 @@ export default function Header({
             </button>
           )}
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-sm xs:text-base md:text-lg lg:text-xl font-black text-slate-900 dark:text-white tracking-tight truncate">
-                {title || 'Dashboard'}
-              </h1>
-              {/* Desktop inline BranchSwitcher (md and up) */}
-              {showSwitcher && (
-                <div className="hidden md:block shrink-0">
-                  <BranchSwitcher />
-                </div>
-              )}
-            </div>
+          {/* Title & Subtitle block: gracefully wraps or truncates on narrow viewports */}
+          <div className="min-w-0 flex flex-col justify-center shrink-0">
+            <h1 className="text-sm xs:text-base md:text-lg font-black text-slate-900 dark:text-white tracking-tight truncate max-w-[145px] xs:max-w-[185px] sm:max-w-[260px] md:max-w-none">
+              {title || 'Dashboard'}
+            </h1>
             {subtitle && (
-              <p className="text-[11px] md:text-xs text-slate-500 dark:text-slate-400 truncate hidden md:block">
+              <p className="text-[11px] md:text-xs text-slate-500 dark:text-slate-400 truncate hidden lg:block leading-tight mt-0.5">
                 {subtitle}
               </p>
             )}
           </div>
+
+          {/* Desktop inline BranchSwitcher: vertically centered on the main navbar axis with divider */}
+          {showSwitcher && (
+            <div className="hidden md:flex items-center min-w-0 shrink pl-0.5">
+              <div className="h-5 w-px bg-slate-200 dark:bg-slate-800 mx-2 sm:mx-2.5 shrink-0" />
+              <BranchSwitcher />
+            </div>
+          )}
         </div>
 
-        {/* Right side controls: ThemeToggle + Action */}
-        <div className="flex items-center gap-1.5 xs:gap-2 sm:gap-3 shrink-0">
+        {/* Right side controls: ThemeToggle + Action (Always shrink-0 and fully visible) */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           <ThemeToggle />
           {action || (
             <Link href="/rentals/new">
@@ -92,11 +97,11 @@ export default function Header({
                 variant="primary"
                 size="sm"
                 icon={PlusCircle}
-                className="h-8.5 px-2.5 xs:px-3 text-xs font-bold shrink-0"
+                className="h-9 px-3 sm:px-3.5 text-xs font-bold shrink-0 shadow-xs"
                 title="Issue Rental"
               >
-                <span className="hidden sm:inline">Issue Rental</span>
-                <span className="sm:hidden">Rental</span>
+                <span className="hidden sm:inline">Issue New Rental</span>
+                <span className="sm:hidden">New Rental</span>
               </Button>
             </Link>
           )}

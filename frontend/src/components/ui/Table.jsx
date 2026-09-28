@@ -36,8 +36,8 @@ export default function Table({
   }, [data, loading]);
 
   return (
-    <div className="w-full overflow-x-auto lg:overflow-x-visible rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
-      <table className="w-full min-w-[640px] lg:min-w-0 text-sm text-slate-600 dark:text-slate-300">
+    <div className="w-full overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
+      <table className="w-full min-w-[760px] text-sm text-slate-600 dark:text-slate-300">
         <thead className="border-b border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-slate-800/60 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           <tr>
             {columns.map((col, idx) => (

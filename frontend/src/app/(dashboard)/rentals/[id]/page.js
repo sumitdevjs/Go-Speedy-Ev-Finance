@@ -388,7 +388,7 @@ export default function TenantDetailPage() {
         }
       />
 
-      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+      <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Auto Complete Success Banner */}
         {autoCompleteNotice && !isEditMode && (
           <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-800 flex items-center justify-between">

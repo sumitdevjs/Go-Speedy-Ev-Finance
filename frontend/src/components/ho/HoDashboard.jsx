@@ -118,7 +118,7 @@ export default function HoDashboard() {
         subtitle="Zonal Command Center • Fleet, Wards & Revenue Monitoring"
       />
 
-      <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-6">
         {/* Zonal Header Banner */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-blue-950/80 border border-blue-500/25 p-5 sm:p-7 shadow-xl text-white">
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">

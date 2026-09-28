@@ -102,23 +102,10 @@ function NavGroup({ items, isActive }) {
 function SidebarInner({ isOpen, onClose }) {
   const pathname = usePathname();
   const { user, role, selectedBranch, logout } = useAuthStore();
-  const logoRef = useRef(null);
 
   const isSuperAdmin = role === 'super_admin' || role === 'admin';
   const isHoAdmin = role === 'ho_admin';
   const isBranchAdmin = role === 'branch_admin';
-
-  // A tiny "wake up" wiggle on the logo whenever the drawer opens on mobile —
-  // makes the panel feel alive rather than just sliding into place.
-  useEffect(() => {
-    if (isOpen && logoRef.current) {
-      gsap.fromTo(
-        logoRef.current,
-        { rotate: -8, scale: 0.85 },
-        { rotate: 0, scale: 1, duration: 0.5, ease: 'back.out(3)' }
-      );
-    }
-  }, [isOpen]);
 
   const staffNavItems = [
     { name: "Today's Desk", href: '/dashboard', icon: LayoutDashboard },
@@ -188,7 +175,7 @@ function SidebarInner({ isOpen, onClose }) {
     <aside className="w-64 shrink-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 flex flex-col h-full select-none transition-colors">
       {/* Brand Header */}
       <div className="h-[76px] shrink-0 flex items-center justify-center px-4 border-b border-slate-100 dark:border-slate-800 relative">
-        <Link href="/dashboard" className="flex flex-col items-center justify-center transition-transform hover:scale-[1.02]">
+        <Link href="/dashboard" className="flex flex-col items-center justify-center">
           <BrandLogo size="sidebar" showText={true} />
         </Link>
 

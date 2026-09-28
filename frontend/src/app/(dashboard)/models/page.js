@@ -104,6 +104,25 @@ export default function ModelsPage() {
     fetchModels();
   }, [search, stockStatus, activeFilter, page, selectedBranch]);
 
+  // Reset page when branch changes
+  useEffect(() => {
+    setPage(1);
+  }, [selectedBranch]);
+
+  // Listen to branchChange custom event for instant updates
+  useEffect(() => {
+    const handleBranchChange = () => {
+      fetchModels();
+      if (activeTab === 'old') {
+        fetchOldEvs();
+      } else if (activeTab === 'ward_breakdown') {
+        fetchWardBreakdown();
+      }
+    };
+    window.addEventListener('branchChange', handleBranchChange);
+    return () => window.removeEventListener('branchChange', handleBranchChange);
+  }, [activeTab, page, search, stockStatus, activeFilter, selectedBranch]);
+
   // One-time entrance animation for the filter bar
   useEffect(() => {
     staggerFadeIn('.gsap-filter-bar', { y: 14, duration: 0.45, stagger: 0 });
@@ -130,7 +149,8 @@ export default function ModelsPage() {
   const fetchOldEvs = async () => {
     try {
       setLoadingOldEvs(true);
-      const res = await api.get('/api/old-evs');
+      const branchId = selectedBranch ? (selectedBranch.id || selectedBranch.code || 'scoped') : 'all';
+      const res = await api.get(`/api/old-evs?branch_id=${encodeURIComponent(branchId)}&_t=${Date.now()}`);
       if (res.data?.success) {
         setOldEvs(res.data.data || []);
       }
@@ -144,7 +164,8 @@ export default function ModelsPage() {
   const fetchWardBreakdown = async () => {
     try {
       setLoadingWardBreakdown(true);
-      const res = await api.get('/api/models/ward-breakdown');
+      const branchId = selectedBranch ? (selectedBranch.id || selectedBranch.code || 'scoped') : 'all';
+      const res = await api.get(`/api/models/ward-breakdown?branch_id=${encodeURIComponent(branchId)}&_t=${Date.now()}`);
       if (res.data?.success) {
         setWardBreakdown(res.data.data || []);
       }
@@ -162,6 +183,10 @@ export default function ModelsPage() {
       if (search) query += `&search=${encodeURIComponent(search)}`;
       if (stockStatus) query += `&stockStatus=${encodeURIComponent(stockStatus)}`;
       if (activeFilter !== '') query += `&is_active=${activeFilter}`;
+
+      const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
+      query += `&branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`;
+
       const res = await api.get(query);
       if (res.data?.success) {
         setModels(res.data.data || []);
@@ -537,7 +562,7 @@ export default function ModelsPage() {
             size="sm"
             icon={Plus}
             onClick={handleOpenAddModal}
-            className="h-8.5 px-2.5 sm:px-3.5 text-xs font-bold shrink-0"
+            className="h-9 px-3 sm:px-4 text-xs font-bold shrink-0 shadow-xs"
             title="Add New EV Model"
           >
             <span className="hidden sm:inline">Add New EV Model</span>
@@ -546,9 +571,9 @@ export default function ModelsPage() {
         }
       />
 
-      <div className="p-3.5 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
+      <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Navigation Tabs */}
-        <div className="w-full sm:w-fit flex items-center gap-1.5 p-1 bg-slate-100/90 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-white/10 overflow-x-auto no-scrollbar scrollbar-none py-1">
+        <div className="w-full flex items-center gap-1.5 p-1.5 bg-slate-100/90 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-white/10 overflow-x-auto scrollbar-thin">
           <button
             onClick={() => setActiveTab('new')}
             className={`shrink-0 whitespace-nowrap px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer ${
@@ -588,7 +613,7 @@ export default function ModelsPage() {
         {activeTab === 'new' ? (
           <>
             {/* Search & Filter Bar */}
-            <div className="gsap-filter-bar flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
+            <div className="gsap-filter-bar flex flex-col xl:flex-row flex-wrap items-stretch xl:items-center justify-between gap-3 sm:gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
               <SearchBar
                 value={search}
                 onChange={(val) => {
@@ -596,9 +621,9 @@ export default function ModelsPage() {
                   setPage(1);
                 }}
                 placeholder="Search model name, company or ward..."
-                className="w-full sm:max-w-md sm:flex-1 sm:min-w-0"
+                className="w-full xl:max-w-md xl:flex-1 min-w-0"
               />
-              <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2.5 sm:gap-3">
+              <div className="w-full xl:w-auto flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0">
                 <Select
                   value={stockStatus}
                   onChange={(e) => { setStockStatus(e.target.value); setPage(1); }}
@@ -607,7 +632,7 @@ export default function ModelsPage() {
                     { value: 'in_stock', label: 'In Stock' },
                     { value: 'out_of_stock', label: 'Out of Stock' },
                   ]}
-                  className="w-full sm:w-44"
+                  className="flex-1 sm:flex-initial sm:w-44"
                 />
                 <Select
                   value={activeFilter}
@@ -617,7 +642,7 @@ export default function ModelsPage() {
                     { value: 'false', label: 'Cancelled Models' },
                     { value: '', label: 'All Models' },
                   ]}
-                  className="w-full sm:w-44"
+                  className="flex-1 sm:flex-initial sm:w-44"
                 />
               </div>
             </div>

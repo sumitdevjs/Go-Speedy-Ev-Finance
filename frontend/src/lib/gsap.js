@@ -37,8 +37,14 @@ export const animateCounter = (target, endValue, options = {}) => {
     duration,
     ease,
     onUpdate: () => {
+      if (!el.isConnected) return;
       const formatted = decimals > 0 ? obj.val.toFixed(decimals) : Math.round(obj.val).toLocaleString('en-IN');
-      el.innerText = `${prefix}${formatted}${suffix}`;
+      const text = `${prefix}${formatted}${suffix}`;
+      if (el.firstChild && el.firstChild.nodeType === 3) {
+        el.firstChild.nodeValue = text;
+      } else {
+        el.textContent = text;
+      }
     },
   });
 };

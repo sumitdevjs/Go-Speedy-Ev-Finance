@@ -76,6 +76,15 @@ class ModelsService {
     const { page, limit, offset } = getPaginationOptions(query);
     const branches = await getLiveBranches();
 
+    // Determine if a specific branch/ward is currently scoped
+    const branchHeader = req?.headers?.['x-branch-id'];
+    const branchQuery = req?.query?.branch_id;
+    const userBranch = req?.user?.role === 'branch_admin' ? req?.user?.branch_id : null;
+    const userWardArea = req?.user?.role === 'branch_admin' ? req?.user?.ward_area : null;
+
+    const targetBranchIdentifier = branchHeader || branchQuery || userBranch || userWardArea;
+    const scopedWard = findWard(targetBranchIdentifier, branches);
+
     let queryBuilder = supabase
       .from('ev_models')
       .select('*', { count: 'exact' })
@@ -91,29 +100,22 @@ class ModelsService {
       queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'company', 'ward'], query.search));
     }
 
-    if (query.stockStatus === 'in_stock') {
-      queryBuilder = queryBuilder.gt('stock_count', 0);
-    } else if (query.stockStatus === 'out_of_stock') {
-      queryBuilder = queryBuilder.eq('stock_count', 0);
-    }
-
     if (query.is_active !== undefined) {
       queryBuilder = queryBuilder.eq('is_active', query.is_active === 'true');
     }
 
-    const { data, count, error } = await queryBuilder
-      .range(offset, offset + limit - 1);
+    // When viewing globally (no scoped ward), SQL filter on stock_count is valid:
+    if (!scopedWard) {
+      if (query.stockStatus === 'in_stock') {
+        queryBuilder = queryBuilder.gt('stock_count', 0);
+      } else if (query.stockStatus === 'out_of_stock') {
+        queryBuilder = queryBuilder.eq('stock_count', 0);
+      }
+    }
+
+    let { data, error } = await queryBuilder;
 
     if (error) throw error;
-
-    // Determine if a specific branch/ward is currently scoped
-    const branchHeader = req?.headers?.['x-branch-id'];
-    const branchQuery = req?.query?.branch_id;
-    const userBranch = req?.user?.role === 'branch_admin' ? req?.user?.branch_id : null;
-    const userWardArea = req?.user?.role === 'branch_admin' ? req?.user?.ward_area : null;
-
-    const targetBranchIdentifier = branchHeader || branchQuery || userBranch || userWardArea;
-    const scopedWard = findWard(targetBranchIdentifier, branches);
 
     if (data && Array.isArray(data)) {
       data.forEach(m => {
@@ -141,10 +143,22 @@ class ModelsService {
           m.scoped_ward = null;
         }
       });
+
+      // When a ward is scoped, filter stockStatus on the ward-calculated stock count:
+      if (scopedWard && query.stockStatus) {
+        if (query.stockStatus === 'in_stock') {
+          data = data.filter(m => (m.stock_count || 0) > 0);
+        } else if (query.stockStatus === 'out_of_stock') {
+          data = data.filter(m => (m.stock_count || 0) === 0);
+        }
+      }
     }
 
-    const meta = getPaginationMeta(count, page, limit);
-    return { data, meta };
+    const totalCount = data ? data.length : 0;
+    const paginatedData = (data || []).slice(offset, offset + limit);
+    const meta = getPaginationMeta(totalCount, page, limit);
+
+    return { data: paginatedData, meta };
   }
 
   // Lightweight list for dropdowns — returns all models with branch scoping

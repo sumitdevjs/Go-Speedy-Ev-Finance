@@ -127,13 +127,14 @@ export default function WebsiteIntro() {
     };
   }, [shouldRender]);
 
-  if (!shouldRender) return null;
-
   return (
     <aside
       ref={containerRef}
       aria-label="Website Introduction"
-      className="fixed inset-0 z-[999999] bg-[#050811] flex items-center justify-center overflow-hidden select-none cursor-pointer"
+      aria-hidden={!shouldRender}
+      className={`fixed inset-0 z-[999999] bg-[#050811] flex items-center justify-center overflow-hidden select-none cursor-pointer ${
+        shouldRender ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none !hidden'
+      }`}
       onClick={() => {
         // Quick skip on click
         gsap.to(containerRef.current, {

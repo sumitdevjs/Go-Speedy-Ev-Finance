@@ -19,8 +19,8 @@ export default function BrandLogo({
     nav: {
       imgH: 'h-8 xxs:h-9 xs:h-10 sm:h-11 desk:h-12',
       text: 'text-xs xxs:text-[13px] sm:text-sm desk:text-[15px]',
-      titleColor: isDark ? 'text-[#38bdf8]' : 'text-[#0f2b6e]',
-      pvtColor: isDark ? 'text-[#4ade80]' : 'text-[#16a34a]',
+      titleColor: theme === 'dark' ? 'text-[#38bdf8]' : theme === 'light' ? 'text-[#0f2b6e]' : 'text-[#0f2b6e] dark:text-[#38bdf8]',
+      pvtColor: theme === 'dark' ? 'text-[#4ade80]' : theme === 'light' ? 'text-[#16a34a]' : 'text-[#16a34a] dark:text-[#4ade80]',
     },
     lg: {
       imgH: 'h-11 xxs:h-13 sm:h-15 desk:h-16',

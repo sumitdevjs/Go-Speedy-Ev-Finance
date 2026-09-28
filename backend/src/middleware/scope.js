@@ -55,8 +55,13 @@ const applyScope = (queryBuilder, req, options = {}) => {
   const branchCol = options.branchColumn || 'branch_id';
   const hoCol = options.headOfficeColumn || 'head_office_id';
 
-  const selectedBranchId = req.query?.branch_id || req.headers?.['x-branch-id'];
-  const selectedHoId = req.query?.head_office_id || req.headers?.['x-head-office-id'];
+  const rawBranchId = req.query?.branch_id || req.headers?.['x-branch-id'];
+  const rawHoId = req.query?.head_office_id || req.headers?.['x-head-office-id'];
+
+  const isValidId = (val) => val && typeof val === 'string' && val.trim() !== '' && val !== 'all' && val !== 'global' && val !== 'null' && val !== 'undefined';
+
+  const selectedBranchId = isValidId(rawBranchId) ? rawBranchId.trim() : null;
+  const selectedHoId = isValidId(rawHoId) ? rawHoId.trim() : null;
 
   // 1. Super Admin: full access, with optional query/header filters
   if (scope.isSuperAdmin) {
@@ -97,9 +102,13 @@ const resolveCreateScope = (req, payload = {}) => {
     return { branch_id: null, head_office_id: null };
   }
 
+  const isValidId = (val) => val && typeof val === 'string' && val.trim() !== '' && val !== 'all' && val !== 'global' && val !== 'null' && val !== 'undefined';
+  const rawBranchId = payload.branch_id || req.headers?.['x-branch-id'];
+  const rawHoId = payload.head_office_id || req.headers?.['x-head-office-id'];
+
   const scope = getScope(req);
-  const selectedBranchId = payload.branch_id || req.headers?.['x-branch-id'];
-  const selectedHoId = payload.head_office_id || req.headers?.['x-head-office-id'];
+  const selectedBranchId = isValidId(rawBranchId) ? rawBranchId.trim() : null;
+  const selectedHoId = isValidId(rawHoId) ? rawHoId.trim() : null;
 
   if (scope.isSuperAdmin) {
     return {
