@@ -2,14 +2,19 @@ const supabase = require('../../config/db');
 const { calcBalance } = require('../../utils/balanceCalc');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
 const { buildSearchFilter, buildEqOrFilter } = require('../../utils/searchFilter');
+const { applyScope, resolveCreateScope } = require('../../middleware/scope');
 
 class RentalsService {
-  async getRentals(query = {}) {
+  async getRentals(query = {}, req = null) {
     const { page, limit, offset } = getPaginationOptions(query);
-    
+
     let queryBuilder = supabase
       .from('tenants')
       .select('*, ev_models(name, company, total_price), users!tenants_created_by_fkey(name)', { count: 'exact' });
+
+    if (req) {
+      queryBuilder = applyScope(queryBuilder, req);
+    }
 
     if (query.status) {
       queryBuilder = queryBuilder.eq('status', query.status);
@@ -18,7 +23,7 @@ class RentalsService {
       queryBuilder = queryBuilder.neq('status', 'completed');
       queryBuilder = queryBuilder.neq('status', 'direct_purchase');
     }
-    
+
     if (query.search) {
       queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'phone'], query.search));
     }
@@ -46,6 +51,18 @@ class RentalsService {
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
+
+    // Safely batch-resolve branch details if branch_id exists on rows
+    if (tenants && tenants.some(t => t.branch_id)) {
+      try {
+        const branchIds = [...new Set(tenants.map(t => t.branch_id).filter(Boolean))];
+        if (branchIds.length > 0) {
+          const { data: bList } = await supabase.from('branches').select('id, name, code, ward_no').in('id', branchIds);
+          const bMap = new Map((bList || []).map(b => [b.id, b]));
+          tenants.forEach(t => { if (t.branch_id) t.branch = bMap.get(t.branch_id) || null; });
+        }
+      } catch (e) { }
+    }
 
     // Fetch total paid for all these tenants to compute balance
     const tenantIds = tenants.map(t => t.id);
@@ -105,7 +122,7 @@ class RentalsService {
     return { ...tenant, computed_balance: balance, total_paid: totalPaid };
   }
 
-  async createRental(tenantData, createdBy) {
+  async createRental(tenantData, createdBy, req = null) {
     // Sanitize empty strings to undefined so they are inserted as NULL in DB
     Object.keys(tenantData).forEach(key => {
       if (tenantData[key] === '') {
@@ -129,6 +146,15 @@ class RentalsService {
       }
     }
 
+    let assignedBranchId = tenantData.branch_id || null;
+    let assignedHoId = tenantData.head_office_id || null;
+
+    if (req) {
+      const scope = resolveCreateScope(req, tenantData);
+      assignedBranchId = scope.branch_id;
+      assignedHoId = scope.head_office_id;
+    }
+
     // Prevent new rental if an active one exists for this phone
     if (tenantData.phone) {
       const { data: existingActive } = await supabase
@@ -136,7 +162,6 @@ class RentalsService {
         .select('id')
         .eq('phone', tenantData.phone)
         .eq('status', 'rented')
-        .limit(1)
         .maybeSingle();
 
       if (existingActive) {
@@ -144,24 +169,50 @@ class RentalsService {
       }
     }
 
-    // 1. Fetch Model to get price and check stock
-    const { data: model, error: modelError } = await supabase
-      .from('ev_models')
-      .select('total_price, stock_count')
-      .eq('id', tenantData.ev_model_id)
-      .single();
-      
-    if (modelError || !model) throw new Error('EV Model not found');
-    if (model.stock_count <= 0) throw new Error('EV Model out of stock');
+    let modelTotalPrice = 0;
+    let originalStockCount = 0;
+    const isOldEv = Boolean(tenantData.old_ev_id);
 
-    // 2. Decrement stock
-    const { error: stockError } = await supabase
-      .from('ev_models')
-      .update({ stock_count: model.stock_count - 1 })
-      .eq('id', tenantData.ev_model_id)
-      .gt('stock_count', 0); // Safety net for concurrent access
+    if (isOldEv) {
+      const { data: oldEv, error: oldEvErr } = await supabase
+        .from('old_evs')
+        .select('*')
+        .eq('id', tenantData.old_ev_id)
+        .single();
 
-    if (stockError) throw new Error('Failed to reserve stock. It might be exhausted.');
+      if (oldEvErr || !oldEv) throw new Error('Selected used EV not found');
+      if (oldEv.status !== 'available') throw new Error('Selected used EV is no longer available');
+
+      modelTotalPrice = Number(oldEv.price) || 0;
+
+      // Mark old EV as rented or sold
+      await supabase
+        .from('old_evs')
+        .update({ status: tenantData.status === 'direct_purchase' ? 'sold' : 'rented' })
+        .eq('id', tenantData.old_ev_id);
+    } else {
+      // 1. Fetch Model to get price and check stock
+      const { data: model, error: modelError } = await supabase
+        .from('ev_models')
+        .select('total_price, stock_count')
+        .eq('id', tenantData.ev_model_id)
+        .single();
+
+      if (modelError || !model) throw new Error('EV Model not found');
+      if (model.stock_count <= 0) throw new Error('EV Model out of stock');
+
+      originalStockCount = model.stock_count;
+
+      // 2. Decrement stock
+      const { error: stockError } = await supabase
+        .from('ev_models')
+        .update({ stock_count: model.stock_count - 1 })
+        .eq('id', tenantData.ev_model_id)
+        .gt('stock_count', 0);
+
+      if (stockError) throw new Error('Failed to reserve stock. It might be exhausted.');
+      modelTotalPrice = model.total_price;
+    }
 
     // 3. Compute dates
     const startDate = tenantData.start_date ? new Date(tenantData.start_date) : new Date();
@@ -186,9 +237,12 @@ class RentalsService {
         .from('tenants')
         .insert([{
           ...tenantData,
+          branch_id: assignedBranchId,
+          head_office_id: assignedHoId,
+          late_fee_daily_rate: tenantData.late_fee_daily_rate || 50.00,
           references: tenantData.references || [],
           guarantors: tenantData.guarantors || [],
-          total_price: model.total_price, // snapshot price
+          total_price: tenantData.total_price || modelTotalPrice,
           start_date: tenantData.status === 'direct_purchase' ? null : startDate.toISOString().split('T')[0],
           expected_end_date: tenantData.status === 'direct_purchase' ? null : expectedEndDate.toISOString().split('T')[0],
           created_by: createdBy
@@ -199,12 +253,19 @@ class RentalsService {
       if (error) throw error;
       return data;
     } catch (error) {
-      // Rollback stock
-      await supabase
-        .from('ev_models')
-        .update({ stock_count: model.stock_count })
-        .eq('id', tenantData.ev_model_id);
-      
+      // Rollback stock or old_ev reservation
+      if (!isOldEv && tenantData.ev_model_id) {
+        await supabase
+          .from('ev_models')
+          .update({ stock_count: originalStockCount })
+          .eq('id', tenantData.ev_model_id);
+      } else if (isOldEv && tenantData.old_ev_id) {
+        await supabase
+          .from('old_evs')
+          .update({ status: 'available' })
+          .eq('id', tenantData.old_ev_id);
+      }
+
       if (error.code === '23505') {
         console.error('[createRental] Unique constraint violation:', error);
         throw new Error('Unique constraint violation: a record with this value already exists.');
@@ -271,32 +332,43 @@ class RentalsService {
 
     if (cancelError) throw cancelError;
 
-    // 2. Restore stock
-    const { data: model } = await supabase
-      .from('ev_models')
-      .select('stock_count')
-      .eq('id', tenant.ev_model_id)
+    // 2. Insert into old_evs instead of restoring stock to ev_models
+    const { data: tenantDetails } = await supabase
+      .from('tenants')
+      .select('chassis_no, motor_no, controller_no, battery_no, charger_no, ev_model_id, branch_id, head_office_id')
+      .eq('id', id)
       .single();
 
-    if (model) {
+    if (tenantDetails) {
       await supabase
-        .from('ev_models')
-        .update({ stock_count: model.stock_count + 1 })
-        .eq('id', tenant.ev_model_id);
+        .from('old_evs')
+        .insert([{
+          original_ev_model_id: tenantDetails.ev_model_id,
+          returned_from_tenant_id: id,
+          chassis_no: tenantDetails.chassis_no,
+          motor_no: tenantDetails.motor_no,
+          controller_no: tenantDetails.controller_no,
+          battery_no: tenantDetails.battery_no,
+          charger_no: tenantDetails.charger_no,
+          branch_id: tenantDetails.branch_id,
+          head_office_id: tenantDetails.head_office_id,
+          price: 0, // Admin can update this later
+          status: 'available'
+        }]);
     }
-    
+
     return { success: true };
   }
 
   async completeRental(id) {
     // Verify it can be completed (outstanding = 0, dp cleared)
     const rental = await this.getRentalById(id);
-    
+
     if (rental.status !== 'rented') throw new Error('Rental is not currently active');
-    
+
     const dpOwed = (rental.total_price - (rental.booking_amount || 0)) - (rental.downpayment_paid || 0);
     // Actually the calculation logic in balanceCalc handles downpayment properly via contractAmount
-    
+
     if (rental.computed_balance.outstanding > 0) {
       throw new Error(`Cannot complete: Outstanding balance is ₹${rental.computed_balance.outstanding}`);
     }
@@ -313,12 +385,12 @@ class RentalsService {
   }
 
   async checkUniqueHardwareOrPolicy(fields) {
-    const { chassis_no, motor_ctrl_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number } = fields;
+    const { chassis_no, motor_no, controller_no, charger_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number } = fields;
 
     // buildEqOrFilter escapes values so a comma/parenthesis can't inject
     // extra filter clauses into the query.
     const orFilter = buildEqOrFilter({
-      chassis_no, motor_ctrl_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number,
+      chassis_no, motor_no, controller_no, charger_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number,
     });
 
     if (!orFilter) {
@@ -327,7 +399,7 @@ class RentalsService {
 
     const { data, error } = await supabase
       .from('tenants')
-      .select('chassis_no, motor_ctrl_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number')
+      .select('chassis_no, motor_no, controller_no, charger_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number')
       .or(orFilter);
 
     if (error) throw error;
@@ -336,12 +408,14 @@ class RentalsService {
       // Find which one matched to give a specific error message
       const conflict = data[0];
       if (chassis_no && conflict.chassis_no === chassis_no) return { exists: true, message: 'Chassis number already exists in the system.' };
-      if (motor_ctrl_no && conflict.motor_ctrl_no === motor_ctrl_no) return { exists: true, message: 'Motor controller number already exists in the system.' };
+      if (motor_no && conflict.motor_no === motor_no) return { exists: true, message: 'Motor number already exists in the system.' };
+      if (controller_no && conflict.controller_no === controller_no) return { exists: true, message: 'Controller number already exists in the system.' };
+      if (charger_no && conflict.charger_no === charger_no) return { exists: true, message: 'Charger number already exists in the system.' };
       if (battery_no && conflict.battery_no === battery_no) return { exists: true, message: 'Battery serial number already exists in the system.' };
       if (vehicle_number && conflict.vehicle_number === vehicle_number) return { exists: true, message: 'Vehicle number already exists in the system.' };
       if (scooty_policy_number && conflict.scooty_policy_number === scooty_policy_number) return { exists: true, message: 'Scooty policy number already exists in the system.' };
       if (rider_policy_number && conflict.rider_policy_number === rider_policy_number) return { exists: true, message: 'Rider policy number already exists in the system.' };
-      
+
       return { exists: true, message: 'One of the provided unique identifiers already exists in the system.' };
     }
 

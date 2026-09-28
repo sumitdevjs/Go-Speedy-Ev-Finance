@@ -15,6 +15,8 @@ import {
   LogOut,
   Zap,
   X,
+  Building2,
+  MapPin,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Badge from '../ui/Badge';
@@ -82,11 +84,10 @@ function NavGroup({ items, isActive }) {
               key={item.name}
               href={item.href}
               data-active={active}
-              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors duration-200 ${
-                active
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors duration-200 ${active
                   ? 'text-blue-600 dark:text-blue-400 font-semibold'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
-              }`}
+                }`}
             >
               <Icon className={`h-4 w-4 shrink-0 ${active ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`} />
               <span className="truncate">{item.name}</span>
@@ -100,8 +101,12 @@ function NavGroup({ items, isActive }) {
 
 function SidebarInner({ isOpen, onClose }) {
   const pathname = usePathname();
-  const { user, role, logout } = useAuthStore();
+  const { user, role, selectedBranch, logout } = useAuthStore();
   const logoRef = useRef(null);
+
+  const isSuperAdmin = role === 'super_admin' || role === 'admin';
+  const isHoAdmin = role === 'ho_admin';
+  const isBranchAdmin = role === 'branch_admin';
 
   // A tiny "wake up" wiggle on the logo whenever the drawer opens on mobile —
   // makes the panel feel alive rather than just sliding into place.
@@ -124,6 +129,17 @@ function SidebarInner({ isOpen, onClose }) {
     { name: 'Payments / Ledger', href: '/purchases', icon: ShoppingBag },
   ];
 
+  // Branch admin: same as staff but also sees their ward staff
+  const branchAdminNavItems = [
+    { name: 'Ward Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Rentals', href: '/rentals', icon: Users },
+    { name: 'Issue Rental', href: '/rentals/new', icon: UserPlus },
+    { name: 'Bookings', href: '/bookings', icon: CalendarCheck },
+    { name: 'EV Models & Stock', href: '/models', icon: Bike },
+    { name: 'Payments / Ledger', href: '/purchases', icon: ShoppingBag },
+    { name: 'My Branch Staff', href: '/staff', icon: UserCheck },
+  ];
+
   const adminNavItemsList = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Rentals', href: '/rentals', icon: Users },
@@ -132,12 +148,36 @@ function SidebarInner({ isOpen, onClose }) {
     { name: 'Purchases', href: '/purchases', icon: ShoppingBag },
   ];
 
-  const navItems = role === 'staff' ? staffNavItems : adminNavItemsList;
+  const navItems = role === 'staff' ? staffNavItems
+    : role === 'branch_admin' ? branchAdminNavItems
+    : adminNavItemsList;
 
   const adminNavItems = [
+    ...(isSuperAdmin || isHoAdmin ? [{ name: 'Branches & Wards', href: '/branches', icon: Building2 }] : []),
     { name: 'Staff Management', href: '/staff', icon: UserCheck },
     { name: 'Audit Logs', href: '/audit', icon: ShieldCheck },
   ];
+
+  // Derive role label & badge variant
+  let roleLabel = 'Staff Desk';
+  let badgeVariant = 'emerald';
+  if (role === 'super_admin' || role === 'admin') {
+    roleLabel = 'Super Admin';
+    badgeVariant = 'indigo';
+  } else if (role === 'ho_admin') {
+    roleLabel = 'HO Admin';
+    badgeVariant = 'purple';
+  } else if (role === 'branch_admin') {
+    roleLabel = 'Branch Admin';
+    badgeVariant = 'blue';
+  }
+
+  // Branch display label
+  const branchDisplay = selectedBranch
+    ? (selectedBranch.ward_no ? `Ward ${selectedBranch.ward_no}: ${selectedBranch.name}` : selectedBranch.name)
+    : (user?.branch?.name
+      ? (user.branch.ward_no ? `Ward ${user.branch.ward_no}: ${user.branch.name}` : user.branch.name)
+      : (isSuperAdmin ? 'All Wards (Global)' : (user?.ward_area || 'Central Branch')));
 
   const isActive = (href) => {
     if (href === '/dashboard') return pathname === '/dashboard';
@@ -167,16 +207,16 @@ function SidebarInner({ isOpen, onClose }) {
       <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-1" data-lenis-prevent>
         <div className="px-3 pb-1 flex items-center justify-between">
           <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-            {role === 'staff' ? 'Staff Desk' : 'Operations'}
+            {role === 'staff' ? 'Staff Desk' : role === 'branch_admin' ? 'Ward Desk' : 'Operations'}
           </p>
-          {role === 'staff' && (
+          {(role === 'staff' || role === 'branch_admin') && (
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
           )}
         </div>
 
         <NavGroup items={navItems} isActive={isActive} />
 
-        {role === 'admin' && (
+        {(isSuperAdmin || isHoAdmin) && (
           <>
             <div className="pt-4 pb-1">
               <p className="px-3 text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
@@ -190,7 +230,7 @@ function SidebarInner({ isOpen, onClose }) {
 
       {/* User Card & Logout */}
       <div className="shrink-0 p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80">
-        <div className="flex items-center justify-between gap-2.5 mb-3">
+        <div className="flex items-center justify-between gap-2.5 mb-2">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
               {user?.name || (role === 'staff' ? 'Staff Operator' : 'Administrator')}
@@ -200,10 +240,16 @@ function SidebarInner({ isOpen, onClose }) {
             </p>
           </div>
           <Badge
-            status={role === 'staff' ? 'Staff Desk' : 'Admin'}
-            variant={role === 'staff' ? 'emerald' : 'blue'}
+            status={roleLabel}
+            variant={badgeVariant}
             size="sm"
           />
+        </div>
+
+        {/* Current Active Branch / Ward Tag */}
+        <div className="flex items-center gap-1.5 mb-3 px-2 py-1 rounded-md bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 text-[11px] text-slate-600 dark:text-slate-300">
+          <MapPin className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0" />
+          <span className="truncate font-medium">{branchDisplay}</span>
         </div>
 
         <button
@@ -248,18 +294,16 @@ export default function Sidebar({ isOpen, onClose }) {
 
       {/* Mobile Backdrop */}
       <div
-        className={`fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
-          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
+        className={`fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Mobile Slide-in Drawer */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 h-full transition-transform duration-300 ease-in-out lg:hidden shadow-2xl ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 w-64 h-full transition-transform duration-300 ease-in-out lg:hidden shadow-2xl ${isOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <SidebarInner isOpen={isOpen} onClose={onClose} />
       </div>

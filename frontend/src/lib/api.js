@@ -20,6 +20,22 @@ api.interceptors.request.use((config) => {
     config.method = 'put';
     config.headers['X-HTTP-Method-Override'] = 'PATCH';
   }
+
+  // Attach selected branch header if present
+  if (typeof window !== 'undefined') {
+    try {
+      const rawBranch = localStorage.getItem('gospeedy_selected_branch');
+      if (rawBranch) {
+        const parsed = JSON.parse(rawBranch);
+        if (parsed?.id) {
+          config.headers['x-branch-id'] = parsed.id;
+        }
+      }
+    } catch (e) {
+      // ignore parsing errors
+    }
+  }
+
   return config;
 });
 

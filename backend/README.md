@@ -1,31 +1,61 @@
-# Go Speedy EV Finance Scheme - Backend
+# ⚙️ Go Speedy EV Finance Scheme - Backend API
 
-This is the Express REST API that powers the Go Speedy EV Finance Scheme operations. 
-It serves as the sole authorization boundary, enforcing all security rules in code rather than relying on Supabase RLS.
+The high-performance Express REST API that powers the Go Speedy EV Finance Scheme. It serves as the secure core of the platform, enforcing complex business rules, validating data, and acting as the sole authorization boundary for database and storage operations.
 
-## Features
-- **Complete EV Inventory API**: Endpoints for fleet tracking, uniqueness checks, and stock management.
-- **Direct Purchases & Rentals Tracking**: Complex state machines for rental lifecycles (Pending -> Rented -> Completed/Cancelled).
-- **Comprehensive Insurance & AMC Data**: API support for tracking Scooty/Rider insurance, Annual Maintenance Contracts, and Buybacks.
-- **Secure File Handling**: Integration with Supabase Storage to issue short-lived signed URLs for vault documents.
-- **Advanced Auth**:
-  - Email & Password with JWT access tokens.
-  - Refresh Token Rotation (hashed in DB).
-  - Google OAuth2 authentication.
-  - OTP Password Resets via Brevo SMTP.
+## ✨ API Capabilities
 
-## Tech Stack
-- **Runtime**: Node.js + Express
-- **Database**: Supabase (PostgreSQL) using `@supabase/supabase-js`
-- **Auth & Crypto**: JWT, bcrypt, Google Auth Library
-- **Email**: Brevo SMTP integration (Nodemailer)
-- **Validation**: Zod (Strict payload sanitization)
+- **Fleet & Inventory Engine**: Endpoints for registering new EV models, verifying chassis/motor uniqueness, and managing ward stock.
+- **Rental Lifecycle Management**: Complex state machines tracking rentals from `Pending` -> `Rented` -> `Completed`/`Cancelled`.
+- **Financial & Insurance Tracking**: Support for tracking Scooty/Rider insurance expiries, Annual Maintenance Contracts (AMC), and dynamic buyback workflows.
+- **Secure Vault Integration**: Connects with Supabase Storage to issue short-lived signed URLs for sensitive user documents (Aadhar, PAN, Agreements).
+- **Robust Authentication Module**:
+  - Email/Password login with JWT access tokens.
+  - Secure Refresh Token Rotation (hashed in PostgreSQL).
+  - Google OAuth2 SSO authentication.
+  - OTP-based Password Resets powered by Brevo SMTP.
 
-## Setup
-1. Duplicate `.env.example` to `.env`. You will need:
+## 🛠️ Tech Stack & Architecture
+
+- **Runtime**: Node.js + Express.js
+- **Database**: Supabase (PostgreSQL) managed via `@supabase/supabase-js`
+- **Security & Crypto**: `jsonwebtoken` (JWT), `bcrypt`, Google Auth Library
+- **Mail Delivery**: Brevo SMTP integration (Nodemailer)
+- **Validation Layer**: `zod` for rigorous payload sanitization.
+
+### Directory Structure
+
+```text
+/src
+├── api/            # Express routes and controllers
+├── config/         # App configurations (DB, Env vars)
+├── middleware/     # Auth checks, error handling, input validation
+├── modules/        # Feature-specific logic (e.g., models, tenants, staff)
+├── services/       # Integrations (Supabase client, Brevo email)
+└── utils/          # Helpers (CORS config, token generators, formatters)
+```
+
+## 🚀 Getting Started
+
+1. **Environment Setup**:
+   Duplicate `.env.example` and rename to `.env`. Required variables include:
    - Supabase URL & Service Role Key
    - Google Client ID & Secret
-   - Brevo SMTP Credentials
-   - JWT Secret & Session configurations
-2. Run `npm install`
-3. Start development server: `npm run dev`
+   - Brevo SMTP Credentials (Host, Port, User, Pass)
+   - JWT Secret & Session expiration configs
+   - Frontend CORS Origin URLs
+
+2. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Run Development Server**:
+   ```bash
+   npm run dev
+   ```
+   *The server uses `nodemon` for hot-reloading.*
+
+## 📚 API Documentation
+
+Once the server is running, the Swagger API documentation is automatically generated and accessible at:
+👉 **[http://localhost:5000/api/docs](http://localhost:5000/api/docs)**

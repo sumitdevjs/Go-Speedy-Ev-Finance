@@ -54,15 +54,19 @@ export default function Table({
         <tbody ref={tbodyRef} className="divide-y divide-slate-100 dark:divide-white/5">
           {loading ? (
             <tr>
-              <td colSpan={columns.length} className="px-6 py-14 text-center">
-                <Spinner size="lg" className="text-blue-600 dark:text-blue-400 mx-auto" />
-                <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">Loading records...</p>
+              <td colSpan={columns.length} className="px-4 py-12 text-center">
+                <div className="max-w-xs mx-auto sticky left-0 right-0 px-2">
+                  <Spinner size="lg" className="text-blue-600 dark:text-blue-400 mx-auto" />
+                  <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">Loading records...</p>
+                </div>
               </td>
             </tr>
           ) : data.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="px-6 py-14 text-center text-slate-400 dark:text-slate-500">
-                <p className="text-sm font-medium">{emptyText}</p>
+              <td colSpan={columns.length} className="px-4 py-12 text-center text-slate-400 dark:text-slate-500">
+                <div className="max-w-xs sm:max-w-sm mx-auto sticky left-0 right-0 px-2">
+                  <p className="text-xs sm:text-sm font-medium leading-relaxed text-slate-500 dark:text-slate-400">{emptyText}</p>
+                </div>
               </td>
             </tr>
           ) : (

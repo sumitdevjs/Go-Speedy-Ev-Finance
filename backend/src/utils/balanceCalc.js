@@ -67,6 +67,13 @@ function calcBalance(tenant, totalPaid = 0) {
     daysAdvance = dailyRate > 0 ? Math.floor(Math.abs(shortfall) / dailyRate) : 0;
   }
 
+  const lateFeeDailyRate = tenant.late_fee_daily_rate !== undefined && tenant.late_fee_daily_rate !== null
+    ? Number(tenant.late_fee_daily_rate)
+    : 50; // Default ₹50/day
+
+  const totalLateFee = daysOverdue > 0 ? daysOverdue * lateFeeDailyRate : 0;
+  const netTotalDue = outstanding + totalLateFee;
+
   let contractExpired = false;
   if (tenant.expected_end_date) {
     const endDate = new Date(tenant.expected_end_date);
@@ -82,6 +89,9 @@ function calcBalance(tenant, totalPaid = 0) {
       daysOverdue: 0,
       daysAdvance: 0,
       contractExpired: false,
+      lateFeeDailyRate: 0,
+      totalLateFee: 0,
+      netTotalDue: outstanding,
     };
   }
 
@@ -92,6 +102,9 @@ function calcBalance(tenant, totalPaid = 0) {
     daysOverdue,
     daysAdvance,
     contractExpired,
+    lateFeeDailyRate,
+    totalLateFee,
+    netTotalDue,
   };
 }
 

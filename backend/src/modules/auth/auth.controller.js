@@ -1,4 +1,5 @@
 const authService = require('./auth.service');
+const supabase = require('../../config/db');
 const { successResponse, errorResponse } = require('../../utils/response');
 
 class AuthController {
@@ -55,8 +56,37 @@ class AuthController {
   }
 
   async me(req, res) {
-    // req.user is set by auth middleware
-    return successResponse(res, 200, { user: req.user }, 'User profile retrieved');
+    try {
+      let branch = null;
+      let headOffice = null;
+
+      const isSuperAdmin = req.user?.role === 'super_admin' || req.user?.email === 'admin@gmail.com';
+      const branchRef = !isSuperAdmin ? (req.user?.branch_id || req.user?.ward_area) : null;
+      if (branchRef) {
+        try {
+          const branchesService = require('../branches/branches.service');
+          branch = await branchesService.getById(branchRef);
+        } catch (e) {}
+      }
+
+      const hoRef = req.user?.head_office_id || branch?.head_office_id;
+      if (hoRef) {
+        try {
+          const headOfficesService = require('../headOffices/headOffices.service');
+          headOffice = await headOfficesService.getById(hoRef);
+        } catch (e) {}
+      }
+
+      return successResponse(res, 200, {
+        user: {
+          ...req.user,
+          branch,
+          head_office: headOffice,
+        },
+      }, 'User profile retrieved');
+    } catch (err) {
+      return successResponse(res, 200, { user: req.user }, 'User profile retrieved');
+    }
   }
 
   async forgotPassword(req, res) {

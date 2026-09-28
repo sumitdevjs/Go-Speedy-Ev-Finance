@@ -1,14 +1,19 @@
 const supabase = require('../../config/db');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
 const { buildSearchFilter } = require('../../utils/searchFilter');
+const { applyScope } = require('../../middleware/scope');
 
 class PurchasesService {
-  async getPurchases(query = {}) {
+  async getPurchases(query = {}, req = null) {
     const { page, limit, offset } = getPaginationOptions(query);
     
     let queryBuilder = supabase
       .from('tenants')
       .select('*, ev_models(name, company)', { count: 'exact' });
+
+    if (req) {
+      queryBuilder = applyScope(queryBuilder, req);
+    }
       
     if (query.status) {
       // When showing cancelled, we only want cancelled direct purchases
@@ -44,6 +49,17 @@ class PurchasesService {
       .range(offset, offset + limit - 1);
 
     if (error) throw error;
+
+    if (data && data.some(p => p.branch_id)) {
+      try {
+        const branchIds = [...new Set(data.map(p => p.branch_id).filter(Boolean))];
+        if (branchIds.length > 0) {
+          const { data: bList } = await supabase.from('branches').select('id, name, code').in('id', branchIds);
+          const bMap = new Map((bList || []).map(b => [b.id, b]));
+          data.forEach(p => { if (p.branch_id) p.branch = bMap.get(p.branch_id) || null; });
+        }
+      } catch (e) {}
+    }
 
     const meta = getPaginationMeta(count, page, limit);
     return { data, meta };

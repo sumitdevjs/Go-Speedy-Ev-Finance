@@ -4,7 +4,7 @@ const { successResponse, errorResponse } = require('../../utils/response');
 class PurchasesController {
   async getAll(req, res) {
     try {
-      const { data, meta } = await purchasesService.getPurchases(req.query);
+      const { data, meta } = await purchasesService.getPurchases(req.query, req);
       return successResponse(res, 200, data, 'Purchases retrieved successfully', meta);
     } catch (error) {
       console.error(error);

@@ -30,6 +30,11 @@ module.exports = {
           700: '#047857',
         },
       },
+      fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'sans-serif'],
+        serif: ['"Charis SIL"', 'Georgia', 'serif'],
+        charis: ['"Charis SIL"', 'serif'],
+      },
     },
   },
   plugins: [

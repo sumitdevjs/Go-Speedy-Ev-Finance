@@ -11,6 +11,7 @@ const Select = forwardRef(function Select(
     id,
     name,
     required = false,
+    children,
     ...props
   },
   ref
@@ -39,16 +40,22 @@ const Select = forwardRef(function Select(
           } ${className}`}
           {...props}
         >
-          {placeholder && (
-            <option value="" disabled className="dark:bg-slate-900">
-              {placeholder}
-            </option>
+          {children ? (
+            children
+          ) : (
+            <>
+              {placeholder && (
+                <option value="" disabled className="dark:bg-slate-900">
+                  {placeholder}
+                </option>
+              )}
+              {options.map((opt) => (
+                <option key={opt.value} value={opt.value} className="dark:bg-slate-900 text-slate-900 dark:text-white">
+                  {opt.label}
+                </option>
+              ))}
+            </>
           )}
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value} className="dark:bg-slate-900 text-slate-900 dark:text-white">
-              {opt.label}
-            </option>
-          ))}
         </select>
       </div>
       {error && <p className="mt-1 text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</p>}

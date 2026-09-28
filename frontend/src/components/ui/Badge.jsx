@@ -14,8 +14,9 @@ export default function Badge({
     if (['rented', 'active', 'converted'].includes(normStatus)) computedVariant = 'blue';
     else if (['completed', 'advance', 'paid'].includes(normStatus)) computedVariant = 'emerald';
     else if (['overdue', 'cancelled', 'breach'].includes(normStatus)) computedVariant = 'rose';
-    else if (['pending', 'partial', 'warning'].includes(normStatus)) computedVariant = 'amber';
-    else if (['admin'].includes(normStatus)) computedVariant = 'purple';
+    else if (['admin', 'super_admin'].includes(normStatus)) computedVariant = 'purple';
+    else if (['ho_admin'].includes(normStatus)) computedVariant = 'blue';
+    else if (['branch_admin'].includes(normStatus)) computedVariant = 'amber';
     else computedVariant = 'slate';
   }
 

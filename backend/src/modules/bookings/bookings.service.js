@@ -1,15 +1,25 @@
 const supabase = require('../../config/db');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
 const { buildSearchFilter } = require('../../utils/searchFilter');
+const { applyScope, resolveCreateScope } = require('../../middleware/scope');
 
 class BookingsService {
-  async getBookings(query = {}) {
+  async getBookings(query = {}, req = null) {
     const { page, limit, offset } = getPaginationOptions(query);
 
     let queryBuilder = supabase
       .from('bookings')
-      .select('*, ev_models(name, company), users!bookings_created_by_fkey(name)', { count: 'exact' })
-      .eq('status', 'pending');
+      .select('*, ev_models(name, company), users!bookings_created_by_fkey(name)', { count: 'exact' });
+
+    if (query.status && query.status !== 'all') {
+      queryBuilder = queryBuilder.eq('status', query.status);
+    } else if (!query.status) {
+      queryBuilder = queryBuilder.eq('status', 'pending');
+    }
+
+    if (req) {
+      queryBuilder = applyScope(queryBuilder, req);
+    }
 
     if (query.search) {
       queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'phone'], query.search));
@@ -21,17 +31,41 @@ class BookingsService {
 
     if (error) throw error;
 
+    if (data && data.some(b => b.branch_id)) {
+      try {
+        const branchIds = [...new Set(data.map(b => b.branch_id).filter(Boolean))];
+        if (branchIds.length > 0) {
+          const { data: bList } = await supabase.from('branches').select('id, name, code').in('id', branchIds);
+          const bMap = new Map((bList || []).map(b => [b.id, b]));
+          data.forEach(b => { if (b.branch_id) b.branch = bMap.get(b.branch_id) || null; });
+        }
+      } catch (e) { }
+    }
+
     const meta = getPaginationMeta(count, page, limit);
     return { data, meta };
   }
 
-  async createBooking(bookingData, createdBy) {
+  async createBooking(bookingData, createdBy, req = null) {
+    let assignedBranchId = bookingData.branch_id || null;
+    let assignedHoId = bookingData.head_office_id || null;
+
+    if (req) {
+      const scope = resolveCreateScope(req, bookingData);
+      assignedBranchId = scope.branch_id;
+      assignedHoId = scope.head_office_id;
+    }
+
+    const insertPayload = {
+      ...bookingData,
+      created_by: createdBy
+    };
+    if (assignedBranchId) insertPayload.branch_id = assignedBranchId;
+    if (assignedHoId) insertPayload.head_office_id = assignedHoId;
+
     const { data, error } = await supabase
       .from('bookings')
-      .insert([{
-        ...bookingData,
-        created_by: createdBy
-      }])
+      .insert([insertPayload])
       .select('*')
       .single();
 
@@ -100,6 +134,8 @@ class BookingsService {
         .from('tenants')
         .insert([{
           ...tenantData,
+          branch_id: tenantData.branch_id || booking.branch_id || null,
+          head_office_id: tenantData.head_office_id || booking.head_office_id || null,
           total_price: model.total_price,
           booking_amount: booking.booking_amount,
           name: tenantData.name || booking.name,
@@ -126,7 +162,7 @@ class BookingsService {
         .from('ev_models')
         .update({ stock_count: model.stock_count })
         .eq('id', tenantData.ev_model_id);
-        
+
       if (error.code === '23505') {
         console.error('[convertBooking] Unique constraint violation:', error);
         throw new Error('Unique constraint violation: a record with this value already exists.');
@@ -145,9 +181,9 @@ class BookingsService {
       .single();
 
     if (error) {
-       // Check if no rows were updated (meaning it wasn't pending)
-       if(error.code === 'PGRST116') throw new Error('Booking not found or not pending');
-       throw error;
+      // Check if no rows were updated (meaning it wasn't pending)
+      if (error.code === 'PGRST116') throw new Error('Booking not found or not pending');
+      throw error;
     }
     return data;
   }
@@ -161,8 +197,8 @@ class BookingsService {
       .single();
 
     if (error) {
-       if(error.code === 'PGRST116') throw new Error('Booking not found');
-       throw error;
+      if (error.code === 'PGRST116') throw new Error('Booking not found');
+      throw error;
     }
     return data;
   }

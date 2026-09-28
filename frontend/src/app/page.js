@@ -6,34 +6,19 @@ import {
   User,
   Lock,
   ArrowRight,
-  Shield,
   Eye,
   EyeOff,
   AlertCircle,
-  Zap,
-  Leaf,
   Car,
-  Calendar,
   BarChart3,
-  Crown,
-  Users,
-  Mail,
-  KeyRound,
-  CheckCircle2,
-  RefreshCw,
-  X,
+  Zap,
+  Shield,
 } from 'lucide-react';
 import ThemeToggle from '../components/ui/ThemeToggle';
 import BrandLogo from '../components/ui/BrandLogo';
 import { useAuthStore } from '../store/authStore';
 import { gsap } from '../lib/gsap';
 import api from '../lib/api';
-
-const FEATURES = [
-  { icon: Car, title: 'Fleet Management', desc: 'Track and manage your EV fleet' },
-  { icon: Calendar, title: 'Rental Operations', desc: 'Streamline bookings and rentals' },
-  { icon: BarChart3, title: 'Finance & Collections', desc: 'Stay in control of your revenue' },
-];
 
 
 /* Brand lock-up using BrandLogo */
@@ -59,109 +44,7 @@ export default function RootPage() {
   const [mounted, setMounted] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
 
-  // Forgot Password modal state
-  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
-  const [forgotStep, setForgotStep] = useState('request'); // 'request' | 'verify' | 'success'
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotOtp, setForgotOtp] = useState('');
-  const [forgotNewPass, setForgotNewPass] = useState('');
-  const [forgotConfirmPass, setForgotConfirmPass] = useState('');
-  const [showForgotPass, setShowForgotPass] = useState(false);
-  const [forgotLoading, setForgotLoading] = useState(false);
-  const [forgotError, setForgotError] = useState('');
-  const [forgotSuccess, setForgotSuccess] = useState('');
-  const [resendTimer, setResendTimer] = useState(0);
 
-  // Resend OTP countdown timer
-  useEffect(() => {
-    let interval = null;
-    if (resendTimer > 0) {
-      interval = setInterval(() => setResendTimer((prev) => prev - 1), 1000);
-    }
-    return () => clearInterval(interval);
-  }, [resendTimer]);
-
-  const handleRequestOtp = async (e) => {
-    if (e) e.preventDefault();
-    if (!forgotEmail || !forgotEmail.includes('@')) {
-      setForgotError('Please enter a valid email address.');
-      return;
-    }
-    setForgotLoading(true);
-    setForgotError('');
-    try {
-      const res = await api.post('/api/auth/forgot-password', { email: forgotEmail });
-      setForgotSuccess(res.data?.message || 'Verification code sent to your email!');
-      setForgotStep('verify');
-      setResendTimer(60);
-    } catch (err) {
-      setForgotError(err.response?.data?.message || 'Failed to send OTP. Please check your email and try again.');
-    } finally {
-      setForgotLoading(false);
-    }
-  };
-
-  const handleResetPassword = async (e) => {
-    if (e) e.preventDefault();
-    if (!forgotOtp || forgotOtp.trim().length !== 6) {
-      setForgotError('Please enter the 6-digit OTP code sent to your email.');
-      return;
-    }
-    if (!forgotNewPass || forgotNewPass.length < 6) {
-      setForgotError('Password must be at least 6 characters long.');
-      return;
-    }
-    if (forgotNewPass !== forgotConfirmPass) {
-      setForgotError('Passwords do not match. Please re-enter.');
-      return;
-    }
-    setForgotLoading(true);
-    setForgotError('');
-    try {
-      const res = await api.post('/api/auth/reset-password', {
-        email: forgotEmail,
-        otp: forgotOtp.trim(),
-        newPassword: forgotNewPass,
-      });
-      setForgotStep('success');
-      setForgotSuccess(res.data?.message || 'Password reset successful!');
-    } catch (err) {
-      setForgotError(err.response?.data?.message || 'Failed to reset password. Please check your OTP.');
-    } finally {
-      setForgotLoading(false);
-    }
-  };
-
-  const handleBackToLoginFromForgot = () => {
-    setIsForgotModalOpen(false);
-    if (forgotEmail) {
-      setIdentifier(forgotEmail);
-    }
-    setForgotStep('request');
-    setForgotError('');
-    setForgotSuccess('');
-    setForgotOtp('');
-    setForgotNewPass('');
-    setForgotConfirmPass('');
-  };
-
-  useEffect(() => {
-    // Check for OAuth error query params (e.g. ?error=account_deactivated)
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const errParam = params.get('error');
-      if (errParam === 'not_registered') {
-        setError('Access denied. Your email is not registered. Kindly contact admin to get an account.');
-        window.history.replaceState({}, '', window.location.pathname);
-      } else if (errParam === 'account_deactivated') {
-        setError('Your account is deactivated. Kindly contact admin.');
-        window.history.replaceState({}, '', window.location.pathname);
-      } else if (errParam === 'oauth_failed') {
-        setError('Google sign-in failed or was cancelled. Please try again.');
-        window.history.replaceState({}, '', window.location.pathname);
-      }
-    }
-  }, []);
 
 
 
@@ -233,205 +116,200 @@ export default function RootPage() {
 
   return (
     <div className="relative min-h-screen bg-[#070c18] text-white flex flex-col overflow-x-hidden select-none">
-      {/* ── DESKTOP HERO PHOTO (split layout only): cinematic, near full-height photo on the left ~62% of the
-          screen. It is anchored to its right edge so the scooter sits centre-left and the charging station
-          ends just before the login-card column; only the far-left (tree) is trimmed, under the headline. ── */}
+      {/* ── MOBILE AMBIENT BACKGROUND ── */}
+      <div className="desk:hidden fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <img
+          src="/ev-hero-bg.jpg"
+          alt=""
+          className="w-full h-full object-cover object-center opacity-25 filter blur-[1px]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#070c18]/90 via-[#070c18]/95 to-[#070c18]" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] bg-emerald-500/10 rounded-full blur-[90px]" />
+      </div>
+
+      {/* ── DESKTOP HERO PHOTO (Cinematic EV fleet background) ── */}
       <div className="hero-bg-layer hidden desk:block fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-y-0 left-0 w-[60%] xl:w-[61%] 2xl:w-[63%] min-[1700px]:w-[65%] max-w-[calc(50vw_+_260px)] flex items-center">
-          <div className="relative w-full h-[90%] max-h-[900px] overflow-hidden">
+        <div className="absolute inset-y-0 left-0 w-[64%] xl:w-[66%] 2xl:w-[68%] max-w-[calc(50vw_+_320px)] flex items-center">
+          <div className="relative w-full h-[92%] max-h-[920px] overflow-hidden">
             <img
               src="/ev-hero-bg.jpg"
-              alt=""
+              alt="Go Speedy EV Fleet"
               className="w-full h-full object-cover object-right"
             />
-            {/* Left: typography contrast (wider on smaller desktops where the copy reaches further right) */}
-            <div className="absolute inset-y-0 left-0 w-[64%] xl:w-[56%] bg-gradient-to-r from-[#070c18]/90 via-[#070c18]/45 to-transparent" />
+            {/* Left: typography readability gradient (only behind the text, leaving the scooter clear) */}
+            <div className="absolute inset-y-0 left-0 w-[45%] xl:w-[40%] bg-gradient-to-r from-[#070c18] via-[#070c18]/80 to-transparent" />
             {/* Right: soft fade towards the login card */}
-            <div className="absolute inset-y-0 right-0 w-[5%] bg-gradient-to-r from-transparent to-[#070c18]" />
-            {/* Top / bottom: melt into the page */}
-            <div className="absolute inset-x-0 top-0 h-[14%] bg-gradient-to-b from-[#070c18] via-[#070c18]/55 to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 h-[12%] bg-gradient-to-t from-[#070c18] via-[#070c18]/55 to-transparent" />
+            <div className="absolute inset-y-0 right-0 w-[8%] bg-gradient-to-r from-transparent to-[#070c18]" />
+            {/* Top & bottom melts */}
+            <div className="absolute inset-x-0 top-0 h-[14%] bg-gradient-to-b from-[#070c18] via-[#070c18]/50 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-[14%] bg-gradient-to-t from-[#070c18] via-[#070c18]/50 to-transparent" />
           </div>
         </div>
       </div>
 
       {/* ── NAVBAR ── */}
-      <nav className="relative z-20 flex items-center justify-between px-3 xxs:px-4 xs:px-5 sm:px-8 desk:px-16 py-2.5 xs:py-3 desk:py-5 [@media(max-height:720px)]:desk:!py-3 w-full max-w-[1720px] mx-auto">
+      <nav className="relative z-20 flex items-center justify-between px-4 xs:px-6 sm:px-8 desk:px-16 py-3 desk:py-5 [@media(max-height:720px)]:desk:!py-3 w-full max-w-[1720px] mx-auto">
         <Brand size="nav" />
         <ThemeToggle variant="glass" />
       </nav>
 
-      {/* ── MOBILE / TABLET HERO (stacked layout): the photo sits behind the copy, scooter on the right,
-          copy on the darkened left, and it melts into the page just above the login card. ── */}
-      <section className="hero-bg-layer desk:hidden relative isolate -mt-[60px] pt-[60px] overflow-hidden">
-        <div className="absolute inset-0 -z-10 pointer-events-none">
-          <img
-            src="/ev-hero-bg.jpg"
-            alt=""
-            className="w-full h-full object-cover object-[80%_center] sm:object-[70%_center]"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#070c18]/95 via-[#070c18]/60 to-[#070c18]/10" />
-          <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-[#070c18]/80 to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 h-[45%] bg-gradient-to-t from-[#070c18] via-[#070c18]/60 to-transparent" />
-        </div>
+      {/* ── MAIN CONTENT (Split on desktop, streamlined single-column on mobile) ── */}
+      <main className="relative z-10 flex-1 flex flex-col justify-center px-4 xs:px-5 sm:px-8 desk:px-16 py-2 xs:py-4 desk:py-8 [@media(max-height:720px)]:desk:!py-3 w-full max-w-[1720px] mx-auto">
+        <div className="w-full grid grid-cols-1 desk:grid-cols-12 desk:gap-10 xl:gap-14 items-center">
 
-        <div className="gsap-left-content px-3.5 xxs:px-4 xs:px-5 sm:px-8 pt-4 xs:pt-6 sm:pt-8 pb-3 xs:pb-4 sm:pb-6 w-full max-w-[1720px] mx-auto [text-shadow:0_1px_2px_rgba(7,12,24,0.9),0_2px_14px_rgba(7,12,24,0.8)]">
-          <p className="text-[9px] xxs:text-[10px] sm:text-xs font-bold uppercase tracking-[0.15em] xs:tracking-[0.18em] text-emerald-400 leading-relaxed">
-            Clean Mobility.
-            <br className="sm:hidden" />
-            <span className="hidden sm:inline"> </span>
-            Better Tomorrow.
-          </p>
-
-          <h1 className="mt-1.5 xs:mt-2 sm:mt-3 text-[20px] xxs:text-[23px] xs:text-[26px] sm:text-5xl font-black tracking-tight leading-[1.12] sm:leading-[1.1] max-w-[88%] sm:max-w-[60%] text-white">
-            Powering Smarter <br />
-            <span className="text-emerald-400">Electric Mobility.</span>
-          </h1>
-
-          <p className="mt-2 xs:mt-2.5 sm:mt-4 text-[11px] xxs:text-xs xs:text-[13px] sm:text-lg text-slate-300/90 leading-relaxed max-w-[85%] xs:max-w-[70%] sm:max-w-[58%]">
-            Manage EV rentals, fleet operations and finance — all from one simple platform.
-          </p>
-
-          {/* Feature row (icon + title) — wraps cleanly on fold phones */}
-          <div className="mt-4 xs:mt-5 sm:mt-7 grid grid-cols-1 xxs:grid-cols-3 gap-1.5 xs:gap-2 sm:gap-4">
-            {FEATURES.map((f) => {
-              const Icon = f.icon;
-              return (
-                <div key={f.title} className="flex items-center gap-2 sm:gap-3 p-1.5 xxs:p-0 rounded-lg xxs:rounded-none bg-emerald-950/40 xxs:bg-transparent border border-emerald-500/20 xxs:border-0">
-                  <div className="w-7 h-7 xxs:w-8 xxs:h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-emerald-950/80 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                    <Icon className="w-3.5 h-3.5 xxs:w-4 xxs:h-4 sm:w-5 sm:h-5" />
-                  </div>
-                  <h4 className="text-[10px] xxs:text-[11px] sm:text-sm font-bold text-white leading-tight">{f.title}</h4>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ── MAIN: desktop = split (copy left / card right); stacked = card only (copy lives in the hero above) ── */}
-      <main className="relative z-10 flex-1 flex items-center px-2.5 xxs:px-4 xs:px-5 sm:px-8 desk:px-16 pt-1 pb-5 xs:pb-6 sm:pb-8 desk:py-8 [@media(max-height:720px)]:desk:!py-3 w-full max-w-[1720px] mx-auto">
-        <div className="w-full grid grid-cols-1 desk:grid-cols-12 desk:gap-12 items-center">
-          {/* LEFT SIDE (desktop only): intro & features */}
-          <div className="gsap-left-content hidden desk:flex desk:col-span-7 flex-col justify-center text-left [text-shadow:0_1px_2px_rgba(7,12,24,0.9),0_2px_14px_rgba(7,12,24,0.8)]">
-            {/* Pill Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-950/70 border border-emerald-500/40 text-emerald-400 text-sm font-semibold tracking-wide self-start mb-6">
-              <Leaf className="w-4 h-4 fill-emerald-400 text-emerald-400" />
-              <span>Clean Mobility. Better Tomorrow.</span>
+          {/* DESKTOP LEFT SIDE: Enterprise Fleet Narrative & Metric Cards (constrained width so scooter stays 100% open) */}
+          <div className="gsap-left-content hidden desk:flex desk:col-span-7 flex-col justify-center text-left max-w-[430px] xl:max-w-[460px]">
+            {/* Live Ward Status Pill */}
+            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold tracking-wide self-start mb-5 backdrop-blur-md shadow-sm">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span>Delhi-NCR Municipal EV Network • 50 Active Wards</span>
             </div>
 
-            {/* Headline */}
-            <h1 className="text-[52px] xl:text-[58px] 2xl:text-[64px] font-black text-white tracking-tight leading-[1.08]">
-              Powering Smarter <br />
-              <span className="text-emerald-400">Electric Mobility.</span>
+            {/* Authoritative Headline */}
+            <h1 className="text-4xl xl:text-5xl font-extrabold text-white tracking-tight leading-[1.12]">
+              Enterprise EV Fleet &amp; <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">
+                Rental Governance
+              </span>
             </h1>
 
             {/* Subtitle */}
-            <p className="text-lg xl:text-xl text-slate-300/90 mt-5 max-w-[520px] leading-relaxed">
-              Manage EV rentals, fleet operations and finance — all from one simple platform.
+            <p className="text-sm xl:text-base text-slate-300/85 mt-3.5 leading-relaxed font-normal">
+              Unified operating portal for ward-level scooter deployment, battery telemetry, automated rent reconciliation, and multi-tier fleet access.
             </p>
 
-            {/* Feature columns */}
-            <div className="grid grid-cols-3 gap-6 mt-9 max-w-[640px]">
-              {FEATURES.map((f) => {
-                const Icon = f.icon;
-                return (
-                  <div key={f.title} className="flex items-start gap-3.5">
-                    <div className="w-11 h-11 rounded-xl bg-emerald-950/80 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-sm">
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <div className="max-w-[140px]">
-                      <h4 className="text-[17px] font-bold text-white leading-snug">{f.title}</h4>
-                      <p className="hidden xl:block text-[13px] text-slate-400 mt-1 leading-snug">{f.desc}</p>
-                    </div>
-                  </div>
-                );
-              })}
+            {/* 3 Metric Cards */}
+            <div className="grid grid-cols-3 gap-2.5 mt-6 max-w-[440px]">
+              <div className="p-4 rounded-2xl bg-slate-900/50 hover:bg-slate-900/80 border border-white/[0.08] hover:border-emerald-500/30 backdrop-blur-md transition-all group shadow-sm">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-3 group-hover:scale-105 transition-transform">
+                  <Car className="w-4 h-4" />
+                </div>
+                <div className="text-lg xl:text-xl font-bold text-white tracking-tight">50 Wards</div>
+                <div className="text-xs text-slate-400 mt-1 leading-snug">Autonomous NCR Coverage</div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-900/50 hover:bg-slate-900/80 border border-white/[0.08] hover:border-teal-500/30 backdrop-blur-md transition-all group shadow-sm">
+                <div className="w-9 h-9 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 mb-3 group-hover:scale-105 transition-transform">
+                  <BarChart3 className="w-4 h-4" />
+                </div>
+                <div className="text-lg xl:text-xl font-bold text-white tracking-tight">100% Digital</div>
+                <div className="text-xs text-slate-400 mt-1 leading-snug">Daily Ledger &amp; Collections</div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-900/50 hover:bg-slate-900/80 border border-white/[0.08] hover:border-cyan-500/30 backdrop-blur-md transition-all group shadow-sm">
+                <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-3 group-hover:scale-105 transition-transform">
+                  <Zap className="w-4 h-4" />
+                </div>
+                <div className="text-lg xl:text-xl font-bold text-white tracking-tight">Live Telemetry</div>
+                <div className="text-xs text-slate-400 mt-1 leading-snug">SoC &amp; Asset Protection</div>
+              </div>
             </div>
 
-            {/* Tagline */}
-            <div className="mt-9 pt-4 border-t border-emerald-500/20 max-w-[640px] flex items-center gap-2 text-sm text-slate-400">
-              <span className="w-1 h-4 bg-emerald-400 rounded-full inline-block" />
-              <span>Built for a cleaner, smarter, and more sustainable future.</span>
+            {/* Bottom Status / Security Bar */}
+            <div className="mt-8 pt-5 border-t border-white/[0.08] max-w-[640px] flex items-center justify-between text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-emerald-400" />
+                <span>Enterprise 3-Tier Security (Super Admin • Ward • Counter)</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Grid Operational</span>
+              </div>
             </div>
           </div>
 
-          {/* LOGIN CARD */}
-          <div className="gsap-login-card desk:col-span-5 w-full max-w-[540px] mx-auto desk:mr-0 desk:max-w-[520px] xl:max-w-[540px]">
-            <div className="bg-white/90 dark:bg-[#0b1222]/85 backdrop-blur-2xl rounded-2xl desk:rounded-[28px] p-3.5 xxs:p-4 xs:p-5 sm:p-7 desk:p-8 xl:p-9 [@media(max-height:720px)]:desk:!p-6 shadow-[0_25px_60px_rgba(15,23,42,0.15)] dark:shadow-[0_25px_60px_rgba(0,0,0,0.7)] border border-slate-200/80 dark:border-white/10 text-slate-900 dark:text-white transition-all">
-              {/* Card brand header (desktop only) */}
-              <div className="hidden desk:block mb-7 [@media(max-height:720px)]:desk:!hidden">
-                <Brand size="lg" />
-              </div>
+          {/* MOBILE BRAND HEADER (Compact, sleek, above card on phone/tablet) */}
+          <div className="desk:hidden text-center mb-3 sm:mb-5">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold tracking-wider mb-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Delhi-NCR • 50 Municipal Wards</span>
+            </div>
+            <h1 className="text-2xl xs:text-3xl font-extrabold text-white tracking-tight">
+              EV Fleet &amp; Rental Portal
+            </h1>
+            <p className="text-xs text-slate-400 mt-1 max-w-[320px] mx-auto leading-relaxed">
+              Sign in to manage your ward fleet, rentals, and daily collections.
+            </p>
+          </div>
 
-              <div className="mb-4 xs:mb-5 desk:mb-6 [@media(max-height:720px)]:desk:!mb-4">
-                <h2 className="text-xl xxs:text-[22px] desk:text-[34px] [@media(max-height:720px)]:desk:!text-[26px] font-black text-slate-900 dark:text-white tracking-tight leading-tight">Welcome back</h2>
-                <p className="text-xs xxs:text-[13px] desk:text-base text-slate-500 dark:text-slate-400 mt-0.5 xs:mt-1 desk:mt-1.5">Sign in to continue to your dashboard.</p>
+          {/* LOGIN CARD */}
+          <div className="gsap-login-card desk:col-span-5 w-full max-w-[450px] mx-auto desk:mr-0 desk:max-w-[460px] xl:max-w-[480px]">
+            <div className="bg-[#0b1222]/90 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-5 sm:p-7 xl:p-8 shadow-[0_25px_70px_rgba(0,0,0,0.7)] border border-white/[0.08] text-white transition-all">
+
+              {/* Header: starts directly from Welcome Back */}
+              <div className="mb-4 desk:mb-6">
+                <div className="hidden desk:inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold tracking-wider mb-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Fleet Operations Portal</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl desk:text-3xl font-extrabold text-white tracking-tight">
+                  Welcome Back
+                </h2>
+                <p className="hidden desk:block text-xs sm:text-sm text-slate-400 mt-1 leading-relaxed">
+                  Sign in to access your ward fleet, rentals, and finance.
+                </p>
               </div>
 
               {error && (
-                <div className="bg-rose-500/10 dark:bg-rose-950/60 border border-rose-400 dark:border-rose-600/80 rounded-xl p-3 flex items-start gap-2.5 text-rose-600 dark:text-rose-300 text-xs font-semibold mb-3.5 shadow-md shadow-rose-950/20 animate-in fade-in duration-200">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-500 mt-0.5" />
+                <div className="bg-rose-500/10 border border-rose-500/40 rounded-xl p-3 flex items-start gap-2.5 text-rose-300 text-xs font-semibold font-sans mb-4 shadow-lg shadow-rose-950/30 animate-in fade-in duration-200">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
                   <div className="flex-1 leading-relaxed">
-                    <span className="font-bold">{error}</span>
+                    <span>{error}</span>
                   </div>
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-3.5 xs:space-y-4 desk:space-y-5 [@media(max-height:720px)]:desk:!space-y-4" autoComplete="off">
+              <form onSubmit={handleSubmit} className="space-y-4 font-sans" autoComplete="off">
                 <div>
-                  <label className="block text-[10px] desk:text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1 xs:mb-1.5 desk:mb-2" htmlFor="identifier">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2 font-sans" htmlFor="identifier">
                     Phone Number or Email
                   </label>
-                  <div className="relative">
-                    <span className={`absolute left-3 xs:left-3.5 desk:left-4 top-1/2 -translate-y-1/2 ${
-                      error && (error.toLowerCase().includes('phone') || error.toLowerCase().includes('email') || error.toLowerCase().includes('account') || (!identifier && error))
-                        ? 'text-rose-500'
-                        : 'text-slate-400 dark:text-slate-500'
-                    }`}>
-                      <User size={15} />
+                  <div className="relative group">
+                    <span className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${error && (error.toLowerCase().includes('phone') || error.toLowerCase().includes('email') || error.toLowerCase().includes('account') || (!identifier && error))
+                        ? 'text-rose-400'
+                        : 'text-slate-400 group-focus-within:text-emerald-400'
+                      }`}>
+                      <User size={16} />
                     </span>
                     <input
                       id="identifier"
                       type="text"
-                      className={`w-full bg-slate-50 dark:bg-[#131d35]/90 border ${
-                        error && (error.toLowerCase().includes('phone') || error.toLowerCase().includes('email') || error.toLowerCase().includes('account') || (!identifier && error))
-                          ? 'border-rose-500 ring-1 ring-rose-500/40 text-rose-600 dark:text-rose-300'
-                          : 'border-slate-200 dark:border-slate-700/80 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 text-slate-900 dark:text-white'
-                      } rounded-xl pl-9 xs:pl-10 desk:pl-11 pr-3 xs:pr-4 py-2.5 xs:py-3 desk:py-3.5 [@media(max-height:720px)]:desk:!py-3 text-xs xs:text-sm desk:text-base placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none transition-all font-sans`}
+                      className={`w-full bg-[#0d1629]/95 hover:bg-[#101b33] border ${error && (error.toLowerCase().includes('phone') || error.toLowerCase().includes('email') || error.toLowerCase().includes('account') || (!identifier && error))
+                          ? 'border-rose-500 ring-1 ring-rose-500/40 text-rose-300'
+                          : 'border-slate-700/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-white'
+                        } rounded-xl pl-11 pr-4 py-3 sm:py-3.5 text-base sm:text-sm placeholder:text-slate-500 focus:outline-none transition-all font-sans`}
                       value={identifier}
                       onChange={(e) => {
                         setIdentifier(e.target.value);
                         if (error) setError('');
                       }}
-                      placeholder="e.g. 9999999999 or admin@gmail.com"
+                      placeholder="e.g. admin@gmail.com or wardadminrohini"
                       autoComplete="username"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <div className="mb-1 xs:mb-1.5 desk:mb-2">
-                    <label className="block text-[10px] desk:text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300" htmlFor="password">
-                      Password
-                    </label>
-                  </div>
-                  <div className="relative">
-                    <span className={`absolute left-3 xs:left-3.5 desk:left-4 top-1/2 -translate-y-1/2 ${
-                      error && (error.toLowerCase().includes('password') || error.toLowerCase().includes('pass') || (!password && error))
-                        ? 'text-rose-500'
-                        : 'text-slate-400 dark:text-slate-500'
-                    }`}>
-                      <Lock size={15} />
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2 font-sans" htmlFor="password">
+                    Password
+                  </label>
+                  <div className="relative group">
+                    <span className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${error && (error.toLowerCase().includes('password') || error.toLowerCase().includes('pass') || (!password && error))
+                        ? 'text-rose-400'
+                        : 'text-slate-400 group-focus-within:text-emerald-400'
+                      }`}>
+                      <Lock size={16} />
                     </span>
                     <input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
-                      className={`w-full bg-slate-50 dark:bg-[#131d35]/90 border ${
-                        error && (error.toLowerCase().includes('password') || error.toLowerCase().includes('pass') || (!password && error))
-                          ? 'border-rose-500 ring-1 ring-rose-500/40 text-rose-600 dark:text-rose-300'
-                          : 'border-slate-200 dark:border-slate-700/80 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/50 text-slate-900 dark:text-white'
-                      } rounded-xl pl-9 xs:pl-10 desk:pl-11 pr-10 xs:pr-11 py-2.5 xs:py-3 desk:py-3.5 [@media(max-height:720px)]:desk:!py-3 text-xs xs:text-sm desk:text-base placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none transition-all font-sans`}
+                      className={`w-full bg-[#0d1629]/95 hover:bg-[#101b33] border ${error && (error.toLowerCase().includes('password') || error.toLowerCase().includes('pass') || (!password && error))
+                          ? 'border-rose-500 ring-1 ring-rose-500/40 text-rose-300'
+                          : 'border-slate-700/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-white'
+                        } rounded-xl pl-11 pr-11 py-3 sm:py-3.5 text-base sm:text-sm placeholder:text-slate-500 focus:outline-none transition-all font-sans`}
                       value={password}
                       onChange={(e) => {
                         setPassword(e.target.value);
@@ -442,12 +320,12 @@ export default function RootPage() {
                     />
                     <button
                       type="button"
-                      className="absolute right-3 xs:right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer transition-colors"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white cursor-pointer transition-colors"
                       onClick={() => setShowPassword(!showPassword)}
                       tabIndex={-1}
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
-                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </div>
@@ -455,59 +333,39 @@ export default function RootPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full mt-1 py-2.5 xs:py-3 desk:py-3.5 px-3 xs:px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-white font-bold text-xs xs:text-sm desk:text-base tracking-wide flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/25 cursor-pointer disabled:opacity-60"
+                  className="w-full mt-2 py-3 sm:py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 active:scale-[0.99] text-slate-950 font-bold text-sm sm:text-base tracking-wide flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/25 cursor-pointer disabled:opacity-60 font-sans"
                 >
                   {submitting ? (
                     <span>Signing In...</span>
                   ) : (
                     <>
                       <span>Sign In to Dashboard</span>
-                      <ArrowRight className="h-4 w-4 desk:h-5 desk:w-5" />
+                      <ArrowRight className="h-4 w-4" />
                     </>
                   )}
                 </button>
               </form>
 
-              {/* ── Google OAuth Button ── */}
-              <a
-                href="/api/auth/google"
-                className="mt-2.5 xs:mt-3 w-full flex items-center justify-center gap-2.5 xs:gap-3 py-2 xs:py-2.5 px-3 xs:px-4 rounded-xl
-                           bg-white hover:bg-slate-50 active:bg-slate-100
-                           text-slate-800 font-semibold text-xs xs:text-sm tracking-wide
-                           shadow-md shadow-black/10 dark:shadow-black/20 border border-slate-200 dark:border-white/20
-                           transition-all duration-200 cursor-pointer group"
-              >
-                {/* Official Google "G" SVG */}
-                <svg width="17" height="17" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                  <path fill="none" d="M0 0h48v48H0z"/>
-                </svg>
-                <span>Continue with Google</span>
-              </a>
+              {/* Enterprise Security Tag */}
+              <div className="mt-5 pt-3.5 border-t border-slate-800/70 flex items-center justify-center gap-2 text-[11px] text-slate-500 font-sans">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span>Enterprise 256-Bit SSL Encrypted Session</span>
+              </div>
+            </div>
 
-              {/* ── Forgot Password Section (Bottom) ── */}
-              <div className="mt-4 xs:mt-5 pt-3 xs:pt-4 border-t border-slate-200/80 dark:border-slate-800/80 flex flex-col items-center justify-center text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForgotEmail(identifier.includes('@') ? identifier : '');
-                    setForgotStep('request');
-                    setForgotError('');
-                    setForgotSuccess('');
-                    setForgotOtp('');
-                    setForgotNewPass('');
-                    setForgotConfirmPass('');
-                    setIsForgotModalOpen(true);
-                  }}
-                  className="group inline-flex flex-wrap items-center justify-center gap-1.5 xs:gap-2 text-[11px] xs:text-xs desk:text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer py-1.5 px-2 xs:px-3 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5"
-                >
-                  <KeyRound size={14} className="text-emerald-500 group-hover:scale-110 transition-transform shrink-0" />
-                  <span>Forgot your password?</span>
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400 underline underline-offset-2">Reset Password</span>
-                </button>
+            {/* Mobile quick metrics strip (shown only on phone/tablet under the card) */}
+            <div className="desk:hidden mt-3.5 w-full grid grid-cols-3 gap-2 text-center">
+              <div className="p-2 sm:p-2.5 rounded-xl bg-slate-900/60 border border-white/[0.06] backdrop-blur-sm shadow-sm">
+                <div className="text-xs sm:text-sm font-bold text-white tracking-tight">50 Wards</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Municipal Grid</div>
+              </div>
+              <div className="p-2 sm:p-2.5 rounded-xl bg-slate-900/60 border border-white/[0.06] backdrop-blur-sm shadow-sm">
+                <div className="text-xs sm:text-sm font-bold text-emerald-400 tracking-tight">100% Digital</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Daily Ledger</div>
+              </div>
+              <div className="p-2 sm:p-2.5 rounded-xl bg-slate-900/60 border border-white/[0.06] backdrop-blur-sm shadow-sm">
+                <div className="text-xs sm:text-sm font-bold text-teal-400 tracking-tight">Live SoC</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Fleet Telemetry</div>
               </div>
             </div>
           </div>
@@ -536,245 +394,7 @@ export default function RootPage() {
         </div>
       </footer>
 
-      {/* ── FORGOT PASSWORD MODAL ── */}
-      {isForgotModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 xxs:p-3 sm:p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div
-            className="relative w-full max-w-md bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-white/10 rounded-2xl sm:rounded-3xl p-4 xxs:p-5 sm:p-8 shadow-2xl shadow-black/40 text-slate-900 dark:text-white"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close button */}
-            <button
-              type="button"
-              onClick={() => setIsForgotModalOpen(false)}
-              className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-            >
-              <X size={18} />
-            </button>
 
-            {/* STEP 1: REQUEST OTP */}
-            {forgotStep === 'request' && (
-              <div>
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
-                    <KeyRound size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">Reset Password</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Receive a 6-digit OTP on your registered email</p>
-                  </div>
-                </div>
-
-                {forgotError && (
-                  <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>{forgotError}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleRequestOtp} className="space-y-4" autoComplete="off">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5">
-                      Registered Email Address
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
-                        <Mail size={16} />
-                      </span>
-                      <input
-                        type="email"
-                        required
-                        placeholder="e.g. staff@gmail.com"
-                        value={forgotEmail}
-                        onChange={(e) => setForgotEmail(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-[#131d35] border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-sans"
-                        autoFocus
-                      />
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-1.5">
-                      Enter the email address associated with your staff or admin account.
-                    </p>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={forgotLoading}
-                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-sm tracking-wide shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    {forgotLoading ? (
-                      <>
-                        <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                        <span>Sending OTP...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Send Verification Code</span>
-                        <ArrowRight size={16} />
-                      </>
-                    )}
-                  </button>
-                </form>
-              </div>
-            )}
-
-            {/* STEP 2: VERIFY OTP & RESET */}
-            {forgotStep === 'verify' && (
-              <div>
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
-                    <Shield size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">Enter OTP &amp; New Password</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Code sent to <span className="text-emerald-500 font-semibold">{forgotEmail}</span>
-                    </p>
-                  </div>
-                </div>
-
-                {forgotSuccess && (
-                  <div className="mb-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span>{forgotSuccess}</span>
-                  </div>
-                )}
-
-                {forgotError && (
-                  <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>{forgotError}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleResetPassword} className="space-y-3.5 xs:space-y-4" autoComplete="off">
-                  {/* OTP Input */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1 xs:mb-1.5">
-                      6-Digit OTP Code
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={6}
-                      required
-                      placeholder="000000"
-                      value={forgotOtp}
-                      onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, ''))}
-                      className="w-full bg-slate-50 dark:bg-[#131d35] border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 xs:py-3 text-center text-lg xxs:text-xl xs:text-2xl font-mono tracking-[4px] xxs:tracking-[6px] xs:tracking-[8px] font-black text-emerald-600 dark:text-emerald-400 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
-                      autoFocus
-                    />
-                  </div>
-
-                  {/* New Password */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1 xs:mb-1.5">
-                      New Password
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 xs:left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
-                        <Lock size={15} />
-                      </span>
-                      <input
-                        type={showForgotPass ? 'text' : 'password'}
-                        required
-                        minLength={6}
-                        placeholder="Min 6 characters"
-                        value={forgotNewPass}
-                        onChange={(e) => setForgotNewPass(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-[#131d35] border border-slate-200 dark:border-slate-700 rounded-xl pl-9 xs:pl-10 pr-9 xs:pr-10 py-2.5 xs:py-3 text-xs xs:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-sans"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowForgotPass(!showForgotPass)}
-                        className="absolute right-3 xs:right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
-                      >
-                        {showForgotPass ? <EyeOff size={15} /> : <Eye size={15} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Confirm Password */}
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1 xs:mb-1.5">
-                      Confirm New Password
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 xs:left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
-                        <Lock size={15} />
-                      </span>
-                      <input
-                        type={showForgotPass ? 'text' : 'password'}
-                        required
-                        minLength={6}
-                        placeholder="Re-enter new password"
-                        value={forgotConfirmPass}
-                        onChange={(e) => setForgotConfirmPass(e.target.value)}
-                        className="w-full bg-slate-50 dark:bg-[#131d35] border border-slate-200 dark:border-slate-700 rounded-xl pl-9 xs:pl-10 pr-3 xs:pr-4 py-2.5 xs:py-3 text-xs xs:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-sans"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setForgotStep('request')}
-                      className="text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors underline cursor-pointer"
-                    >
-                      Change email
-                    </button>
-                    {resendTimer > 0 ? (
-                      <span className="text-slate-400">Resend code in {resendTimer}s</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleRequestOtp}
-                        className="text-emerald-500 hover:underline font-semibold cursor-pointer flex items-center gap-1"
-                      >
-                        <RefreshCw size={12} /> Resend OTP
-                      </button>
-                    )}
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={forgotLoading}
-                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-sm tracking-wide shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    {forgotLoading ? (
-                      <>
-                        <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                        <span>Updating Password...</span>
-                      </>
-                    ) : (
-                      <span>Reset Password</span>
-                    )}
-                  </button>
-                </form>
-              </div>
-            )}
-
-            {/* STEP 3: SUCCESS */}
-            {forgotStep === 'success' && (
-              <div className="text-center py-4">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                  <CheckCircle2 size={36} />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Password Reset Successfully!</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto mb-6 leading-relaxed">
-                  Your GoSpeedy password has been updated. You can now sign in using your new password.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleBackToLoginFromForgot}
-                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-sm tracking-wide shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <span>Sign In Now</span>
-                  <ArrowRight size={16} />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

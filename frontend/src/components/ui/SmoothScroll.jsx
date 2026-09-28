@@ -26,6 +26,17 @@ export default function SmoothScroll({ children }) {
       smoothWheel: true,
       wheelMultiplier: 1.05,
       touchMultiplier: 1.5,
+      allowNestedScroll: true,
+      prevent: (node) => {
+        if (!node || node.nodeType !== 1) return false;
+        return (
+          node.hasAttribute('data-lenis-prevent') ||
+          Boolean(node.closest?.('[data-lenis-prevent]')) ||
+          Boolean(node.closest?.('.overflow-y-auto')) ||
+          Boolean(node.closest?.('.overflow-auto')) ||
+          Boolean(node.closest?.('.dropdown-scroll'))
+        );
+      },
     });
 
     window.__lenis = lenis;

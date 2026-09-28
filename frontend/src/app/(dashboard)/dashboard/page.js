@@ -13,6 +13,9 @@ import {
   ArrowRight,
   Clock,
   Phone,
+  Zap,
+  MapPin,
+  Layers,
 } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Card from '../../../components/ui/Card';
@@ -23,6 +26,8 @@ import api from '../../../lib/api';
 import { formatCurrency, formatDate } from '../../../lib/constants';
 import { useAuthStore } from '../../../store/authStore';
 import StaffDashboard from '../../../components/staff/StaffDashboard';
+import HoDashboard from '../../../components/ho/HoDashboard';
+import BranchDashboard from '../../../components/branch/BranchDashboard';
 import SustainabilityBanner from '../../../components/dashboard/SustainabilityBanner';
 import { gsap, animateCounter, staggerFadeIn } from '../../../lib/gsap';
 
@@ -33,23 +38,32 @@ export default function DashboardPage() {
     return <StaffDashboard />;
   }
 
+  // Branch-level admins/managers only see their own ward data
+  if (role === 'branch_admin') {
+    return <BranchDashboard />;
+  }
+
+  // Normal admin / super_admin branch & wards dashboard
   return <AdminDashboard />;
 }
 
 function AdminDashboard() {
+  const { selectedBranch } = useAuthStore();
   const [stats, setStats] = useState({
     totalStock: 0,
+    oldStock: 0,
     activeRentals: 0,
     overdueCount: 0,
     totalCollections: 0,
   });
   const [overdueTenants, setOverdueTenants] = useState([]);
   const [recentRentals, setRecentRentals] = useState([]);
+  const [wardFleet, setWardFleet] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [selectedBranch]);
 
   const fetchDashboardData = async () => {
     try {
@@ -59,6 +73,10 @@ function AdminDashboard() {
       const modelsRes = await api.get('/api/models/dropdown');
       const models = modelsRes.data?.data || [];
       const totalStock = models.filter(m => m.is_active).reduce((sum, m) => sum + (m.stock_count || 0), 0);
+
+      // Fetch Used EVs for stock
+      const oldEvsRes = await api.get('/api/old-evs/available');
+      const oldStock = oldEvsRes.data?.data?.length || 0;
 
       // Fetch Rentals (Active/Cancelled)
       const rentalsRes = await api.get('/api/rentals?limit=10000');
@@ -79,7 +97,7 @@ function AdminDashboard() {
       // Fetch Payments
       const paymentsRes = await api.get('/api/payments?limit=10000');
       const payments = paymentsRes.data?.data || [];
-      
+
       const totalPayments = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
       const totalDownpayments = allTenants.reduce((sum, t) => sum + Number(t.downpayment_paid || 0), 0);
       const totalBookings = allTenants.reduce((sum, t) => sum + Number(t.booking_amount || 0), 0);
@@ -88,6 +106,7 @@ function AdminDashboard() {
 
       setStats({
         totalStock,
+        oldStock,
         activeRentals: active.length,
         overdueCount: overdue.length,
         totalCollections: totalCol,
@@ -95,6 +114,15 @@ function AdminDashboard() {
 
       setOverdueTenants(overdue.slice(0, 6));
       setRecentRentals(rentals.slice(0, 5));
+
+      // Fetch live Ward Fleet Distribution
+      try {
+        const wbRes = await api.get('/api/models/ward-breakdown');
+        if (wbRes.data?.success) {
+          const wb = wbRes.data.data || [];
+          setWardFleet(wb.filter((w) => w.total_stock > 0));
+        }
+      } catch (_) {}
     } catch (err) {
       console.error('Error loading dashboard data:', err);
     } finally {
@@ -107,7 +135,8 @@ function AdminDashboard() {
       staggerFadeIn('.gsap-admin-kpi', { stagger: 0.08, y: 15, duration: 0.5, hover: true });
       staggerFadeIn('.gsap-admin-row', { stagger: 0.04, y: 10, duration: 0.4, delay: 0.1 });
 
-      animateCounter('#gsap-admin-stock', stats.totalStock, { suffix: ' units', duration: 0.8 });
+      animateCounter('#gsap-admin-stock-new', stats.totalStock, { duration: 0.8 });
+      animateCounter('#gsap-admin-stock-old', stats.oldStock, { duration: 0.8 });
       animateCounter('#gsap-admin-active', stats.activeRentals, { suffix: ' tenants', duration: 0.8 });
       animateCounter('#gsap-admin-overdue', stats.overdueCount, { suffix: ' cases', duration: 0.8 });
       animateCounter('#gsap-admin-collections', stats.totalCollections, { prefix: '₹', duration: 1.2 });
@@ -125,69 +154,41 @@ function AdminDashboard() {
         {/* KPI Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* Available Stock */}
-          <div className="gsap-admin-kpi group rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all cursor-default relative">
+          <div className="gsap-admin-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-5 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] flex items-center justify-between transition-all relative">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Available EV Stock
               </p>
-              <h3 id="gsap-admin-stock" className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-                {loading ? <Spinner size="sm" /> : `${stats.totalStock} units`}
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1 flex items-baseline gap-2">
+                {loading ? <Spinner size="sm" /> : (
+                  <>
+                    <span title="Brand New Stock">
+                      <span id="gsap-admin-stock-new">{stats.totalStock}</span>
+                      <span className="text-sm font-medium text-slate-500 ml-1">New</span>
+                    </span>
+                    <span className="text-sm font-medium text-slate-300 dark:text-slate-600">|</span>
+                    <span title="Returned/Refurbished Stock" className="text-amber-600 dark:text-amber-500">
+                      <span id="gsap-admin-stock-old">{stats.oldStock}</span>
+                      <span className="text-sm font-medium text-amber-500/70 ml-1">Used</span>
+                    </span>
+                  </>
+                )}
               </h3>
-              
-              {/* Default Subtitle */}
-              <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium mt-1 absolute transition-all duration-300 group-hover:opacity-0 group-hover:-translate-y-2">
+
+              <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium mt-1">
                 Ready for deployment
               </p>
-              
-              {/* Hover Stats */}
-              <div className="absolute text-[11px] font-medium mt-1 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none flex items-center gap-1.5">
-                <span className="text-blue-600 dark:text-blue-400">{stats.totalStock} Free</span>
-                <span className="text-slate-300">•</span>
-                <span className="text-emerald-500">{stats.activeRentals} Rented</span>
-              </div>
+              <Link
+                href="/models?tab=ward_breakdown"
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline mt-1"
+              >
+                <span>View Ward Breakdown</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
             </div>
-            
-            <div className="relative h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 overflow-hidden">
-              {/* Default Icon */}
-              <Bike className="h-6 w-6 absolute transition-all duration-300 group-hover:scale-50 group-hover:opacity-0" />
-              
-              {/* Circle Analytics - Appears on hover */}
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transform scale-50 group-hover:scale-100 transition-all duration-300">
-                <svg className="w-10 h-10 transform -rotate-90">
-                  <circle
-                    cx="20"
-                    cy="20"
-                    r="16"
-                    stroke="currentColor"
-                    strokeWidth="3.5"
-                    fill="transparent"
-                    className="text-blue-200/50 dark:text-blue-900/30"
-                  />
-                  <circle
-                    cx="20"
-                    cy="20"
-                    r="16"
-                    stroke="currentColor"
-                    strokeWidth="3.5"
-                    fill="transparent"
-                    strokeDasharray={2 * Math.PI * 16}
-                    strokeDashoffset={
-                      stats.totalStock + stats.activeRentals > 0 
-                      ? (2 * Math.PI * 16) - ((stats.totalStock / (stats.totalStock + stats.activeRentals)) * 100 / 100) * (2 * Math.PI * 16)
-                      : (2 * Math.PI * 16)
-                    }
-                    strokeLinecap="round"
-                    className="text-blue-500 transition-all duration-1000 ease-out delay-100"
-                  />
-                </svg>
-                <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-[9px] font-black text-slate-700 dark:text-slate-200">
-                    {stats.totalStock + stats.activeRentals > 0 
-                      ? Math.round((stats.totalStock / (stats.totalStock + stats.activeRentals)) * 100) 
-                      : 0}%
-                  </span>
-                </div>
-              </div>
+
+            <div className="relative h-12 w-12 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <Bike className="h-6 w-6" />
             </div>
           </div>
 
@@ -282,6 +283,62 @@ function AdminDashboard() {
           </Link>
         </div>
 
+        {/* Live Delhi Ward Fleet Distribution */}
+        {!selectedBranch && wardFleet.length > 0 && (
+          <div className="p-5 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-emerald-500" />
+                  <span>Ward EV Fleet Distribution (Live)</span>
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Real-time stock readiness across active Delhi municipal wards
+                </p>
+              </div>
+              <Link
+                href="/models?tab=ward_breakdown"
+                className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+              >
+                <span>View All 46 Wards</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+              {wardFleet.map((w) => (
+                <Link
+                  key={w.id}
+                  href="/models?tab=ward_breakdown"
+                  className="p-3.5 rounded-xl border border-slate-200/80 dark:border-white/5 bg-slate-50/80 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all flex flex-col justify-between group"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-blue-500 uppercase">
+                        Ward #{w.ward_no}
+                      </span>
+                      <p className="text-sm font-black text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors">
+                        {w.name}
+                      </p>
+                      <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                        <MapPin className="w-3 h-3" />
+                        <span>{w.ward_area || 'Delhi'}</span>
+                      </p>
+                    </div>
+                    <span className="text-xs font-black text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                      {w.total_stock} EVs
+                    </span>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-slate-200/60 dark:border-white/5 text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                    {w.models.filter((m) => m.stock > 0).map((m) => `${m.name}: ${m.stock}`).join(' • ') || 'Allocated stock ready'}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Overdue Priority Alert Card */}
           <div className="lg:col-span-2">
@@ -313,42 +370,42 @@ function AdminDashboard() {
                 <>
                   <div className="divide-y divide-slate-100 dark:divide-white/5 max-h-[320px] overflow-y-auto pr-1">
                     {overdueTenants.map((tenant) => (
-                    <div
-                      key={tenant.id}
-                      className="py-3.5 flex items-center justify-between gap-4 hover:bg-slate-50/70 dark:hover:bg-white/5 rounded-xl px-2 transition-smooth"
-                    >
-                      <div className="min-w-0">
-                        <Link
-                          href={`/rentals/${tenant.id}`}
-                          className="text-sm font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block"
-                        >
-                          {tenant.name}
-                        </Link>
-                        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                          <span className="flex items-center gap-1">
-                            <Phone className="h-3 w-3" /> {tenant.phone}
-                          </span>
-                          <span>•</span>
-                          <span>{tenant.ev_models?.name || 'EV Model'}</span>
+                      <div
+                        key={tenant.id}
+                        className="py-3.5 flex items-center justify-between gap-4 hover:bg-slate-50/70 dark:hover:bg-white/5 rounded-xl px-2 transition-smooth"
+                      >
+                        <div className="min-w-0">
+                          <Link
+                            href={`/rentals/${tenant.id}`}
+                            className="text-sm font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block"
+                          >
+                            {tenant.name}
+                          </Link>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                            <span className="flex items-center gap-1">
+                              <Phone className="h-3 w-3" /> {tenant.phone}
+                            </span>
+                            <span>•</span>
+                            <span>{tenant.ev_models?.name || 'EV Model'}</span>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-3 shrink-0">
-                        <div className="text-right">
-                          <Badge status="overdue" size="sm">
-                            {tenant.computed_balance?.daysOverdue} days overdue
-                          </Badge>
-                          <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-1">
-                            {formatCurrency(tenant.computed_balance?.outstanding)}
-                          </p>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <Badge status="overdue" size="sm">
+                              {tenant.computed_balance?.daysOverdue} days overdue
+                            </Badge>
+                            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-1">
+                              {formatCurrency(tenant.computed_balance?.outstanding)}
+                            </p>
+                          </div>
+                          <Link href={`/rentals/${tenant.id}`}>
+                            <Button variant="outline" size="sm">
+                              Collect
+                            </Button>
+                          </Link>
                         </div>
-                        <Link href={`/rentals/${tenant.id}`}>
-                          <Button variant="outline" size="sm">
-                            Collect
-                          </Button>
-                        </Link>
                       </div>
-                    </div>
                     ))}
                   </div>
                   <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/5 text-center">
@@ -393,20 +450,20 @@ function AdminDashboard() {
                 <>
                   <div className="divide-y divide-slate-100 dark:divide-white/5 max-h-[320px] overflow-y-auto pr-1">
                     {recentRentals.map((r) => (
-                    <div key={r.id} className="py-3 flex items-center justify-between hover:bg-slate-50/70 dark:hover:bg-white/5 rounded-xl px-2 transition-smooth">
-                      <div className="min-w-0">
-                        <Link
-                          href={`/rentals/${r.id}`}
-                          className="text-xs font-bold text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 truncate block"
-                        >
-                          {r.name}
-                        </Link>
-                        <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
-                          {formatDate(r.created_at)}
-                        </p>
+                      <div key={r.id} className="py-3 flex items-center justify-between hover:bg-slate-50/70 dark:hover:bg-white/5 rounded-xl px-2 transition-smooth">
+                        <div className="min-w-0">
+                          <Link
+                            href={`/rentals/${r.id}`}
+                            className="text-xs font-bold text-slate-800 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 truncate block"
+                          >
+                            {r.name}
+                          </Link>
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                            {formatDate(r.created_at)}
+                          </p>
+                        </div>
+                        <Badge status={r.status} size="sm" />
                       </div>
-                      <Badge status={r.status} size="sm" />
-                    </div>
                     ))}
                   </div>
                   <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/5 text-center">

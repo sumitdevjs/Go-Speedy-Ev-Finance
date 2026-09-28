@@ -101,7 +101,9 @@ export default function TenantDetailPage() {
           phone: t.phone || '',
           address: t.address || '',
           chassis_no: t.chassis_no || '',
-          motor_ctrl_no: t.motor_ctrl_no || '',
+          motor_no: t.motor_no || '',
+          controller_no: t.controller_no || '',
+          charger_no: t.charger_no || '',
           battery_no: t.battery_no || '',
           date_of_purchase: t.date_of_purchase ? t.date_of_purchase.split('T')[0] : '',
           rto_type: t.rto_type || '',
@@ -536,14 +538,44 @@ export default function TenantDetailPage() {
               <div>
                 {isEditMode ? (
                   <Input
-                    label="Motor Controller"
-                    value={editData.motor_ctrl_no}
-                    onChange={(e) => setEditData({ ...editData, motor_ctrl_no: e.target.value })}
+                    label="Motor Number"
+                    value={editData.motor_no}
+                    onChange={(e) => setEditData({ ...editData, motor_no: e.target.value })}
                   />
                 ) : (
                   <>
-                    <p className="font-bold text-slate-400 uppercase text-[10px]">Motor Controller</p>
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.motor_ctrl_no || '—'}</p>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Motor Number</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.motor_no || '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Controller Number"
+                    value={editData.controller_no}
+                    onChange={(e) => setEditData({ ...editData, controller_no: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Controller Number</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.controller_no || '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Charger Number"
+                    value={editData.charger_no}
+                    onChange={(e) => setEditData({ ...editData, charger_no: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Charger Number</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.charger_no || '—'}</p>
                   </>
                 )}
               </div>
@@ -1237,7 +1269,6 @@ export default function TenantDetailPage() {
                 { label: 'Scooty Insurance', url: signedDocs.scooty_insurance_url, path: tenant.scooty_insurance_path, docType: 'scooty_insurance_path' },
                 { label: 'Rider Insurance', url: signedDocs.rider_insurance_url, path: tenant.rider_insurance_path, docType: 'rider_insurance_path' },
                 { label: 'Rider License', url: signedDocs.rider_license_url, path: tenant.rider_license_path, docType: 'rider_license_path' },
-                { label: 'AMC Document', url: signedDocs.amc_doc_url, path: tenant.amc_doc_path, docType: 'amc_doc_path' },
               ].map((item, idx) => (
                 isEditMode ? (
                   <div key={idx} className="mb-4">
@@ -1431,8 +1462,8 @@ export default function TenantDetailPage() {
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-700 dark:text-slate-300">
-            Are you sure you want to cancel the {tenant.status === 'direct_purchase' ? 'purchase' : 'rental'} contract for <span className="font-bold">{tenant.name}</span>?
-            The EV model stock will automatically increase by 1 in the inventory.
+            Are you sure you want to cancel the {tenant.status === 'direct_purchase' ? 'purchase' : 'rental'} contract for <span className="font-bold">{tenant.name}</span>? 
+            This vehicle will be moved to the Returned / Refurbished EVs pool and become available for future rentals or purchases.
           </p>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">

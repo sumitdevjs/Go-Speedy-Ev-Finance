@@ -14,6 +14,7 @@ import Pagination from '../../../components/ui/Pagination';
 import api from '../../../lib/api';
 import { formatCurrency, formatDate } from '../../../lib/constants';
 import { staggerFadeIn } from '../../../lib/gsap';
+import { useAuthStore } from '../../../store/authStore';
 
 export default function RentalsListPage() {
   const router = useRouter();
@@ -29,10 +30,11 @@ export default function RentalsListPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const { selectedBranch } = useAuthStore();
 
   useEffect(() => {
     fetchRentals();
-  }, [search, statusFilter, overdueFilter, insuranceFilter, page, showCancelled]);
+  }, [search, statusFilter, overdueFilter, insuranceFilter, page, showCancelled, selectedBranch]);
 
   // One-time entrance for the header/filter chrome when the page first mounts.
   useEffect(() => {
@@ -189,11 +191,11 @@ export default function RentalsListPage() {
               variant="primary"
               size="sm"
               icon={Plus}
-              className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-3 xs:py-1.5"
+              className="h-8.5 px-2.5 sm:px-3 text-xs font-bold shrink-0"
               title="Issue New Rental"
             >
               <span className="hidden sm:inline">Issue New Rental</span>
-              <span className="hidden xs:inline sm:hidden">New</span>
+              <span className="sm:hidden">New Rental</span>
             </Button>
           </Link>
         }

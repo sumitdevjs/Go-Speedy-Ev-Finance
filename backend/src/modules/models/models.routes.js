@@ -19,16 +19,20 @@ const createModelSchema = z.object({
 });
 
 const stockLogSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().optional(),
   date: z.string(),
   stock_added: z.number(),
-  ward_area: z.string()
+  ward_area: z.string().optional(),
+  branch_id: z.string().nullable().optional(),
+  ward_no: z.number().nullable().optional(),
 });
 
 const addStockSchema = z.object({
   date: z.string(),
   stock_added: z.number().int().positive(),
-  ward_area: z.string().min(1)
+  ward_area: z.string().optional(),
+  branch_id: z.string().nullable().optional(),
+  ward_no: z.number().nullable().optional(),
 });
 
 const updateModelSchema = z.object({
@@ -58,6 +62,20 @@ const validateBody = (schema) => (req, res, next) => {
  *         description: Full list of models
  */
 router.get('/dropdown', modelsController.getAllForDropdown.bind(modelsController));
+
+/**
+ * @openapi
+ * /api/models/ward-breakdown:
+ *   get:
+ *     summary: List stock distribution matrix across all Delhi municipal wards
+ *     tags: [Models]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Full breakdown of stock per ward and per model
+ */
+router.get('/ward-breakdown', modelsController.getWardBreakdown.bind(modelsController));
 
 /**
  * @openapi
