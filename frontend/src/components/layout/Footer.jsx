@@ -148,7 +148,7 @@ export default function DashboardFooter() {
                     Zero-Emission Fleet
                   </p>
                   <p className="text-[9px] sm:text-[10px] md:text-[11px] text-slate-500 dark:text-slate-400 mt-1 leading-none font-medium">
-                    Municipal EV Operations
+                    Smart Fleet Operations
                   </p>
                 </div>
               </div>

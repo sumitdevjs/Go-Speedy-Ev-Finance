@@ -46,8 +46,9 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Swagger Docs (enabled by default unless explicitly disabled)
-if (env.SWAGGER_ENABLED) {
+// Swagger Docs: strictly enabled ONLY in local testing/development; completely disabled in live production
+const isProduction = env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+if (env.SWAGGER_ENABLED && !isProduction) {
   app.get(['/api/docs', '/api/docs/'], (req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.send(`
@@ -122,7 +123,7 @@ const PORT = env.PORT || 5000;
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT} in ${env.NODE_ENV} mode`);
-    if (env.SWAGGER_ENABLED) {
+    if (env.SWAGGER_ENABLED && !isProduction) {
       console.log(`📄 Swagger docs available at http://localhost:${PORT}/api/docs`);
     }
   });

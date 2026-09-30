@@ -165,7 +165,7 @@ export default function RootPage() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span>Delhi-NCR Municipal EV Network • 50 Active Wards</span>
+              <span>Delhi-NCR Smart EV Mobility Network • Live Operations</span>
             </div>
 
             {/* Authoritative Headline */}
@@ -178,7 +178,7 @@ export default function RootPage() {
 
             {/* Subtitle */}
             <p className="text-sm xl:text-base text-slate-600 dark:text-slate-300/85 mt-3.5 leading-relaxed font-normal">
-              Unified operating portal for ward-level scooter deployment, battery telemetry, automated rent reconciliation, and multi-tier fleet access.
+              Unified enterprise portal for city-wide scooter deployment, battery telemetry, automated rent reconciliation, and multi-tier fleet access.
             </p>
 
             {/* 3 Metric Cards */}
@@ -187,8 +187,8 @@ export default function RootPage() {
                 <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-3 group-hover:scale-105 transition-transform">
                   <Car className="w-4 h-4" />
                 </div>
-                <div className="text-lg xl:text-xl font-bold text-slate-900 dark:text-white tracking-tight">50 Wards</div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">Autonomous NCR Coverage</div>
+                <div className="text-lg xl:text-xl font-bold text-slate-900 dark:text-white tracking-tight">Connected Fleet</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">Multi-Zone NCR Network</div>
               </div>
 
               <div className="p-4 rounded-2xl bg-white/90 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-900/80 border border-slate-200/90 dark:border-white/[0.08] hover:border-teal-500/40 backdrop-blur-md transition-all group shadow-sm dark:shadow-none">
@@ -209,13 +209,13 @@ export default function RootPage() {
             </div>
 
             {/* Bottom Status / Security Bar */}
-            <div className="mt-8 pt-5 border-t border-slate-200/80 dark:border-white/[0.08] max-w-[640px] flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-              <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Enterprise 3-Tier Security (Super Admin • Ward • Counter)</span>
+            <div className="mt-8 pt-5 border-t border-slate-200/80 dark:border-white/[0.08] max-w-[460px] flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+              <div className="flex items-center gap-2 min-w-0">
+                <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span className="whitespace-nowrap font-medium">Enterprise RBAC Security</span>
               </div>
-              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold shrink-0 whitespace-nowrap">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                 <span>Grid Operational</span>
               </div>
             </div>
@@ -225,13 +225,13 @@ export default function RootPage() {
           <div className="desk:hidden text-center mb-3 sm:mb-5">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-400 text-xs font-semibold tracking-wider mb-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Delhi-NCR • 50 Municipal Wards</span>
+              <span>Delhi-NCR • Smart Fleet Operations</span>
             </div>
             <h1 className="text-2xl xs:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               EV Fleet &amp; Rental Portal
             </h1>
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-[320px] mx-auto leading-relaxed">
-              Sign in to manage your ward fleet, rentals, and daily collections.
+              Sign in to manage fleet operations, rentals, and daily collections.
             </p>
           </div>
 
@@ -249,7 +249,7 @@ export default function RootPage() {
                   Welcome Back
                 </h2>
                 <p className="hidden desk:block text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                  Sign in to access your ward fleet, rentals, and finance.
+                  Sign in to access fleet operations, rentals, and finance.
                 </p>
               </div>
 
@@ -269,8 +269,8 @@ export default function RootPage() {
                   </label>
                   <div className="relative group">
                     <span className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${error && (error.toLowerCase().includes('phone') || error.toLowerCase().includes('email') || error.toLowerCase().includes('account') || (!identifier && error))
-                        ? 'text-rose-500'
-                        : 'text-slate-400 group-focus-within:text-emerald-500'
+                      ? 'text-rose-500'
+                      : 'text-slate-400 group-focus-within:text-emerald-500'
                       }`}>
                       <User size={16} />
                     </span>
@@ -278,8 +278,8 @@ export default function RootPage() {
                       id="identifier"
                       type="text"
                       className={`w-full bg-slate-50/90 hover:bg-slate-100/80 dark:bg-[#0d1629]/95 dark:hover:bg-[#101b33] border ${error && (error.toLowerCase().includes('phone') || error.toLowerCase().includes('email') || error.toLowerCase().includes('account') || (!identifier && error))
-                          ? 'border-rose-500 ring-1 ring-rose-500/40 text-rose-600 dark:text-rose-300'
-                          : 'border-slate-300/90 dark:border-slate-700/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-slate-900 dark:text-white'
+                        ? 'border-rose-500 ring-1 ring-rose-500/40 text-rose-600 dark:text-rose-300'
+                        : 'border-slate-300/90 dark:border-slate-700/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-slate-900 dark:text-white'
                         } rounded-xl pl-11 pr-4 py-3 sm:py-3.5 text-base sm:text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none transition-all font-sans`}
                       value={identifier}
                       onChange={(e) => {
@@ -298,8 +298,8 @@ export default function RootPage() {
                   </label>
                   <div className="relative group">
                     <span className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${error && (error.toLowerCase().includes('password') || error.toLowerCase().includes('pass') || (!password && error))
-                        ? 'text-rose-500'
-                        : 'text-slate-400 group-focus-within:text-emerald-500'
+                      ? 'text-rose-500'
+                      : 'text-slate-400 group-focus-within:text-emerald-500'
                       }`}>
                       <Lock size={16} />
                     </span>
@@ -307,8 +307,8 @@ export default function RootPage() {
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       className={`w-full bg-slate-50/90 hover:bg-slate-100/80 dark:bg-[#0d1629]/95 dark:hover:bg-[#101b33] border ${error && (error.toLowerCase().includes('password') || error.toLowerCase().includes('pass') || (!password && error))
-                          ? 'border-rose-500 ring-1 ring-rose-500/40 text-rose-600 dark:text-rose-300'
-                          : 'border-slate-300/90 dark:border-slate-700/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-slate-900 dark:text-white'
+                        ? 'border-rose-500 ring-1 ring-rose-500/40 text-rose-600 dark:text-rose-300'
+                        : 'border-slate-300/90 dark:border-slate-700/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-slate-900 dark:text-white'
                         } rounded-xl pl-11 pr-11 py-3 sm:py-3.5 text-base sm:text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none transition-all font-sans`}
                       value={password}
                       onChange={(e) => {
@@ -356,8 +356,8 @@ export default function RootPage() {
             {/* Mobile quick metrics strip (shown only on phone/tablet under the card) */}
             <div className="desk:hidden mt-3.5 w-full grid grid-cols-3 gap-2 text-center">
               <div className="p-2 sm:p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/60 border border-slate-200/80 dark:border-white/[0.06] backdrop-blur-sm shadow-xs">
-                <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white tracking-tight">50 Wards</div>
-                <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Municipal Grid</div>
+                <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white tracking-tight">Delhi-NCR</div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Smart Network</div>
               </div>
               <div className="p-2 sm:p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/60 border border-slate-200/80 dark:border-white/[0.06] backdrop-blur-sm shadow-xs">
                 <div className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">100% Digital</div>
@@ -380,9 +380,6 @@ export default function RootPage() {
             <span className="hidden sm:inline"> • </span>
             <br className="sm:hidden" />
             <span>Electric Mobility Rental &amp; Finance</span>
-          </div>
-          <div className="text-[10px] xs:text-[11px] text-slate-400 dark:text-slate-500">
-            Developed by Yana Malhotra, Harsh Raj Singh, Sumit Tripathi &amp; Sanchit Aggarwal
           </div>
         </div>
         <div className="flex items-center gap-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white cursor-pointer transition-colors text-[11px] xs:text-xs">

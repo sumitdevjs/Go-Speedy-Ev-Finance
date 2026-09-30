@@ -19,12 +19,28 @@ const nextConfig = {
 
   // Redirect old /login route to root (login is now on the landing page)
   async redirects() {
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
     return [
       {
         source: '/login',
         destination: '/',
         permanent: true,
       },
+      // In live production, block Swagger docs from ever being exposed on the frontend
+      ...(isProduction
+        ? [
+          {
+            source: '/api/docs',
+            destination: '/',
+            permanent: false,
+          },
+          {
+            source: '/api/docs/:path*',
+            destination: '/',
+            permanent: false,
+          },
+        ]
+        : []),
     ];
   },
 };
