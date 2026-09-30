@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Users, Plus, Phone, AlertTriangle, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Users, Plus, Phone, AlertTriangle, ArrowRight, CheckCircle2, Download } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
 import Button from '../../../components/ui/Button';
@@ -15,6 +15,7 @@ import api from '../../../lib/api';
 import { formatCurrency, formatDate } from '../../../lib/constants';
 import { staggerFadeIn } from '../../../lib/gsap';
 import { useAuthStore } from '../../../store/authStore';
+import { exportToExcel } from '../../../lib/exportToExcel';
 
 export default function RentalsListPage() {
   const router = useRouter();
@@ -84,6 +85,47 @@ export default function RentalsListPage() {
       console.error('Failed to load rentals:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadData = async () => {
+    try {
+      let query = `/api/rentals?page=1&limit=9999`;
+      if (search) query += `&search=${encodeURIComponent(search)}`;
+      if (showCancelled) {
+        query += `&status=cancelled`;
+      }
+      if (statusFilter === 'pending_docs') {
+        query += `&has_pending_docs=true`;
+      } else if (statusFilter === 'completed_docs') {
+        query += `&has_pending_docs=false`;
+      }
+      if (overdueFilter) query += `&overdue_days=${overdueFilter}`;
+      if (insuranceFilter) query += `&insurance_status=${insuranceFilter}`;
+
+      const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
+      query += `&branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`;
+
+      const res = await api.get(query);
+      if (res.data?.success) {
+        const dataToExport = res.data.data.map(row => ({
+          Name: row.name,
+          Phone: row.phone,
+          'EV Model': row.ev_models?.name || 'EV Scooter',
+          'Total Price': row.total_price,
+          Downpayment: row.downpayment_paid,
+          'Downpayment Mode': row.downpayment_mode || 'Cash',
+          'Outstanding Balance': row.computed_balance?.outstanding || 0,
+          'Days Overdue': row.computed_balance?.daysOverdue || 0,
+          'Contract Status': row.status,
+          'Pending Docs': row.has_pending_docs ? 'Yes' : 'No',
+          Created: formatDate(row.created_at)
+        }));
+        exportToExcel(dataToExport, 'Rentals_Data.xlsx');
+      }
+    } catch (err) {
+      console.error('Failed to download data:', err);
+      alert('Failed to download data.');
     }
   };
 
@@ -226,15 +268,27 @@ export default function RentalsListPage() {
       <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Filters and Search Bar */}
         <div className="gsap-filter-bar flex flex-col xl:flex-row flex-wrap items-stretch xl:items-center justify-between gap-3 sm:gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
-          <SearchBar
-            value={search}
-            onChange={(val) => {
-              setSearch(val);
-              setPage(1);
-            }}
-            placeholder="Search tenant name or phone..."
-            className="w-full xl:max-w-md xl:flex-1 min-w-0"
-          />
+          <div className="flex w-full xl:max-w-md xl:flex-1 min-w-0 gap-2 items-center">
+            <SearchBar
+              value={search}
+              onChange={(val) => {
+                setSearch(val);
+                setPage(1);
+              }}
+              placeholder="Search tenant name or phone..."
+              className="flex-1"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Download}
+              className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+              onClick={handleDownloadData}
+              title="Download Data as Excel"
+            >
+              <span className="hidden sm:inline">Download Data</span>
+            </Button>
+          </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full xl:w-auto shrink-0">
             <Button

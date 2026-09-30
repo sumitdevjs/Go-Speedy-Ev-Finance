@@ -19,7 +19,8 @@ import {
   User, 
   Phone, 
   Sparkles,
-  TrendingUp
+  TrendingUp,
+  Download
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Header from '../../../components/layout/Header';
@@ -39,6 +40,7 @@ import { staggerFadeIn } from '../../../lib/gsap';
 import { toast } from '../../../lib/toast';
 import { confirmDialog } from '../../../lib/confirmDialog';
 import { useAuthStore } from '../../../store/authStore';
+import { exportToExcel } from '../../../lib/exportToExcel';
 
 export default function ModelsPage() {
   const [activeTab, setActiveTab] = useState('new'); // 'new', 'old', or 'ward_breakdown'
@@ -198,6 +200,47 @@ export default function ModelsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDownloadNewModels = async () => {
+    try {
+      let query = `/api/models?page=1&limit=9999`;
+      if (search) query += `&search=${encodeURIComponent(search)}`;
+      if (stockStatus) query += `&stockStatus=${encodeURIComponent(stockStatus)}`;
+      if (activeFilter !== '') query += `&is_active=${activeFilter}`;
+      
+      const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
+      query += `&branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`;
+
+      const res = await api.get(query);
+      if (res.data?.success) {
+        const dataToExport = res.data.data.map(m => ({
+          'Model Name': m.name,
+          Company: m.company,
+          'Total Price': m.total_price,
+          'Total Global Stock': m.total_stock,
+          Status: m.is_active ? 'Active' : 'Cancelled',
+          Created: formatDate(m.created_at)
+        }));
+        exportToExcel(dataToExport, 'Master_Fleet_Models.xlsx');
+      }
+    } catch (err) {
+      console.error('Failed to download new models:', err);
+      alert('Failed to download data.');
+    }
+  };
+
+  const handleDownloadWardBreakdown = () => {
+    if (!wardBreakdown || wardBreakdown.length === 0) return;
+    const dataToExport = filteredWards.map(w => ({
+      'Ward ID': w.ward_id,
+      'Ward Name': w.ward_name,
+      'Area': w.area_name,
+      'Candidate Name': w.candidate_name,
+      'Total Stock': w.total_stock,
+      'Active Models': w.models_count
+    }));
+    exportToExcel(dataToExport, 'Ward_Stock_Matrix.xlsx');
   };
 
   const handleEditClick = (model) => {
@@ -614,15 +657,27 @@ export default function ModelsPage() {
           <>
             {/* Search & Filter Bar */}
             <div className="gsap-filter-bar flex flex-col xl:flex-row flex-wrap items-stretch xl:items-center justify-between gap-3 sm:gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
-              <SearchBar
-                value={search}
-                onChange={(val) => {
-                  setSearch(val);
-                  setPage(1);
-                }}
-                placeholder="Search model name, company or ward..."
-                className="w-full xl:max-w-md xl:flex-1 min-w-0"
-              />
+              <div className="flex w-full xl:max-w-md xl:flex-1 min-w-0 gap-2 items-center">
+                <SearchBar
+                  value={search}
+                  onChange={(val) => {
+                    setSearch(val);
+                    setPage(1);
+                  }}
+                  placeholder="Search model name, company or ward..."
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon={Download}
+                  className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  onClick={handleDownloadNewModels}
+                  title="Download Data as Excel"
+                >
+                  <span className="hidden sm:inline">Download Data</span>
+                </Button>
+              </div>
               <div className="w-full xl:w-auto flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0">
                 <Select
                   value={stockStatus}
@@ -815,12 +870,24 @@ export default function ModelsPage() {
 
             {/* Filter & Search Bar */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-white/10">
-              <SearchBar
-                value={wardSearch}
-                onChange={setWardSearch}
-                placeholder="Search by Ward name, ward number, area, or candidate..."
-                className="w-full sm:max-w-md sm:flex-1"
-              />
+              <div className="flex w-full sm:max-w-md sm:flex-1 min-w-0 gap-2 items-center">
+                <SearchBar
+                  value={wardSearch}
+                  onChange={setWardSearch}
+                  placeholder="Search by Ward name, ward number, area, or candidate..."
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon={Download}
+                  className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  onClick={handleDownloadWardBreakdown}
+                  title="Download Data as Excel"
+                >
+                  <span className="hidden sm:inline">Download Data</span>
+                </Button>
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"

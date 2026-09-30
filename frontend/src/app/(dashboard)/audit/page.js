@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, ChevronDown, ChevronUp, User, Clock } from 'lucide-react';
+import { ShieldCheck, ChevronDown, ChevronUp, User, Clock, Download } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
 import Pagination from '../../../components/ui/Pagination';
 import Badge from '../../../components/ui/Badge';
 import ProtectedRoute from '../../../components/layout/ProtectedRoute';
 import api from '../../../lib/api';
+import Button from '../../../components/ui/Button';
+import { exportToExcel } from '../../../lib/exportToExcel';
 
 // ── Human-readable action descriptions ──────────────────────────────────────
 const ACTION_LABELS = {
@@ -238,6 +240,26 @@ export default function AuditPage() {
     }
   };
 
+  const handleDownloadData = async () => {
+    try {
+      const res = await api.get(`/api/audit?page=1&limit=9999`);
+      if (res.data?.success) {
+        const dataToExport = res.data.data.map(log => ({
+          'When': new Date(log.created_at).toLocaleString('en-IN'),
+          'Done By': log.users?.name || 'System',
+          'Role': log.user_role,
+          'Action': log.action,
+          'Section': log.entity_type,
+          'Changes': JSON.stringify(log.changes)
+        }));
+        exportToExcel(dataToExport, 'Audit_Logs.xlsx');
+      }
+    } catch (err) {
+      console.error('Failed to download audit logs:', err);
+      alert('Failed to download data.');
+    }
+  };
+
   const columns = [
     {
       header: 'When',
@@ -330,6 +352,18 @@ export default function AuditPage() {
         />
 
         <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Download}
+              className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+              onClick={handleDownloadData}
+              title="Download Data as Excel"
+            >
+              <span className="hidden sm:inline">Download Data</span>
+            </Button>
+          </div>
           <Table
             columns={columns}
             data={logs}

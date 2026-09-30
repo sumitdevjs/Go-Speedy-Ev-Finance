@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { UserCheck, Plus, Key, UserX, AlertCircle, Pencil, MapPin, Building2 } from 'lucide-react';
+import { UserCheck, Plus, Key, UserX, AlertCircle, Pencil, MapPin, Building2, Download } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
 import Button from '../../../components/ui/Button';
@@ -18,6 +18,7 @@ import { formatDate } from '../../../lib/constants';
 import { toast } from '../../../lib/toast';
 import { confirmDialog } from '../../../lib/confirmDialog';
 import { staggerFadeIn } from '../../../lib/gsap';
+import { exportToExcel } from '../../../lib/exportToExcel';
 
 const ROLE_OPTIONS = [
   { value: 'staff', label: 'Staff / Field Operator (Ward Fleet & Collections)' },
@@ -112,6 +113,32 @@ export default function StaffPage() {
       console.error('Failed to load staff:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadData = async () => {
+    try {
+      let query = `/api/staff?page=1&limit=9999`;
+      if (search) query += `&search=${encodeURIComponent(search)}`;
+      if (activeFilter !== '') query += `&is_active=${activeFilter}`;
+      const res = await api.get(query);
+      if (res.data?.success) {
+        const dataToExport = res.data.data.map(user => ({
+          Name: user.name,
+          Email: user.email,
+          Phone: user.phone,
+          Role: ROLE_OPTIONS.find(r => r.value === user.role)?.label || user.role,
+          'Ward/Area': user.ward_area,
+          'Branch Name': user.branches?.name,
+          'Head Office': user.head_offices?.name,
+          Status: user.is_active ? 'Active' : 'Deactivated',
+          Created: formatDate(user.created_at)
+        }));
+        exportToExcel(dataToExport, 'Staff_Data.xlsx');
+      }
+    } catch (err) {
+      console.error('Failed to download staff data:', err);
+      alert('Failed to download data.');
     }
   };
 
@@ -426,15 +453,27 @@ export default function StaffPage() {
       <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Search & Filter Bar */}
         <div className="gsap-filter-bar flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-between gap-3 sm:gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
-          <SearchBar
-            value={search}
-            onChange={(val) => {
-              setSearch(val);
-              setPage(1);
-            }}
-            placeholder="Search name, phone or email..."
-            className="w-full sm:max-w-md sm:flex-1 min-w-0"
-          />
+          <div className="flex w-full sm:max-w-md sm:flex-1 min-w-0 gap-2 items-center">
+            <SearchBar
+              value={search}
+              onChange={(val) => {
+                setSearch(val);
+                setPage(1);
+              }}
+              placeholder="Search name, phone or email..."
+              className="flex-1"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Download}
+              className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+              onClick={handleDownloadData}
+              title="Download Data as Excel"
+            >
+              <span className="hidden sm:inline">Download Data</span>
+            </Button>
+          </div>
 
           <select
             value={activeFilter}

@@ -16,6 +16,7 @@ import {
   Award,
   Copy,
   Check,
+  Download,
 } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Card from '../../../components/ui/Card';
@@ -29,6 +30,7 @@ import Pagination from '../../../components/ui/Pagination';
 import api from '../../../lib/api';
 import { staggerFadeIn } from '../../../lib/gsap';
 import { useAuthStore } from '../../../store/authStore';
+import { exportToExcel } from '../../../lib/exportToExcel';
 
 export default function BranchesPage() {
   const { role } = useAuthStore();
@@ -106,6 +108,36 @@ export default function BranchesPage() {
       console.error('Failed to load branches:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadData = async () => {
+    try {
+      const params = {
+        page: 1,
+        limit: 9999,
+        search: search.trim() || undefined,
+        head_office_id: selectedHoFilter || undefined,
+      };
+      const res = await api.get('/api/branches', { params });
+      if (res.data?.success) {
+        const dataToExport = res.data.data.map(branch => ({
+          'Ward No': branch.ward_no,
+          'Ward Name': branch.name,
+          'Ward Code': branch.code,
+          'Area': branch.ward_area,
+          'Candidate/Contact': branch.contact_person,
+          Phone: branch.phone,
+          Address: branch.address,
+          'Head Office': branch.head_offices?.name,
+          'Total Stock': branch.total_stock || 0,
+          'Active Rentals': branch.active_rentals_count || 0
+        }));
+        exportToExcel(dataToExport, 'Branches_Wards_Data.xlsx');
+      }
+    } catch (err) {
+      console.error('Failed to download branches data:', err);
+      alert('Failed to download data.');
     }
   };
 
@@ -421,18 +453,30 @@ export default function BranchesPage() {
           </div>
 
           {/* Search Box */}
-          <div className="relative w-full lg:w-80 shrink-0">
-            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              placeholder="Search ward, candidate (e.g. Virk, Ginni), phone..."
-              className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+          <div className="flex w-full lg:w-auto items-center gap-2 shrink-0">
+            <div className="relative w-full lg:w-80 shrink-0">
+              <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search ward, candidate (e.g. Virk, Ginni), phone..."
+                className="w-full pl-9 pr-3 py-1.5 text-[13px] h-[38px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Download}
+              className="shrink-0 h-[38px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+              onClick={handleDownloadData}
+              title="Download Data as Excel"
+            >
+              <span className="hidden sm:inline">Download Data</span>
+            </Button>
           </div>
         </div>
 

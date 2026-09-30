@@ -19,6 +19,7 @@ import {
   Calendar,
   Sparkles,
   CheckCircle2,
+  Download
 } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
@@ -36,6 +37,7 @@ import { staggerFadeIn } from '../../../lib/gsap';
 import { toast } from '../../../lib/toast';
 import { confirmDialog } from '../../../lib/confirmDialog';
 import { useAuthStore } from '../../../store/authStore';
+import { exportToExcel } from '../../../lib/exportToExcel';
 
 export default function BookingsPage() {
   const router = useRouter();
@@ -130,6 +132,38 @@ export default function BookingsPage() {
       console.error('Error fetching bookings:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadData = async () => {
+    try {
+      let bookingsQuery = `/api/bookings?page=1&limit=9999`;
+      if (search) bookingsQuery += `&search=${encodeURIComponent(search)}`;
+      if (statusFilter && statusFilter !== 'all') {
+        bookingsQuery += `&status=${statusFilter}`;
+      } else if (statusFilter === 'all') {
+        bookingsQuery += `&status=all`;
+      }
+
+      const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
+      bookingsQuery += `&branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`;
+
+      const res = await api.get(bookingsQuery);
+      if (res.data?.success) {
+        const dataToExport = res.data.data.map(b => ({
+          'Customer Name': b.name,
+          Phone: b.phone,
+          'EV Model': b.models?.name || b.custom_model_name || 'N/A',
+          'Booking Amount': b.booking_amount,
+          Status: b.status,
+          Notes: b.notes,
+          'Created At': formatDate(b.created_at)
+        }));
+        exportToExcel(dataToExport, 'Bookings_Data.xlsx');
+      }
+    } catch (err) {
+      console.error('Failed to download data:', err);
+      alert('Failed to download data.');
     }
   };
 
@@ -362,15 +396,27 @@ export default function BookingsPage() {
       <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Filter bar: Search + Status Filter Pills */}
         <div className="gsap-filter-bar flex flex-col md:flex-row flex-wrap items-stretch md:items-center justify-between gap-3 bg-white/95 dark:bg-slate-900/80 backdrop-blur-xl p-3 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs transition-colors">
-          <SearchBar
-            value={search}
-            onChange={(val) => {
-              setSearch(val);
-              setPage(1);
-            }}
-            placeholder="Search customer name or phone..."
-            className="w-full md:max-w-sm md:flex-1 min-w-0"
-          />
+          <div className="flex w-full md:max-w-sm md:flex-1 min-w-0 gap-2 items-center">
+            <SearchBar
+              value={search}
+              onChange={(val) => {
+                setSearch(val);
+                setPage(1);
+              }}
+              placeholder="Search customer name or phone..."
+              className="flex-1"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Download}
+              className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+              onClick={handleDownloadData}
+              title="Download Data as Excel"
+            >
+              <span className="hidden sm:inline">Download Data</span>
+            </Button>
+          </div>
 
           {/* Status filter tabs for 1-tap mobile filtering */}
           <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 md:pb-0 scrollbar-thin shrink-0">
