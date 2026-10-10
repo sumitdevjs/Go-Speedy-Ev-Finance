@@ -41,6 +41,8 @@ export default function DashboardPage() {
         <StaffDashboard />
       ) : role === 'branch_admin' ? (
         <BranchDashboard />
+      ) : role === 'ho_admin' ? (
+        <HoDashboard />
       ) : (
         <AdminDashboard />
       )}

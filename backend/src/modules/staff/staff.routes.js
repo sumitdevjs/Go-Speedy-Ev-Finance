@@ -2,13 +2,13 @@ const express = require('express');
 const { z } = require('zod');
 const staffController = require('./staff.controller');
 const requireAuth = require('../../middleware/auth');
-const { requireAdmin } = require('../../middleware/roleGuard');
+const { requireBranchAdmin } = require('../../middleware/roleGuard');
 const requestLogger = require('../../middleware/requestLogger');
 const router = express.Router();
 
-// Apply auth and admin guard to all staff routes
+// Apply auth and branch/ho/super admin guard to staff routes
 router.use(requireAuth);
-router.use(requireAdmin);
+router.use(requireBranchAdmin);
 
 // Validation Schemas
 const passwordSchema = z.string()

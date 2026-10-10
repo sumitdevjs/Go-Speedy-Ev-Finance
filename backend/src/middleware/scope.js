@@ -2,7 +2,7 @@
  * Scoping middleware & query helpers for Multi-Branch and Head-Office Hierarchy
  */
 
-let hasBranchSupport = false;
+let hasBranchSupport = true;
 
 const checkBranchSupport = async () => {
   try {

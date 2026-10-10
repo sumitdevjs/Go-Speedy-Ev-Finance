@@ -40,7 +40,7 @@ class StaffController {
   async update(req, res) {
     try {
       const { id } = req.params;
-      const { data, diff } = await staffService.updateStaff(id, req.body, req.user.id);
+      const { data, diff } = await staffService.updateStaff(id, req.body, req.user.id, req);
       await logAudit({
         userId: req.user.id,
         userRole: req.user.role,

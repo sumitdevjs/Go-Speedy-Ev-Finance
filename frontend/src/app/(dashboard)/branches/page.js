@@ -33,12 +33,13 @@ import { useAuthStore } from '../../../store/authStore';
 import { exportToExcel } from '../../../lib/exportToExcel';
 
 export default function BranchesPage() {
-  const { role } = useAuthStore();
+  const { role, user } = useAuthStore();
   const isSuperAdmin = role === 'super_admin' || role === 'admin';
+  const isHoAdmin = role === 'ho_admin';
 
   const [branches, setBranches] = useState([]);
   const [headOffices, setHeadOffices] = useState([]);
-  const [selectedHoFilter, setSelectedHoFilter] = useState('');
+  const [selectedHoFilter, setSelectedHoFilter] = useState(isHoAdmin ? (user?.head_office_id || '') : '');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -48,14 +49,16 @@ export default function BranchesPage() {
 
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreateHoOpen, setIsCreateHoOpen] = useState(false);
   const [isOverviewOpen, setIsOverviewOpen] = useState(false);
   const [overviewData, setOverviewData] = useState(null);
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [hoSubmitting, setHoSubmitting] = useState(false);
 
-  // Form state
+  // Form state for Branch
   const [formData, setFormData] = useState({
-    head_office_id: '',
+    head_office_id: isHoAdmin ? (user?.head_office_id || '') : '',
     ward_no: '',
     name: '',
     code: '',
@@ -65,9 +68,45 @@ export default function BranchesPage() {
     ward_area: '',
   });
 
+  // Form state for Head Office
+  const [hoFormData, setHoFormData] = useState({
+    name: '',
+    code: '',
+    city: '',
+    state: '',
+  });
+
+  const handleCreateHeadOffice = async (e) => {
+    e.preventDefault();
+    if (!hoFormData.name || !hoFormData.code || !hoFormData.city || !hoFormData.state) {
+      alert('Please fill in all Head Office fields.');
+      return;
+    }
+    try {
+      setHoSubmitting(true);
+      const res = await api.post('/api/head-offices', hoFormData);
+      if (res.data?.success) {
+        setIsCreateHoOpen(false);
+        setHoFormData({ name: '', code: '', city: '', state: '' });
+        await fetchHeadOffices();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to create Head Office');
+    } finally {
+      setHoSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     fetchHeadOffices();
   }, []);
+
+  // Sync HO filter when user profile loads for ho_admin
+  useEffect(() => {
+    if (isHoAdmin && user?.head_office_id && selectedHoFilter !== user.head_office_id) {
+      setSelectedHoFilter(user.head_office_id);
+    }
+  }, [isHoAdmin, user?.head_office_id]);
 
   // One-time entrance animation for the filter chrome
   useEffect(() => {
@@ -92,11 +131,12 @@ export default function BranchesPage() {
   const fetchBranches = async () => {
     try {
       setLoading(true);
+      const effectiveHoId = isHoAdmin ? (user?.head_office_id || selectedHoFilter) : (selectedHoFilter || undefined);
       const params = {
         page,
         limit: 15,
         search: search.trim() || undefined,
-        head_office_id: selectedHoFilter || undefined,
+        head_office_id: effectiveHoId || undefined,
       };
       const res = await api.get('/api/branches', { params });
       if (res.data?.success) {
@@ -113,11 +153,12 @@ export default function BranchesPage() {
 
   const handleDownloadData = async () => {
     try {
+      const effectiveHoId = isHoAdmin ? (user?.head_office_id || selectedHoFilter) : (selectedHoFilter || undefined);
       const params = {
         page: 1,
         limit: 9999,
         search: search.trim() || undefined,
-        head_office_id: selectedHoFilter || undefined,
+        head_office_id: effectiveHoId || undefined,
       };
       const res = await api.get('/api/branches', { params });
       if (res.data?.success) {
@@ -169,11 +210,15 @@ export default function BranchesPage() {
     e.preventDefault();
     try {
       setSubmitting(true);
-      const res = await api.post('/api/branches', formData);
+      const payload = {
+        ...formData,
+        head_office_id: isHoAdmin ? (user?.head_office_id || formData.head_office_id) : formData.head_office_id,
+      };
+      const res = await api.post('/api/branches', payload);
       if (res.data?.success) {
         setIsCreateOpen(false);
         setFormData({
-          head_office_id: '',
+          head_office_id: isHoAdmin ? (user?.head_office_id || '') : '',
           ward_no: '',
           name: '',
           code: '',
@@ -340,22 +385,57 @@ export default function BranchesPage() {
   return (
     <div>
       <Header
-        title="Branches & Wards"
-        subtitle="Delhi DSGMC Wards (46 Official Wards), In-Charge Candidates, Addresses & Regional Hierarchy"
+        title={
+          isHoAdmin
+            ? `${headOffices.find(h => h.id === user?.head_office_id)?.name || 'Head Office'} — Governed Branches`
+            : "Branches & Wards"
+        }
+        subtitle={
+          isHoAdmin
+            ? `Active operational branches and wards governed under ${headOffices.find(h => h.id === user?.head_office_id)?.name || 'this Head Office'}`
+            : "Delhi DSGMC Wards (46 Official Wards), In-Charge Candidates, Addresses & Regional Hierarchy"
+        }
         action={
-          isSuperAdmin ? (
-            <Button
-              variant="primary"
-              size="sm"
-              icon={Plus}
-              onClick={() => setIsCreateOpen(true)}
-              className="h-9 px-3 sm:px-4 text-xs font-bold shrink-0 shadow-xs"
-              title="Add New Ward / Branch"
-            >
-              <span className="hidden sm:inline">Add New Ward / Branch</span>
-              <span className="sm:hidden">New Ward</span>
-            </Button>
-          ) : null
+          <div className="flex items-center gap-2">
+            {isSuperAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                icon={Building2}
+                onClick={() => setIsCreateHoOpen(true)}
+                className="h-9 px-3 text-xs font-bold shrink-0 shadow-xs"
+                title="Register New Head Office (Zone)"
+              >
+                <span className="hidden sm:inline">Add Head Office</span>
+                <span className="sm:hidden">New HO</span>
+              </Button>
+            )}
+            {(isSuperAdmin || isHoAdmin) && (
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Plus}
+                onClick={() => {
+                  setFormData({
+                    head_office_id: isHoAdmin ? (user?.head_office_id || '') : '',
+                    ward_no: '',
+                    name: '',
+                    code: '',
+                    contact_person: '',
+                    phone: '',
+                    address: '',
+                    ward_area: '',
+                  });
+                  setIsCreateOpen(true);
+                }}
+                className="h-9 px-3 sm:px-4 text-xs font-bold shrink-0 shadow-xs"
+                title="Add New Ward / Branch"
+              >
+                <span className="hidden sm:inline">Add New Ward / Branch</span>
+                <span className="sm:hidden">New Ward</span>
+              </Button>
+            )}
+          </div>
         }
       />
 
@@ -367,10 +447,14 @@ export default function BranchesPage() {
               <Building2 className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">Total Wards</p>
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
+                {isHoAdmin ? 'Zone Branches' : 'Total Wards'}
+              </p>
               <div className="flex items-baseline gap-1.5 flex-wrap mt-0.5">
-                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">46</span>
-                <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">Delhi Wards</span>
+                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">{totalItems}</span>
+                <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">
+                  {isHoAdmin ? 'Under This HO' : 'Delhi Wards'}
+                </span>
               </div>
             </div>
           </Card>
@@ -382,7 +466,9 @@ export default function BranchesPage() {
             <div className="min-w-0 flex-1">
               <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">Assigned In-Charges</p>
               <div className="flex items-baseline gap-1.5 flex-wrap mt-0.5">
-                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">46</span>
+                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+                  {branches.filter(b => b.contact_person).length}
+                </span>
                 <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">Candidates</span>
               </div>
             </div>
@@ -393,10 +479,18 @@ export default function BranchesPage() {
               <Award className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">Districts & Zones</p>
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
+                {isHoAdmin ? 'Regional Territory' : 'Districts & Zones'}
+              </p>
               <div className="flex items-baseline gap-1.5 flex-wrap mt-0.5">
-                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">5</span>
-                <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">Delhi Zones</span>
+                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white truncate">
+                  {isHoAdmin
+                    ? (headOffices.find(h => h.id === user?.head_office_id)?.city || 'Regional')
+                    : '5'}
+                </span>
+                <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">
+                  {isHoAdmin ? 'Head Office Hub' : 'Delhi Zones'}
+                </span>
               </div>
             </div>
           </Card>
@@ -406,10 +500,18 @@ export default function BranchesPage() {
               <MapPin className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">Head Offices</p>
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
+                {isHoAdmin ? 'HO Code' : 'Head Offices'}
+              </p>
               <div className="flex items-baseline gap-1.5 flex-wrap mt-0.5">
-                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">3</span>
-                <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">Regions</span>
+                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono">
+                  {isHoAdmin
+                    ? (headOffices.find(h => h.id === user?.head_office_id)?.code || 'HO')
+                    : '3'}
+                </span>
+                <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">
+                  {isHoAdmin ? 'Jurisdiction' : 'Regions'}
+                </span>
               </div>
             </div>
           </Card>
@@ -417,40 +519,56 @@ export default function BranchesPage() {
 
         {/* Filters & Head Office Tabs */}
         <div className="gsap-filter-bar flex flex-col lg:flex-row flex-wrap items-stretch lg:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-          {/* HO Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 lg:pb-0 scrollbar-thin">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedHoFilter('');
-                setPage(1);
-              }}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
-                selectedHoFilter === ''
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              All Regions (46 Delhi + NCR)
-            </button>
-            {headOffices.map((ho) => (
+          {/* HO Tabs: Rendered exclusively for Super Admin */}
+          {isSuperAdmin ? (
+            <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 lg:pb-0 scrollbar-thin">
               <button
-                key={ho.id}
                 type="button"
                 onClick={() => {
-                  setSelectedHoFilter(ho.id);
+                  setSelectedHoFilter('');
                   setPage(1);
                 }}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
-                  selectedHoFilter === ho.id
+                  selectedHoFilter === ''
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
-                {ho.name}
+                All Regions (46 Delhi + NCR)
               </button>
-            ))}
-          </div>
+              {headOffices.map((ho) => (
+                <button
+                  key={ho.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedHoFilter(ho.id);
+                    setPage(1);
+                  }}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
+                    selectedHoFilter === ho.id
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {ho.name}
+                </button>
+              ))}
+            </div>
+          ) : (
+            /* HO Admin gets a dedicated badge indicating their assigned Head Office jurisdiction */
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60">
+                <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span>{headOffices.find(h => h.id === user?.head_office_id)?.name || 'Assigned Head Office'}</span>
+                <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-blue-200/60 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200">
+                  {headOffices.find(h => h.id === user?.head_office_id)?.code || 'HO'}
+                </span>
+              </span>
+              <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:inline">
+                ({totalItems} {totalItems === 1 ? 'Branch' : 'Branches'} in Zone)
+              </span>
+            </div>
+          )}
 
           {/* Search Box */}
           <div className="flex w-full lg:w-auto items-center gap-2 shrink-0">
@@ -600,24 +718,36 @@ export default function BranchesPage() {
         subtitle="Create a new operating ward under a Head Office"
       >
         <form onSubmit={handleCreateSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Select Head Office *
-            </label>
-            <select
-              value={formData.head_office_id}
-              onChange={(e) => setFormData({ ...formData, head_office_id: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            >
-              <option value="">Select Head Office...</option>
-              {headOffices.map((ho) => (
-                <option key={ho.id} value={ho.id}>
-                  {ho.name} ({ho.city})
-                </option>
-              ))}
-            </select>
-          </div>
+          {isSuperAdmin ? (
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Select Head Office *
+              </label>
+              <select
+                value={formData.head_office_id}
+                onChange={(e) => setFormData({ ...formData, head_office_id: e.target.value })}
+                className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="">Select Head Office...</option>
+                {headOffices.map((ho) => (
+                  <option key={ho.id} value={ho.id}>
+                    {ho.name} ({ho.city})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="p-3 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-800/40 text-xs flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="font-semibold text-slate-700 dark:text-slate-300">Governing Head Office:</span>
+              </div>
+              <span className="font-bold text-blue-700 dark:text-blue-300">
+                {headOffices.find(h => h.id === user?.head_office_id)?.name || 'Assigned Head Office'}
+              </span>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Input
@@ -805,6 +935,63 @@ export default function BranchesPage() {
             </div>
           </div>
         ) : null}
+      </Modal>
+
+      {/* Register New Head Office Modal */}
+      <Modal
+        isOpen={isCreateHoOpen}
+        onClose={() => setIsCreateHoOpen(false)}
+        title="Register New Head Office (Zone)"
+        subtitle="Establish a new regional headquarters to govern regional branches"
+      >
+        <form onSubmit={handleCreateHeadOffice} className="space-y-4">
+          <Input
+            label="Head Office Name"
+            placeholder="e.g. Faridabad Head Office"
+            value={hoFormData.name}
+            onChange={(e) => setHoFormData({ ...hoFormData, name: e.target.value })}
+            required
+          />
+          <Input
+            label="Zonal Code (Short ID)"
+            placeholder="e.g. FAR-HO"
+            value={hoFormData.code}
+            onChange={(e) => setHoFormData({ ...hoFormData, code: e.target.value.toUpperCase() })}
+            required
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="City"
+              placeholder="e.g. Faridabad"
+              value={hoFormData.city}
+              onChange={(e) => setHoFormData({ ...hoFormData, city: e.target.value })}
+              required
+            />
+            <Input
+              label="State"
+              placeholder="e.g. Haryana"
+              value={hoFormData.state}
+              onChange={(e) => setHoFormData({ ...hoFormData, state: e.target.value })}
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsCreateHoOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={hoSubmitting}
+            >
+              {hoSubmitting ? 'Creating...' : 'Create Head Office'}
+            </Button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

@@ -1,15 +1,22 @@
 const supabase = require('../../config/db');
 const { ALL_HEAD_OFFICES } = require('../branches/delhiWardsData');
+const { calcBalance } = require('../../utils/balanceCalc');
 
 let inMemoryHeadOffices = [...ALL_HEAD_OFFICES];
 
 class HeadOfficesService {
-  async getAllHeadOffices() {
+  async getAllHeadOffices(user = {}) {
     try {
-      const { data, error } = await supabase
+      let queryBuilder = supabase
         .from('head_offices')
         .select('*, branches (id, name, code, ward_no, is_active)')
         .order('created_at', { ascending: true });
+
+      if (user && user.role === 'ho_admin' && user.head_office_id) {
+        queryBuilder = queryBuilder.eq('id', user.head_office_id);
+      }
+
+      const { data, error } = await queryBuilder;
 
       if (!error && data && data.length > 0) {
         return data;
@@ -18,17 +25,26 @@ class HeadOfficesService {
       // fallback
     }
 
+    if (user && user.role === 'ho_admin' && user.head_office_id) {
+      return inMemoryHeadOffices.filter(ho => ho.id === user.head_office_id || ho.code === user.head_office_id);
+    }
     return inMemoryHeadOffices;
   }
 
-  async getDropdown() {
+  async getDropdown(user = {}) {
     try {
-      const { data, error } = await supabase
+      let queryBuilder = supabase
         .from('head_offices')
         .select('id, name, code, city')
         .eq('is_active', true)
         .order('name', { ascending: true });
 
+      if (user && user.role === 'ho_admin' && user.head_office_id) {
+        queryBuilder = queryBuilder.eq('id', user.head_office_id);
+      }
+
+      const { data, error } = await queryBuilder;
+
       if (!error && data && data.length > 0) {
         return data;
       }
@@ -36,7 +52,12 @@ class HeadOfficesService {
       // fallback
     }
 
-    return inMemoryHeadOffices.map(ho => ({
+    let list = inMemoryHeadOffices;
+    if (user && user.role === 'ho_admin' && user.head_office_id) {
+      list = list.filter(ho => ho.id === user.head_office_id || ho.code === user.head_office_id);
+    }
+
+    return list.map(ho => ({
       id: ho.id,
       name: ho.name,
       code: ho.code,
@@ -44,7 +65,13 @@ class HeadOfficesService {
     }));
   }
 
-  async getById(id) {
+  async getById(id, user = {}) {
+    if (user && user.role === 'ho_admin' && user.head_office_id) {
+      if (id !== user.head_office_id) {
+        throw new Error('Access denied: You can only access your assigned Head Office');
+      }
+    }
+
     try {
       const { data, error } = await supabase
         .from('head_offices')
@@ -128,15 +155,35 @@ class HeadOfficesService {
   }
 
   async getHeadOfficeDashboard(headOfficeId, user = {}) {
-    // 1. Resolve Head Office ID (if not provided, default to user's head_office_id or del-ho-001)
-    let hoId = headOfficeId || user.head_office_id || 'del-ho-001';
+    // 1. Resolve Head Office (strictly locked for ho_admin)
+    let hoId = (user && user.role === 'ho_admin' && user.head_office_id)
+      ? user.head_office_id
+      : (headOfficeId || user.head_office_id);
+    let headOffice = null;
 
-    let headOffice;
-    try {
-      headOffice = await this.getById(hoId);
-    } catch {
-      headOffice = inMemoryHeadOffices[0] || {
-        id: hoId,
+    if (hoId) {
+      try {
+        headOffice = await this.getById(hoId, user);
+      } catch (e) {
+        headOffice = null;
+      }
+    }
+
+    if (!headOffice) {
+      try {
+        const { data: firstHo } = await supabase
+          .from('head_offices')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: true })
+          .limit(1);
+        headOffice = firstHo?.[0] || null;
+      } catch (e) {}
+    }
+
+    if (!headOffice) {
+      headOffice = {
+        id: '9bab7b7d-e935-4401-ba93-8eddc8b2b90e',
         name: 'Delhi Head Office',
         code: 'DEL-HO',
         city: 'New Delhi',
@@ -144,54 +191,233 @@ class HeadOfficesService {
       };
     }
 
-    // 2. Fetch branches belonging to this Head Office
-    const branchesService = require('../branches/branches.service');
-    const { data: branches } = await branchesService.getAllBranches(
-      { head_office_id: headOffice.id, limit: 300 },
-      user
-    );
+    // 2. Fetch all branches belonging to this Head Office
+    let branches = [];
+    try {
+      const { data: brData, error: brErr } = await supabase
+        .from('branches')
+        .select('*')
+        .eq('head_office_id', headOffice.id)
+        .order('ward_no', { ascending: true, nullsFirst: false });
+      if (!brErr && brData) branches = brData;
+    } catch (e) {}
 
-    // 3. Fetch models for inventory
+    const branchIds = branches.map(b => b.id);
+    const branchMap = new Map(branches.map(b => [b.id, b]));
+
+    // 3. Fetch branch admins assigned to these branches
+    let branchAdmins = new Map();
+    if (branchIds.length > 0) {
+      try {
+        const { data: adminUsers } = await supabase
+          .from('users')
+          .select('id, name, phone, branch_id, role, is_active')
+          .in('branch_id', branchIds)
+          .in('role', ['branch_admin', 'admin'])
+          .eq('is_active', true);
+        (adminUsers || []).forEach(u => {
+          if (u.branch_id && !branchAdmins.has(u.branch_id)) {
+            branchAdmins.set(u.branch_id, u);
+          }
+        });
+      } catch (e) {}
+    }
+
+    // 4. Fetch EV Models and Old EVs to compute zonal and branch stock
+    let allModels = [];
+    let branchStockMap = new Map();
     let totalStock = 0;
+
     try {
-      const { data: models } = await supabase
+      const { data: modelsData } = await supabase
         .from('ev_models')
-        .select('stock_count, is_active')
+        .select('id, name, company, total_price, stock_count, stock_logs, branch_id, head_office_id, is_active')
         .eq('is_active', true);
-      if (models && models.length > 0) {
-        totalStock = models.reduce((sum, m) => sum + (m.stock_count || 0), 0);
-      }
-    } catch {}
+      allModels = modelsData || [];
 
-    // 4. Fetch active rentals and payments
-    let activeRentals = 0;
-    let recentRentals = [];
-    let totalCollections = 0;
+      // Calculate total stock for this HO
+      const hoModels = allModels.filter(m => !m.head_office_id || m.head_office_id === headOffice.id);
+      totalStock = hoModels.reduce((sum, m) => sum + (m.stock_count || 0), 0);
 
+      // Attribute stock to branches via stock_logs
+      branches.forEach(branch => {
+        let bStock = 0;
+        allModels.forEach(m => {
+          const logs = Array.isArray(m.stock_logs) ? m.stock_logs : [];
+          const matchedLogs = logs.filter(log => {
+            if (log.branch_id) {
+              const bId = String(log.branch_id).trim().toLowerCase();
+              if (bId === String(branch.id).toLowerCase() || bId === String(branch.code).toLowerCase()) return true;
+              if (bId.replace(/[^a-z0-9]/g, '') === String(branch.name).toLowerCase().replace(/[^a-z0-9]/g, '')) return true;
+            }
+            if (log.ward_no && branch.ward_no && Number(log.ward_no) === Number(branch.ward_no)) return true;
+            if (log.ward_area) {
+              const lArea = String(log.ward_area).toLowerCase().replace(/[^a-z0-9]/g, '');
+              const bName = String(branch.name).toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (lArea === bName || lArea.includes(bName) || bName.includes(lArea)) return true;
+            }
+            return false;
+          });
+          bStock += matchedLogs.reduce((acc, l) => acc + (Number(l.stock_added) || 0), 0);
+        });
+        branchStockMap.set(branch.id, Math.max(0, bStock));
+      });
+    } catch (e) {}
+
+    // Add available old EVs to stock
     try {
-      const { data: rentals } = await supabase
+      let oldEvQuery = supabase.from('old_evs').select('id, branch_id, head_office_id, status').eq('status', 'available');
+      if (branchIds.length > 0) {
+        oldEvQuery = oldEvQuery.or(`head_office_id.eq.${headOffice.id},branch_id.in.(${branchIds.join(',')})`);
+      } else {
+        oldEvQuery = oldEvQuery.eq('head_office_id', headOffice.id);
+      }
+      const { data: oldEvs } = await oldEvQuery;
+      if (oldEvs && oldEvs.length > 0) {
+        totalStock += oldEvs.length;
+        oldEvs.forEach(ev => {
+          if (ev.branch_id && branchStockMap.has(ev.branch_id)) {
+            branchStockMap.set(ev.branch_id, (branchStockMap.get(ev.branch_id) || 0) + 1);
+          }
+        });
+      }
+    } catch (e) {}
+
+    // 5. Fetch Tenants (Rentals and Purchases) for this HO
+    let tenants = [];
+    try {
+      let tQuery = supabase
         .from('tenants')
-        .select('*, models:model_id (name, brand)')
+        .select('id, name, phone, status, branch_id, head_office_id, total_price, downpayment_paid, booking_amount, installment_daily_rate, start_date, expected_end_date, late_fee_daily_rate, ev_model_id, created_at, ev_models(name)')
         .order('created_at', { ascending: false });
-      if (rentals && rentals.length > 0) {
-        const active = rentals.filter((r) => r.status === 'rented');
-        activeRentals = active.length;
-        recentRentals = active.slice(0, 6);
+
+      if (branchIds.length > 0) {
+        tQuery = tQuery.or(`head_office_id.eq.${headOffice.id},branch_id.in.(${branchIds.join(',')})`);
+      } else {
+        tQuery = tQuery.eq('head_office_id', headOffice.id);
       }
 
-      const { data: payments } = await supabase.from('payments').select('amount');
-      if (payments && payments.length > 0) {
-        totalCollections = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-      }
-    } catch {}
+      const { data: tData } = await tQuery;
+      if (tData) tenants = tData;
+    } catch (e) {}
 
-    // 5. Build Ward Performance Matrix
-    const wardPerformance = (branches || []).map((b) => {
-      const wardNum = Number(b.ward_no) || 1;
-      const wardStock = wardNum <= 10 ? 8 : (wardNum <= 25 ? 5 : (wardNum % 4 === 0 ? 0 : 3));
-      const wardRentals = wardNum <= 8 ? 6 : (wardNum <= 20 ? 4 : 2);
-      const wardOverdue = (wardNum === 2 || wardNum === 9 || wardNum === 16 || wardNum === 28) ? 1 : 0;
-      const wardCollections = (wardRentals * 4500) + (wardStock * 1500);
+    const tenantIds = tenants.map(t => t.id);
+
+    // 6. Fetch Payments for these tenants and HO
+    let payments = [];
+    try {
+      let pQuery = supabase
+        .from('payments')
+        .select('id, tenant_id, amount, payment_date, mode, branch_id, head_office_id, created_at')
+        .order('created_at', { ascending: false });
+
+      if (branchIds.length > 0) {
+        pQuery = pQuery.or(`head_office_id.eq.${headOffice.id},branch_id.in.(${branchIds.join(',')})`);
+      } else {
+        pQuery = pQuery.eq('head_office_id', headOffice.id);
+      }
+
+      const { data: pData } = await pQuery;
+      if (pData) payments = pData;
+    } catch (e) {}
+
+    // Group payments by tenant
+    const paymentsByTenant = payments.reduce((acc, p) => {
+      acc[p.tenant_id] = (acc[p.tenant_id] || 0) + Number(p.amount || 0);
+      return acc;
+    }, {});
+
+    // Compute balances for all tenants
+    let activeRentals = 0;
+    let directPurchases = 0;
+    let overdueCount = 0;
+    let totalOutstanding = 0;
+    let overdueTenantsList = [];
+
+    const branchRentalsMap = new Map();
+    const branchOverdueMap = new Map();
+
+    tenants.forEach(tenant => {
+      const isRented = tenant.status === 'rented';
+      const isDirect = tenant.status === 'completed' || tenant.status === 'direct_purchase';
+
+      if (isRented) activeRentals++;
+      if (isDirect) directPurchases++;
+
+      if (tenant.branch_id) {
+        if (isRented) {
+          branchRentalsMap.set(tenant.branch_id, (branchRentalsMap.get(tenant.branch_id) || 0) + 1);
+        }
+      }
+
+      if (isRented) {
+        const totalPaid = paymentsByTenant[tenant.id] || 0;
+        const balance = calcBalance(tenant, totalPaid);
+        totalOutstanding += balance.outstanding || 0;
+
+        if (balance.daysOverdue > 0) {
+          overdueCount++;
+          if (tenant.branch_id) {
+            branchOverdueMap.set(tenant.branch_id, (branchOverdueMap.get(tenant.branch_id) || 0) + 1);
+          }
+
+          const br = branchMap.get(tenant.branch_id);
+          overdueTenantsList.push({
+            id: tenant.id,
+            name: tenant.name,
+            phone: tenant.phone,
+            model_name: tenant.ev_models?.name || 'EV Bike',
+            branch_id: tenant.branch_id,
+            branch_name: br ? br.name : 'Central Branch',
+            ward_no: br?.ward_no || null,
+            ward_code: br?.code || null,
+            daysOverdue: balance.daysOverdue,
+            outstanding: balance.outstanding,
+            totalLateFee: balance.totalLateFee || 0,
+            netTotalDue: balance.netTotalDue || balance.outstanding,
+          });
+        }
+      }
+    });
+
+    // Sort overdue watchlist by daysOverdue descending
+    overdueTenantsList.sort((a, b) => b.daysOverdue - a.daysOverdue);
+    const recentOverdue = overdueTenantsList.slice(0, 8);
+
+    // Revenue calculations
+    const todayStr = new Date().toISOString().split('T')[0];
+    let totalCollections = 0;
+    let todayCollections = 0;
+    let cashCollections = 0;
+    let onlineCollections = 0;
+    const branchCollectionsMap = new Map();
+
+    payments.forEach(p => {
+      const amt = Number(p.amount || 0);
+      totalCollections += amt;
+
+      if (p.payment_date === todayStr || (p.created_at && p.created_at.startsWith(todayStr))) {
+        todayCollections += amt;
+      }
+
+      if (p.mode === 'cash') cashCollections += amt;
+      else if (p.mode === 'online') onlineCollections += amt;
+
+      if (p.branch_id) {
+        branchCollectionsMap.set(p.branch_id, (branchCollectionsMap.get(p.branch_id) || 0) + amt);
+      }
+    });
+
+    const cashPercent = totalCollections > 0 ? Math.round((cashCollections / totalCollections) * 100) : 50;
+    const onlinePercent = totalCollections > 0 ? 100 - cashPercent : 50;
+
+    // 7. Build Real Ward / Branch Performance Matrix
+    const wardPerformance = branches.map(b => {
+      const bStock = branchStockMap.get(b.id) || 0;
+      const bRentals = branchRentalsMap.get(b.id) || 0;
+      const bOverdue = branchOverdueMap.get(b.id) || 0;
+      const bCollections = branchCollectionsMap.get(b.id) || 0;
+      const bAdmin = branchAdmins.get(b.id) || null;
 
       return {
         id: b.id,
@@ -199,37 +425,45 @@ class HeadOfficesService {
         code: b.code,
         ward_no: b.ward_no,
         ward_area: b.ward_area || b.name,
-        contact_person: b.contact_person || 'Assigned Officer',
-        phone: b.phone || '',
-        address: b.address || 'Delhi NCT',
+        contact_person: bAdmin ? bAdmin.name : (b.contact_person || 'Vacant'),
+        phone: bAdmin ? bAdmin.phone : (b.phone || ''),
+        has_assigned_admin: Boolean(bAdmin),
+        address: b.address || headOffice.city,
         is_active: b.is_active !== false,
-        stock_count: wardStock,
-        active_rentals: wardRentals,
-        overdue_count: wardOverdue,
-        total_collected: wardCollections,
+        stock_count: bStock,
+        active_rentals: bRentals,
+        overdue_count: bOverdue,
+        total_collected: bCollections,
       };
     });
 
-    const sumStock = wardPerformance.reduce((sum, w) => sum + w.stock_count, 0);
-    const sumRentals = wardPerformance.reduce((sum, w) => sum + w.active_rentals, 0);
-    const sumOverdue = wardPerformance.reduce((sum, w) => sum + w.overdue_count, 0);
-    const sumRevenue = wardPerformance.reduce((sum, w) => sum + w.total_collected, 0);
+    const depletedStockWards = wardPerformance.filter(w => w.stock_count === 0).length;
 
     const summary = {
-      totalWards: wardPerformance.length,
-      activeWards: wardPerformance.filter((w) => w.is_active).length,
-      depletedStockWards: wardPerformance.filter((w) => w.stock_count === 0).length,
-      totalStock: totalStock > 0 ? totalStock : sumStock,
-      activeRentals: activeRentals > 0 ? activeRentals : sumRentals,
-      overdueCount: sumOverdue,
-      totalCollections: totalCollections > 0 ? totalCollections : sumRevenue,
+      totalWards: branches.length,
+      activeWards: branches.filter(b => b.is_active !== false).length,
+      depletedStockWards,
+      totalStock,
+      activeRentals,
+      directPurchases,
+      overdueCount,
+      totalOutstanding,
+      totalCollections,
+      todayCollections,
+      modeBreakdown: {
+        cash: cashCollections,
+        online: onlineCollections,
+        cashPercent,
+        onlinePercent,
+      },
     };
 
     return {
       headOffice,
       summary,
       wardPerformance,
-      recentRentals,
+      recentOverdue,
+      recentRentals: tenants.filter(t => t.status === 'rented').slice(0, 6),
     };
   }
 }

@@ -4,7 +4,7 @@ const { successResponse, errorResponse } = require('../../utils/response');
 class HeadOfficesController {
   async getAll(req, res) {
     try {
-      const data = await headOfficesService.getAllHeadOffices();
+      const data = await headOfficesService.getAllHeadOffices(req.user);
       return successResponse(res, 200, data, 'Head offices retrieved successfully');
     } catch (error) {
       console.error('[HeadOfficesController.getAll]', error);
@@ -14,7 +14,7 @@ class HeadOfficesController {
 
   async getDropdown(req, res) {
     try {
-      const data = await headOfficesService.getDropdown();
+      const data = await headOfficesService.getDropdown(req.user);
       return successResponse(res, 200, data, 'Head offices dropdown retrieved');
     } catch (error) {
       console.error('[HeadOfficesController.getDropdown]', error);
@@ -24,7 +24,7 @@ class HeadOfficesController {
 
   async getById(req, res) {
     try {
-      const data = await headOfficesService.getById(req.params.id);
+      const data = await headOfficesService.getById(req.params.id, req.user);
       return successResponse(res, 200, data, 'Head office details retrieved');
     } catch (error) {
       console.error('[HeadOfficesController.getById]', error);

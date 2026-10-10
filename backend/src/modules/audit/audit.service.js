@@ -2,12 +2,56 @@ const supabase = require('../../config/db');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
 
 class AuditService {
-  async getLogs(query = {}) {
+  async getLogs(query = {}, user = null) {
     const { page, limit, offset } = getPaginationOptions(query);
     
     let queryBuilder = supabase
       .from('audit_logs')
       .select('*, users(name, email, ward_area)', { count: 'exact' });
+
+    // Scoping for HO Admin: only actions by or targeting users / entities under their Head Office
+    if (user && user.role === 'ho_admin' && user.head_office_id) {
+      const { data: deptUsers } = await supabase
+        .from('users')
+        .select('id')
+        .eq('head_office_id', user.head_office_id);
+
+      const { data: deptBranches } = await supabase
+        .from('branches')
+        .select('id')
+        .eq('head_office_id', user.head_office_id);
+
+      const branchIds = (deptBranches || []).map(b => b.id);
+      let branchUserIds = [];
+      if (branchIds.length > 0) {
+        const { data: bUsers } = await supabase
+          .from('users')
+          .select('id')
+          .in('branch_id', branchIds);
+        branchUserIds = (bUsers || []).map(u => u.id);
+      }
+
+      const hoUserIds = [...new Set([
+        user.id,
+        ...(deptUsers || []).map(u => u.id),
+        ...branchUserIds,
+      ])].filter(Boolean);
+
+      if (hoUserIds.length > 0) {
+        let filterParts = [
+          `user_id.in.(${hoUserIds.join(',')})`,
+          `and(entity_type.eq.users,entity_id.in.(${hoUserIds.join(',')}))`
+        ];
+        if (branchIds.length > 0) {
+          filterParts.push(`and(entity_type.eq.branches,entity_id.in.(${branchIds.join(',')}))`);
+        }
+        filterParts.push(`and(entity_type.eq.head_offices,entity_id.eq.${user.head_office_id})`);
+
+        queryBuilder = queryBuilder.or(filterParts.join(','));
+      } else {
+        queryBuilder = queryBuilder.eq('user_id', user.id);
+      }
+    }
 
     if (query.user_id) queryBuilder = queryBuilder.eq('user_id', query.user_id);
     if (query.action) queryBuilder = queryBuilder.eq('action', query.action);

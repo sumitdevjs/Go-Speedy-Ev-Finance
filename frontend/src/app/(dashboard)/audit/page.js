@@ -10,6 +10,7 @@ import ProtectedRoute from '../../../components/layout/ProtectedRoute';
 import api from '../../../lib/api';
 import Button from '../../../components/ui/Button';
 import { exportToExcel } from '../../../lib/exportToExcel';
+import { useAuthStore } from '../../../store/authStore';
 
 // ── Human-readable action descriptions ──────────────────────────────────────
 const ACTION_LABELS = {
@@ -207,6 +208,7 @@ function ChangeDiff({ changes, isExpanded, onToggle, targetName }) {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function AuditPage() {
+  const { role } = useAuthStore();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -347,8 +349,8 @@ export default function AuditPage() {
     <ProtectedRoute adminOnly={true}>
       <div>
         <Header
-          title="Activity Log"
-          subtitle="A clear record of every action taken in the system"
+          title={role === 'ho_admin' ? "Department Activity Log" : "Activity Log"}
+          subtitle={role === 'ho_admin' ? "Audit trail of actions taken by and on staff under your Head Office" : "A clear record of every action taken in the system"}
         />
 
         <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">

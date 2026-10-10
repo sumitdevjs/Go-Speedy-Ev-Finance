@@ -656,8 +656,8 @@ export default function ModelsPage() {
         {activeTab === 'new' ? (
           <>
             {/* Search & Filter Bar */}
-            <div className="gsap-filter-bar flex flex-col xl:flex-row flex-wrap items-stretch xl:items-center justify-between gap-3 sm:gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
-              <div className="flex w-full xl:max-w-md xl:flex-1 min-w-0 gap-2 items-center">
+            <div className="gsap-filter-bar flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-3 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
+              <div className="flex flex-1 min-w-0 gap-2 items-center">
                 <SearchBar
                   value={search}
                   onChange={(val) => {
@@ -665,20 +665,20 @@ export default function ModelsPage() {
                     setPage(1);
                   }}
                   placeholder="Search model name, company or ward..."
-                  className="flex-1"
+                  className="flex-1 min-w-0"
                 />
                 <Button
                   variant="outline"
                   size="sm"
                   icon={Download}
-                  className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 whitespace-nowrap"
                   onClick={handleDownloadNewModels}
                   title="Download Data as Excel"
                 >
                   <span className="hidden sm:inline">Download Data</span>
                 </Button>
               </div>
-              <div className="w-full xl:w-auto flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0">
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                 <Select
                   value={stockStatus}
                   onChange={(e) => { setStockStatus(e.target.value); setPage(1); }}
@@ -687,7 +687,7 @@ export default function ModelsPage() {
                     { value: 'in_stock', label: 'In Stock' },
                     { value: 'out_of_stock', label: 'Out of Stock' },
                   ]}
-                  className="flex-1 sm:flex-initial sm:w-44"
+                  containerClassName="w-36 sm:w-44 shrink-0"
                 />
                 <Select
                   value={activeFilter}
@@ -697,7 +697,7 @@ export default function ModelsPage() {
                     { value: 'false', label: 'Cancelled Models' },
                     { value: '', label: 'All Models' },
                   ]}
-                  className="flex-1 sm:flex-initial sm:w-44"
+                  containerClassName="w-36 sm:w-44 shrink-0"
                 />
               </div>
             </div>

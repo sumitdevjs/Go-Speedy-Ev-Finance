@@ -140,9 +140,13 @@ function SidebarInner({ isOpen, onClose }) {
     : adminNavItemsList;
 
   const adminNavItems = [
-    ...(isSuperAdmin || isHoAdmin ? [{ name: 'Branches & Wards', href: '/branches', icon: Building2 }] : []),
-    { name: 'Staff Management', href: '/staff', icon: UserCheck },
-    { name: 'Audit Logs', href: '/audit', icon: ShieldCheck },
+    ...(isSuperAdmin
+      ? [{ name: 'Branches & Wards', href: '/branches', icon: Building2 }]
+      : isHoAdmin
+      ? [{ name: 'Governed Branches', href: '/branches', icon: Building2 }]
+      : []),
+    { name: isHoAdmin ? 'Branch Admins & Staff' : 'Staff Management', href: '/staff', icon: UserCheck },
+    ...(isSuperAdmin || isHoAdmin ? [{ name: 'Audit Logs', href: '/audit', icon: ShieldCheck }] : []),
   ];
 
   // Derive role label & badge variant

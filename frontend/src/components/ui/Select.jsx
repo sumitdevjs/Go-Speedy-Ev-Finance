@@ -8,6 +8,7 @@ const Select = forwardRef(function Select(
     options = [],
     placeholder = 'Select an option',
     className = '',
+    containerClassName = '',
     id,
     name,
     required = false,
@@ -21,7 +22,7 @@ const Select = forwardRef(function Select(
   const hasEmptyOption = options.some((opt) => opt.value === '');
 
   return (
-    <div className="w-full">
+    <div className={containerClassName || "w-full"}>
       {label && (
         <label
           htmlFor={selectId}

@@ -30,8 +30,9 @@ export const useAuthStore = create((set, get) => ({
 
   setSelectedBranch: (branch) => {
     const state = get();
-    // Non-super-admins cannot switch away from their assigned ward
-    if (!isMasterSuperAdmin(state.user)) {
+    // Super admins and HO admins can switch branches
+    const canSwitch = isMasterSuperAdmin(state.user) || state.user?.role === 'ho_admin';
+    if (!canSwitch) {
       return;
     }
     set({ selectedBranch: branch });

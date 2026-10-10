@@ -25,6 +25,10 @@ class StaffService {
           queryBuilder = queryBuilder.ilike('ward_area', `%${userWard}%`);
         }
       }
+      // If caller is ho_admin, they govern branch admins and desk staff under this HO (exclude HO admin and Super Admin accounts)
+      if (req.user?.role === 'ho_admin') {
+        queryBuilder = queryBuilder.in('role', ['branch_admin', 'staff', 'admin']);
+      }
     }
 
     if (query.search) {
@@ -48,13 +52,16 @@ class StaffService {
         if (isMaster) {
           u.display_role = 'Super Admin';
           u.role = 'super_admin';
+        } else if (u.role === 'ho_admin') {
+          u.display_role = 'Head Office Admin';
+          u.role = 'ho_admin';
         } else if (u.role === 'branch_admin' || (u.role === 'admin' && u.ward_area)) {
-          u.display_role = 'Ward Admin';
+          u.display_role = 'Branch Admin';
           u.role = 'branch_admin';
         } else if (u.role === 'staff') {
           u.display_role = 'Staff';
         } else {
-          u.display_role = 'Ward Admin';
+          u.display_role = 'Branch Admin';
           u.role = 'branch_admin';
         }
 
@@ -85,6 +92,13 @@ class StaffService {
   }
 
   async createStaff({ name, phone, email, password, role, ward_area, branch_id, head_office_id }, createdBy, req = null) {
+    if (req?.user?.role === 'ho_admin') {
+      if (role === 'super_admin' || role === 'ho_admin') {
+        throw new Error('Access denied: Head Office Admins can only create Branch Admins and Staff');
+      }
+      head_office_id = req.user.head_office_id;
+    }
+
     const password_hash = await bcrypt.hash(password, 10);
 
     let assignedBranchId = branch_id || null;
@@ -94,6 +108,9 @@ class StaffService {
       const scope = resolveCreateScope(req, { branch_id, head_office_id });
       assignedBranchId = scope.branch_id;
       assignedHoId = scope.head_office_id;
+      if (req.user?.role === 'ho_admin') {
+        assignedHoId = req.user.head_office_id;
+      }
     }
     
     const insertPayload = {
@@ -137,9 +154,16 @@ class StaffService {
     return data;
   }
 
-  async updateStaff(id, updates, requestingUserId) {
+  async updateStaff(id, updates, requestingUserId, req = null) {
     if (requestingUserId && id === requestingUserId && 'role' in updates) {
       throw new Error('Cannot change your own role');
+    }
+
+    if (req?.user?.role === 'ho_admin') {
+      if (updates.role === 'super_admin' || updates.role === 'ho_admin') {
+        throw new Error('Access denied: Head Office Admins can only assign Branch Admin or Staff roles');
+      }
+      updates.head_office_id = req.user.head_office_id;
     }
 
     const { data: before } = await supabase
@@ -147,6 +171,10 @@ class StaffService {
       .select('*')
       .eq('id', id)
       .single();
+
+    if (req?.user?.role === 'ho_admin' && before && before.head_office_id !== req.user.head_office_id) {
+      throw new Error('Access denied: Cannot edit users belonging to another Head Office');
+    }
 
     let cleanUpdates = { ...updates };
     let { data, error } = await supabase

@@ -374,10 +374,12 @@ class ModelsService {
       }
     });
 
-    // If caller is branch_admin, filter to their branch only
+    // If caller is branch_admin, filter to their branch only; if ho_admin, filter to their HO branches
     let targetBranches = branches;
     if (user && (user.role === 'branch_admin' || user.role === 'staff')) {
       targetBranches = branches.filter(b => b.id === user.branch_id || b.ward_area === user.ward_area);
+    } else if (user && user.role === 'ho_admin' && user.head_office_id) {
+      targetBranches = branches.filter(b => b.head_office_id === user.head_office_id);
     }
 
     const breakdown = targetBranches.map(b => {

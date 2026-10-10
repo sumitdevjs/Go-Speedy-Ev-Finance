@@ -89,7 +89,7 @@ export default function HoDashboard() {
     }
   }, [loading, data]);
 
-  const { headOffice, summary, wardPerformance, recentRentals } = data;
+  const { headOffice, summary, wardPerformance, recentRentals, recentOverdue } = data;
 
   // Filtered wards
   const filteredWards = (wardPerformance || []).filter((w) => {
@@ -114,8 +114,8 @@ export default function HoDashboard() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-12 transition-colors">
       <Header
-        title={headOffice?.name || 'Delhi Head Office'}
-        subtitle="Zonal Command Center • Fleet, Wards & Revenue Monitoring"
+        title={headOffice?.name || 'Head Office Dashboard'}
+        subtitle="Zonal Command Center • Fleet, Branches & Revenue Monitoring"
       />
 
       <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-6">
@@ -128,11 +128,11 @@ export default function HoDashboard() {
                 <span>Head Office Jurisdiction: {headOffice?.code || 'DEL-HO'}</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                {headOffice?.name || 'Delhi Head Office'}
+                {headOffice?.name || 'Head Office Command'}
               </h2>
               <p className="text-xs sm:text-sm text-slate-300 flex items-center gap-2">
                 <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span>Governing {summary.totalWards || 46} Ward Operating Desks across {headOffice?.city || 'Delhi NCT'}</span>
+                <span>Governing {summary.totalWards || 0} Operating Branches across {headOffice?.city || headOffice?.state || 'Zone'}</span>
               </p>
             </div>
 
@@ -141,7 +141,7 @@ export default function HoDashboard() {
                 href="/branches"
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs sm:text-sm font-bold tracking-wide transition-all shadow-lg shadow-blue-600/20 cursor-pointer"
               >
-                <span>Manage 46 Wards</span>
+                <span>Manage {summary.totalWards || 0} Branches</span>
                 <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
@@ -225,17 +225,17 @@ export default function HoDashboard() {
             </div>
           </div>
 
-          {/* Governed Wards */}
+          {/* Governed Branches */}
           <div className="gsap-ho-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/80 p-5 shadow-xs flex items-center justify-between transition-all">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Governed Wards
+                Governed Branches
               </p>
               <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
                 {loading ? <Spinner size="sm" /> : <span id="gsap-ho-wards">{summary.totalWards}</span>}
               </h3>
               <p className="text-[10px] text-cyan-600 dark:text-cyan-400 font-medium mt-1">
-                All 46 Delhi Hubs
+                Active Zonal Hubs
               </p>
             </div>
             <div className="h-11 w-11 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shrink-0">
@@ -276,7 +276,7 @@ export default function HoDashboard() {
                 <Badge variant="blue" size="sm">{filteredWards.length} Wards</Badge>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Live monitoring of stock, rentals, candidate contacts and overdue recovery across Delhi
+                Live monitoring of stock, rentals, branch admin contacts and overdue recovery across {headOffice?.city || headOffice?.name || 'the zone'}
               </p>
             </div>
 
@@ -381,9 +381,16 @@ export default function HoDashboard() {
                       </td>
 
                       <td className="py-3 px-3">
-                        <p className="font-semibold text-slate-800 dark:text-slate-200">
-                          {ward.contact_person}
-                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-semibold text-slate-800 dark:text-slate-200">
+                            {ward.contact_person}
+                          </p>
+                          {ward.has_assigned_admin && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                              Admin
+                            </span>
+                          )}
+                        </div>
                         {ward.phone && (
                           <a
                             href={`tel:${ward.phone}`}
@@ -433,9 +440,9 @@ export default function HoDashboard() {
                           type="button"
                           onClick={() => handleSelectWard(ward)}
                           className="px-2.5 py-1 text-xs rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white text-slate-700 dark:text-slate-300 font-semibold transition-all cursor-pointer inline-flex items-center gap-1"
-                          title={`Switch dashboard filter to Ward ${ward.ward_no}`}
+                          title={`Switch dashboard filter to Ward ${ward.ward_no || ward.name}`}
                         >
-                          <span>Filter</span>
+                          <span>Drill Down</span>
                           <ArrowUpRight className="w-3 h-3" />
                         </button>
                       </td>
@@ -449,76 +456,127 @@ export default function HoDashboard() {
 
         {/* Territory Activity Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Overdue Watchlist */}
-          <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/80 p-5 shadow-xs">
-            <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-3">
-              <AlertTriangle className="w-4 h-4 text-rose-500" />
-              <span>Zonal Overdue & Recovery Watchlist</span>
-            </h3>
+          {/* Live Overdue Watchlist */}
+          <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/80 p-5 shadow-xs flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-500" />
+                <span>Zonal Overdue & Recovery Watchlist</span>
+              </h3>
+              <Badge variant="rose" size="sm">
+                {(recentOverdue || []).length} Delinquent
+              </Badge>
+            </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-              High priority payment lags across Delhi wards requiring zonal follow-up
+              High priority payment lags across governed branches requiring zonal follow-up
             </p>
 
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold text-xs">
-                    W2
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900 dark:text-white">Ward 2: Saroop Nagar</p>
-                    <p className="text-[10px] text-slate-500">Operating Desk: North Delhi Ward Recovery</p>
-                  </div>
+            <div className="space-y-2.5 flex-1">
+              {(!recentOverdue || recentOverdue.length === 0) ? (
+                <div className="text-center py-10 text-slate-400 text-xs flex flex-col items-center justify-center h-full">
+                  <CheckCircle2 className="w-10 h-10 text-emerald-500/80 mb-2" />
+                  <p className="font-bold text-slate-700 dark:text-slate-300">All Accounts Up to Date</p>
+                  <p className="text-[11px] text-slate-500">No overdue rental accounts found in this zone.</p>
                 </div>
-                <div className="text-right">
-                  <span className="text-xs font-bold text-rose-600 dark:text-rose-400 block">5 Days Overdue</span>
-                  <span className="text-[10px] text-slate-400">₹65,500 Outstanding</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold text-xs">
-                    W9
+              ) : (
+                recentOverdue.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold text-xs shrink-0">
+                        {item.ward_no ? `W${item.ward_no}` : (item.ward_code || 'EV')}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                          {item.name}
+                        </p>
+                        <p className="text-[10px] text-slate-500 truncate">
+                          {item.branch_name} • {item.model_name}
+                        </p>
+                        {item.phone && (
+                          <a
+                            href={`tel:${item.phone}`}
+                            className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 mt-0.5"
+                          >
+                            <Phone className="w-2.5 h-2.5" />
+                            <span>{item.phone}</span>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 pl-2">
+                      <span className="text-xs font-bold text-rose-600 dark:text-rose-400 block">
+                        {item.daysOverdue} Days Overdue
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {formatCurrency(item.outstanding)} Due
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900 dark:text-white">Ward 9: Punjabi Bagh</p>
-                    <p className="text-[10px] text-slate-500">Operating Desk: West Delhi Ward Recovery</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-bold text-rose-600 dark:text-rose-400 block">3 Days Overdue</span>
-                  <span className="text-[10px] text-slate-400">₹45,000 Outstanding</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold text-xs">
-                    W16
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900 dark:text-white">Ward 16: Tagore Garden</p>
-                    <p className="text-[10px] text-slate-500">Operating Desk: West Delhi Ward Recovery</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs font-bold text-rose-600 dark:text-rose-400 block">2 Days Overdue</span>
-                  <span className="text-[10px] text-slate-400">₹32,000 Outstanding</span>
-                </div>
-              </div>
+                ))
+              )}
             </div>
           </div>
 
-          {/* Quick Zonal Actions & Direct Link */}
-          <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/80 p-5 shadow-xs flex flex-col justify-between">
-            <div>
+          {/* Right Column: Zonal Revenue Split & Shortcuts */}
+          <div className="space-y-6 flex flex-col justify-between">
+            {/* Zonal Collection Health */}
+            <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/80 p-5 shadow-xs">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <IndianRupee className="w-4 h-4 text-emerald-500" />
+                  <span>Zonal Collection Health</span>
+                </h3>
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                  Today: <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">{formatCurrency(summary.todayCollections || 0)}</span>
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                Total zone revenue vs active recoverable installment debt
+              </p>
+
+              {/* Progress bar for Cash vs Online split */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    Online: {summary.modeBreakdown?.onlinePercent ?? 0}% ({formatCurrency(summary.modeBreakdown?.online || 0)})
+                  </span>
+                  <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    Cash: {summary.modeBreakdown?.cashPercent ?? 0}% ({formatCurrency(summary.modeBreakdown?.cash || 0)})
+                  </span>
+                </div>
+                <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
+                  <div
+                    style={{ width: `${summary.modeBreakdown?.onlinePercent ?? 0}%` }}
+                    className="bg-blue-500 h-full transition-all duration-500"
+                  />
+                  <div
+                    style={{ width: `${summary.modeBreakdown?.cashPercent ?? 100}%` }}
+                    className="bg-emerald-500 h-full transition-all duration-500"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                <span className="text-slate-500 dark:text-slate-400">Total Active Outstanding</span>
+                <span className="font-bold text-rose-600 dark:text-rose-400">
+                  {formatCurrency(summary.totalOutstanding || 0)}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Zonal Actions & Direct Links */}
+            <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/80 p-5 shadow-xs">
               <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-3">
                 <ShieldCheck className="w-4 h-4 text-emerald-500" />
                 <span>Head Office Command Shortcuts</span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-                Rapid tools to audit inventory, reallocate stock between Delhi wards, and export territory reports.
+                Rapid tools to manage branches, assign branch admins, audit inventory, and monitor zone collections.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -527,8 +585,17 @@ export default function HoDashboard() {
                   className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-500/40 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 transition-all text-left group"
                 >
                   <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400 mb-2 group-hover:scale-110 transition-transform" />
-                  <p className="text-xs font-bold text-slate-900 dark:text-white">Ward Registry</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Edit candidates, phone & addresses</p>
+                  <p className="text-xs font-bold text-slate-900 dark:text-white">Governed Branches</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Edit locations, phone & contacts</p>
+                </Link>
+
+                <Link
+                  href="/staff"
+                  className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-purple-500/40 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-purple-50/50 dark:hover:bg-purple-950/30 transition-all text-left group"
+                >
+                  <Users className="w-5 h-5 text-purple-600 dark:text-purple-400 mb-2 group-hover:scale-110 transition-transform" />
+                  <p className="text-xs font-bold text-slate-900 dark:text-white">Branch Admins & Staff</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Assign branch managers & operators</p>
                 </Link>
 
                 <Link
@@ -548,24 +615,7 @@ export default function HoDashboard() {
                   <p className="text-xs font-bold text-slate-900 dark:text-white">Zonal Tenants</p>
                   <p className="text-[10px] text-slate-500 mt-0.5">Contracts & rent-to-own balances</p>
                 </Link>
-
-                <Link
-                  href="/purchases"
-                  className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-cyan-500/40 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-cyan-50/50 dark:hover:bg-cyan-950/30 transition-all text-left group"
-                >
-                  <IndianRupee className="w-5 h-5 text-cyan-600 dark:text-cyan-400 mb-2 group-hover:scale-110 transition-transform" />
-                  <p className="text-xs font-bold text-slate-900 dark:text-white">Revenue & Ledger</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Payments & downpayment reconciliation</p>
-                </Link>
               </div>
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
-              <span>Go Speedy EV Finance Platform • Multi-Branch System</span>
-              <span className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Live 24x7 Sync
-              </span>
             </div>
           </div>
         </div>

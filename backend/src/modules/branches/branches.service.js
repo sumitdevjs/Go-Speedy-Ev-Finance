@@ -26,10 +26,11 @@ class BranchesService {
         } else if (user.ward_area) {
           queryBuilder = queryBuilder.ilike('name', `%${user.ward_area}%`);
         }
+      } else if (user && user.role === 'ho_admin' && user.head_office_id) {
+        // HO Admin is strictly isolated to their assigned Head Office
+        queryBuilder = queryBuilder.eq('head_office_id', user.head_office_id);
       } else if (query.head_office_id) {
         queryBuilder = queryBuilder.eq('head_office_id', query.head_office_id);
-      } else if (user.role === 'ho_admin' && user.head_office_id) {
-        queryBuilder = queryBuilder.eq('head_office_id', user.head_office_id);
       }
 
       // Filter by Search
@@ -43,11 +44,11 @@ class BranchesService {
       }
 
       const res = await queryBuilder.range(offset, offset + limit - 1);
-      if (res.error || !res.data || res.data.length === 0) {
+      if (res.error) {
         useFallback = true;
       } else {
-        data = res.data;
-        count = res.count;
+        data = res.data || [];
+        count = res.count || 0;
       }
     } catch (e) {
       useFallback = true;
@@ -73,10 +74,10 @@ class BranchesService {
         if (myWard) {
           filtered = [myWard];
         }
+      } else if (user && user.role === 'ho_admin' && user.head_office_id) {
+        filtered = filtered.filter(w => w.head_office_id === user.head_office_id);
       } else if (query.head_office_id) {
         filtered = filtered.filter(w => w.head_office_id === query.head_office_id);
-      } else if (user.role === 'ho_admin' && user.head_office_id) {
-        filtered = filtered.filter(w => w.head_office_id === user.head_office_id);
       }
 
       // Filter by Search (Name, Code, Area, Candidate Name, Phone, Address, Ward No)
@@ -122,14 +123,14 @@ class BranchesService {
         } else if (user.ward_area) {
           queryBuilder = queryBuilder.ilike('name', `%${user.ward_area}%`);
         }
+      } else if (user && user.role === 'ho_admin' && user.head_office_id) {
+        queryBuilder = queryBuilder.eq('head_office_id', user.head_office_id);
       } else if (query.head_office_id) {
         queryBuilder = queryBuilder.eq('head_office_id', query.head_office_id);
-      } else if (user.role === 'ho_admin' && user.head_office_id) {
-        queryBuilder = queryBuilder.eq('head_office_id', user.head_office_id);
       }
 
       const { data, error } = await queryBuilder;
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data;
       }
     } catch (e) {
@@ -157,10 +158,10 @@ class BranchesService {
         filtered = [myWard];
       }
     } else {
-      if (query.head_office_id) {
-        filtered = filtered.filter(w => w.head_office_id === query.head_office_id);
-      } else if (user.role === 'ho_admin' && user.head_office_id) {
+      if (user && user.role === 'ho_admin' && user.head_office_id) {
         filtered = filtered.filter(w => w.head_office_id === user.head_office_id);
+      } else if (query.head_office_id) {
+        filtered = filtered.filter(w => w.head_office_id === query.head_office_id);
       }
     }
 
@@ -211,11 +212,14 @@ class BranchesService {
     throw new Error('Branch not found');
   }
 
-  async create({ head_office_id, ward_no, name, code, ward_area, address, phone, contact_person, status_label }) {
-    const ho = ALL_HEAD_OFFICES.find(h => h.id === head_office_id) || DELHI_HEAD_OFFICE;
+  async create({ head_office_id, ward_no, name, code, ward_area, address, phone, contact_person, status_label }, user = {}) {
+    const finalHoId = (user && user.role === 'ho_admin' && user.head_office_id)
+      ? user.head_office_id
+      : (head_office_id || '9bab7b7d-e935-4401-ba93-8eddc8b2b90e');
+    const ho = ALL_HEAD_OFFICES.find(h => h.id === finalHoId) || DELHI_HEAD_OFFICE;
     const newBranch = {
       id: `ward-custom-${Date.now()}`,
-      head_office_id: head_office_id || ho.id,
+      head_office_id: finalHoId,
       ward_no: ward_no ? parseInt(ward_no) : null,
       name,
       code: code.toUpperCase().trim(),

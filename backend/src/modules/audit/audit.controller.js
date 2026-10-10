@@ -4,7 +4,7 @@ const { successResponse, errorResponse } = require('../../utils/response');
 class AuditController {
   async getAll(req, res) {
     try {
-      const { data, meta } = await auditService.getLogs(req.query);
+      const { data, meta } = await auditService.getLogs(req.query, req.user);
       return successResponse(res, 200, data, 'Audit logs retrieved successfully', meta);
     } catch (error) {
       console.error(error);

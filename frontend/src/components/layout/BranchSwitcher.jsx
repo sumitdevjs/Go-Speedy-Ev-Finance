@@ -82,8 +82,12 @@ export default function BranchSwitcher({ isMobileBar = false }) {
     );
   }
 
-  // Filter branches by search
+  // Filter branches by search and strict HO isolation
   const filteredBranches = branches.filter((b) => {
+    // If user is HO admin, strictly only show branches under their assigned head office
+    if (isHoAdmin) {
+      if (!user?.head_office_id || b.head_office_id !== user.head_office_id) return false;
+    }
     if (!search.trim()) return true;
     const query = search.toLowerCase();
     return (
@@ -95,17 +99,27 @@ export default function BranchSwitcher({ isMobileBar = false }) {
     );
   });
 
+  // Auto-reset if active branch is from another HO
+  useEffect(() => {
+    if (isHoAdmin && user?.head_office_id && selectedBranch) {
+      if (selectedBranch.head_office_id && selectedBranch.head_office_id !== user.head_office_id) {
+        setSelectedBranch(null);
+      }
+    }
+  }, [isHoAdmin, user?.head_office_id, selectedBranch]);
+
   // Group branches by Head Office
   const grouped = filteredBranches.reduce((acc, b) => {
-    const hoName = b.head_offices?.name || 'Moti Nagar Head Office';
+    const hoName = b.head_office?.name || b.head_offices?.name || 'Head Office';
     if (!acc[hoName]) acc[hoName] = [];
     acc[hoName].push(b);
     return acc;
   }, {});
 
+  const currentHoName = headOffices.find(h => h.id === user?.head_office_id)?.name || 'Zone';
   const currentLabel = selectedBranch
     ? (selectedBranch.ward_no ? `Ward ${selectedBranch.ward_no}: ${selectedBranch.name}` : selectedBranch.name)
-    : 'All Wards (Global Master)';
+    : (isHoAdmin ? `${currentHoName} (All Branches)` : 'All Wards (Global Master)');
 
   return (
     <div className={`relative ${isMobileBar ? 'w-full' : 'min-w-0 shrink'}`} ref={dropdownRef}>
@@ -173,8 +187,8 @@ export default function BranchSwitcher({ isMobileBar = false }) {
             onWheel={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}
           >
-            {/* Global All Option (Only for Super Admin) */}
-            {isSuperAdmin && (
+            {/* Global All Option (Super Admin or HO Admin) */}
+            {(isSuperAdmin || isHoAdmin) && (
               <div className="pb-1">
                 <button
                   type="button"
@@ -190,8 +204,8 @@ export default function BranchSwitcher({ isMobileBar = false }) {
                   <div className="flex items-center gap-2">
                     <Globe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                     <div>
-                      <p className="font-semibold">All Wards (Global Master)</p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400">Aggregated stats across all 50 wards</p>
+                      <p className="font-semibold">{isHoAdmin ? `All ${currentHoName} Branches` : 'All Wards (Global Master)'}</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">{isHoAdmin ? `Aggregated overview of ${currentHoName}` : 'Aggregated stats across all wards'}</p>
                     </div>
                   </div>
                   {!selectedBranch && <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
@@ -201,7 +215,9 @@ export default function BranchSwitcher({ isMobileBar = false }) {
 
             {/* Groups */}
             {Object.keys(grouped).length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-6">No matching wards found.</p>
+              <p className="text-xs text-slate-400 text-center py-6">
+                {isHoAdmin ? 'No branches found for this Head Office.' : 'No matching wards found.'}
+              </p>
             ) : (
               Object.entries(grouped).map(([hoName, branchList]) => (
                 <div key={hoName} className="py-1">

@@ -1,13 +1,13 @@
 const express = require('express');
 const auditController = require('./audit.controller');
 const requireAuth = require('../../middleware/auth');
-const { requireAdmin } = require('../../middleware/roleGuard');
+const { requireHoAdmin } = require('../../middleware/roleGuard');
 
 const router = express.Router();
 
-// Only Admins can view audit logs
+// Admins and Head Office Admins can view audit logs
 router.use(requireAuth);
-router.use(requireAdmin);
+router.use(requireHoAdmin);
 
 /**
  * @openapi

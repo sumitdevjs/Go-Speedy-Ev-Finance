@@ -29,6 +29,11 @@ const ROLE_OPTIONS = [
 
 export default function StaffPage() {
   const { user: currentUser, selectedBranch } = useAuthStore();
+  const isHoAdmin = currentUser?.role === 'ho_admin';
+  const roleOptions = isHoAdmin
+    ? ROLE_OPTIONS.filter((o) => o.value === 'staff' || o.value === 'branch_admin')
+    : ROLE_OPTIONS;
+
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -49,7 +54,7 @@ export default function StaffPage() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('staff');
   const [wardArea, setWardArea] = useState('');
-  const [headOfficeId, setHeadOfficeId] = useState('');
+  const [headOfficeId, setHeadOfficeId] = useState(isHoAdmin ? (currentUser?.head_office_id || '') : '');
   const [branchId, setBranchId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -164,6 +169,7 @@ export default function StaffPage() {
 
     try {
       setIsSubmitting(true);
+      const effectiveHoId = isHoAdmin ? (currentUser?.head_office_id || null) : (headOfficeId || null);
       const res = await api.post('/api/staff', {
         name: name.trim(),
         phone: phone.trim(),
@@ -171,7 +177,7 @@ export default function StaffPage() {
         password,
         role,
         ward_area: wardArea.trim() || null,
-        head_office_id: headOfficeId || null,
+        head_office_id: effectiveHoId,
         branch_id: branchId || null,
       });
 
@@ -224,12 +230,13 @@ export default function StaffPage() {
 
     try {
       setEditSubmitting(true);
+      const effectiveHoId = isHoAdmin ? (currentUser?.head_office_id || null) : (editHeadOfficeId || null);
       const payload = {
         name: editName.trim(),
         phone: editPhone.trim(),
         email: editEmail.trim() || null,
         ward_area: editWardArea.trim() || null,
-        head_office_id: editHeadOfficeId || null,
+        head_office_id: effectiveHoId,
         branch_id: editBranchId || null,
       };
       // Omit role entirely when self-editing — the field is locked in the UI too,
@@ -330,6 +337,9 @@ export default function StaffPage() {
         if (isMaster) {
           return <Badge status="Super Admin" variant="purple" size="sm" />;
         }
+        if (row.role === 'ho_admin' || row.display_role === 'Head Office Admin') {
+          return <Badge status="Head Office Admin" variant="indigo" size="sm" />;
+        }
         if (row.role === 'staff' || row.display_role === 'Staff') {
           return <Badge status="Staff" variant="slate" size="sm" />;
         }
@@ -345,13 +355,22 @@ export default function StaffPage() {
           return (
             <div className="flex items-center gap-1.5 font-semibold text-xs text-indigo-400">
               <MapPin className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
-              <span>All Wards (Moti Nagar Head Office)</span>
+              <span>All Wards (Global Master)</span>
+            </div>
+          );
+        }
+        if (row.role === 'ho_admin' || row.display_role === 'Head Office Admin') {
+          const hoName = row.head_offices?.name || row.head_office?.name || headOffices.find(h => h.id === row.head_office_id)?.name || 'Head Office';
+          return (
+            <div className="flex items-center gap-1.5 font-semibold text-xs text-indigo-600 dark:text-indigo-400">
+              <Building2 className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <span>{hoName} (Zone HQ)</span>
             </div>
           );
         }
         const branchLabel = row.branches
           ? (row.branches.ward_no ? `Ward ${row.branches.ward_no}: ${row.branches.name}` : row.branches.name)
-          : (row.ward_area ? `${row.ward_area} Ward` : 'General Ward');
+          : (row.ward_area ? `${row.ward_area} Ward` : 'Central Branch');
         return (
           <div>
             <div className="flex items-center gap-1.5 font-semibold text-xs text-slate-800 dark:text-slate-200">
@@ -493,7 +512,7 @@ export default function StaffPage() {
           columns={columns}
           data={staffList}
           loading={loading}
-          emptyText="No staff members registered."
+          emptyText={isHoAdmin ? "No branch admins or staff registered under this Head Office yet." : "No staff members registered."}
         />
 
         <Pagination
@@ -559,25 +578,34 @@ export default function StaffPage() {
             label="Role Privilege"
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            options={ROLE_OPTIONS}
+            options={roleOptions}
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Select
-              label="Head Office"
-              value={headOfficeId}
-              onChange={(e) => {
-                setHeadOfficeId(e.target.value);
-                if (e.target.value && branchId) {
-                  const br = branches.find(b => b.id === branchId);
-                  if (br && br.head_office_id !== e.target.value) setBranchId('');
-                }
-              }}
-              options={[
-                { value: '', label: 'Select Head Office (Optional)' },
-                ...headOffices.map((ho) => ({ value: ho.id, label: `${ho.name} (${ho.city})` })),
-              ]}
-            />
+            {!isHoAdmin ? (
+              <Select
+                label="Head Office"
+                value={headOfficeId}
+                onChange={(e) => {
+                  setHeadOfficeId(e.target.value);
+                  if (e.target.value && branchId) {
+                    const br = branches.find(b => b.id === branchId);
+                    if (br && br.head_office_id !== e.target.value) setBranchId('');
+                  }
+                }}
+                options={[
+                  { value: '', label: 'Select Head Office (Optional)' },
+                  ...headOffices.map((ho) => ({ value: ho.id, label: `${ho.name} (${ho.city})` })),
+                ]}
+              />
+            ) : (
+              <div className="p-2.5 rounded-lg bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-800/40 text-xs flex flex-col justify-center">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Head Office Hub</span>
+                <span className="font-bold text-blue-700 dark:text-blue-300 truncate">
+                  {headOffices.find(h => h.id === currentUser?.head_office_id)?.name || 'Assigned Head Office'}
+                </span>
+              </div>
+            )}
 
             <Select
               label="Assigned Ward / Branch"
@@ -587,7 +615,7 @@ export default function StaffPage() {
                 setBranchId(bId);
                 if (bId) {
                   const br = branches.find((b) => b.id === bId);
-                  if (br?.head_office_id && !headOfficeId) {
+                  if (br?.head_office_id && !headOfficeId && !isHoAdmin) {
                     setHeadOfficeId(br.head_office_id);
                   }
                 }
@@ -595,7 +623,7 @@ export default function StaffPage() {
               options={[
                 { value: '', label: 'Select Ward / Branch (Optional)' },
                 ...branches
-                  .filter((b) => !headOfficeId || b.head_office_id === headOfficeId)
+                  .filter((b) => isHoAdmin ? b.head_office_id === currentUser?.head_office_id : (!headOfficeId || b.head_office_id === headOfficeId))
                   .map((b) => ({
                     value: b.id,
                     label: b.ward_no ? `Ward ${b.ward_no}: ${b.name} (${b.code})` : `${b.name} (${b.code})`,
@@ -678,7 +706,7 @@ export default function StaffPage() {
               label="Role Privilege"
               value={editRole}
               onChange={(e) => setEditRole(e.target.value)}
-              options={ROLE_OPTIONS}
+              options={roleOptions}
               disabled={isEditingSelf}
             />
             {isEditingSelf && (
@@ -689,21 +717,30 @@ export default function StaffPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Select
-              label="Head Office"
-              value={editHeadOfficeId}
-              onChange={(e) => {
-                setEditHeadOfficeId(e.target.value);
-                if (e.target.value && editBranchId) {
-                  const br = branches.find(b => b.id === editBranchId);
-                  if (br && br.head_office_id !== e.target.value) setEditBranchId('');
-                }
-              }}
-              options={[
-                { value: '', label: 'Select Head Office (Optional)' },
-                ...headOffices.map((ho) => ({ value: ho.id, label: `${ho.name} (${ho.city})` })),
-              ]}
-            />
+            {!isHoAdmin ? (
+              <Select
+                label="Head Office"
+                value={editHeadOfficeId}
+                onChange={(e) => {
+                  setEditHeadOfficeId(e.target.value);
+                  if (e.target.value && editBranchId) {
+                    const br = branches.find(b => b.id === editBranchId);
+                    if (br && br.head_office_id !== e.target.value) setEditBranchId('');
+                  }
+                }}
+                options={[
+                  { value: '', label: 'Select Head Office (Optional)' },
+                  ...headOffices.map((ho) => ({ value: ho.id, label: `${ho.name} (${ho.city})` })),
+                ]}
+              />
+            ) : (
+              <div className="p-2.5 rounded-lg bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-800/40 text-xs flex flex-col justify-center">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Head Office Hub</span>
+                <span className="font-bold text-blue-700 dark:text-blue-300 truncate">
+                  {headOffices.find(h => h.id === currentUser?.head_office_id)?.name || 'Assigned Head Office'}
+                </span>
+              </div>
+            )}
 
             <Select
               label="Assigned Ward / Branch"
@@ -713,7 +750,7 @@ export default function StaffPage() {
                 setEditBranchId(bId);
                 if (bId) {
                   const br = branches.find((b) => b.id === bId);
-                  if (br?.head_office_id && !editHeadOfficeId) {
+                  if (br?.head_office_id && !editHeadOfficeId && !isHoAdmin) {
                     setEditHeadOfficeId(br.head_office_id);
                   }
                 }
@@ -721,7 +758,7 @@ export default function StaffPage() {
               options={[
                 { value: '', label: 'Select Ward / Branch (Optional)' },
                 ...branches
-                  .filter((b) => !editHeadOfficeId || b.head_office_id === editHeadOfficeId)
+                  .filter((b) => isHoAdmin ? b.head_office_id === currentUser?.head_office_id : (!editHeadOfficeId || b.head_office_id === editHeadOfficeId))
                   .map((b) => ({
                     value: b.id,
                     label: b.ward_no ? `Ward ${b.ward_no}: ${b.name} (${b.code})` : `${b.name} (${b.code})`,
