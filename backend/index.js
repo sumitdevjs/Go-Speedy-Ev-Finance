@@ -100,6 +100,10 @@ const auditRoutes = require('./src/modules/audit/audit.routes');
 const oldEvsRoutes = require('./src/modules/models/oldEvs.routes');
 const headOfficesRoutes = require('./src/modules/headOffices/headOffices.routes');
 const branchesRoutes = require('./src/modules/branches/branches.routes');
+const customersRoutes = require('./src/modules/customers/customers.routes');
+const reportsRoutes = require('./src/modules/reports/reports.routes');
+const transfersRoutes = require('./src/modules/transfers/transfers.routes');
+const penaltiesRoutes = require('./src/modules/penalties/penalties.routes');
 
 // Use Routes
 app.use('/api/auth', authRoutes);
@@ -114,6 +118,10 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/old-evs', oldEvsRoutes);
 app.use('/api/head-offices', headOfficesRoutes);
 app.use('/api/branches', branchesRoutes);
+app.use('/api/customers', customersRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/transfers', transfersRoutes);
+app.use('/api/penalties', penaltiesRoutes);
 
 // Global Error Handler (must be last)
 app.use(errorHandler);

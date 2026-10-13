@@ -413,6 +413,8 @@ export default function StaffPage() {
     {
       header: 'Status',
       key: 'is_active',
+      className: 'whitespace-nowrap text-center',
+      cellClassName: 'whitespace-nowrap text-center',
       render: (row) => (
         <Badge
           status={row.is_active ? 'Active' : 'Deactivated'}
@@ -424,6 +426,8 @@ export default function StaffPage() {
     {
       header: 'Created / Updated',
       key: 'dates',
+      className: 'whitespace-nowrap',
+      cellClassName: 'whitespace-nowrap',
       render: (row) => (
         <div>
           <p className="text-xs text-slate-800 dark:text-slate-200">C: {formatDate(row.created_at)}</p>
@@ -434,8 +438,10 @@ export default function StaffPage() {
     {
       header: 'Actions',
       key: 'actions',
+      className: 'whitespace-nowrap text-right',
+      cellClassName: 'whitespace-nowrap text-right',
       render: (row) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -474,7 +480,7 @@ export default function StaffPage() {
 
   return (
     <ProtectedRoute adminOnly={true}>
-      <div>
+      <div className="flex-1 flex flex-col min-w-0 w-full">
         <Header
         title="Staff & Operator Management"
         subtitle="Admin controls for role assignments and credentials"
@@ -537,6 +543,7 @@ export default function StaffPage() {
           data={staffList}
           loading={loading}
           emptyText={isHoAdmin ? "No branch admins or staff registered under this Head Office yet." : "No staff members registered."}
+          minWidth="min-w-[920px]"
         />
 
         <Pagination

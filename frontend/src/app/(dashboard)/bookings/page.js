@@ -374,7 +374,7 @@ export default function BookingsPage() {
   ];
 
   return (
-    <div>
+    <div className="flex-1 flex flex-col min-w-0 w-full">
       <Header
         title="Walk-in Bookings"
         subtitle="Manage token amounts and convert bookings to active rentals or direct sales"
@@ -454,6 +454,7 @@ export default function BookingsPage() {
             data={bookings}
             loading={loading}
             emptyText="No bookings found. Click '+ New Booking' to record a reservation."
+            minWidth="min-w-[860px]"
           />
         </div>
 

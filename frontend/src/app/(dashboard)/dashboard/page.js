@@ -32,7 +32,7 @@ import DashboardFooter from '../../../components/layout/Footer';
 import { gsap, animateCounter, staggerFadeIn } from '../../../lib/gsap';
 
 export default function DashboardPage() {
-  const { role } = useAuthStore();
+  const { role, selectedBranch } = useAuthStore();
   const isSuperAdmin = role === 'super_admin' || role === 'admin';
 
   return (
@@ -42,17 +42,17 @@ export default function DashboardPage() {
       ) : role === 'branch_admin' ? (
         <BranchDashboard />
       ) : role === 'ho_admin' ? (
-        <HoDashboard />
+        selectedBranch ? <AdminDashboard /> : <HoDashboard />
       ) : (
         <AdminDashboard />
       )}
-      {isSuperAdmin && <DashboardFooter />}
+      {(isSuperAdmin || role === 'ho_admin') && <DashboardFooter />}
     </div>
   );
 }
 
 function AdminDashboard() {
-  const { selectedBranch } = useAuthStore();
+  const { selectedBranch, setSelectedBranch } = useAuthStore();
   const [stats, setStats] = useState({
     totalStock: 0,
     oldStock: 0,
@@ -162,11 +162,34 @@ function AdminDashboard() {
   return (
     <div className="w-full">
       <Header
-        title="Operations Dashboard"
-        subtitle="Delhi Fleet & Finance Monitoring"
+        title={selectedBranch ? (selectedBranch.ward_no ? `Ward ${selectedBranch.ward_no}: ${selectedBranch.name}` : selectedBranch.name) : "Operations Dashboard"}
+        subtitle={selectedBranch ? `Active Ward Operations & Performance (${selectedBranch.ward_area || selectedBranch.code || 'Delhi'})` : "Delhi Fleet & Finance Monitoring"}
       />
 
       <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-6 pb-6">
+        {selectedBranch && (
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-800 dark:text-blue-300">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-bold truncate">
+                  Filtered View: {selectedBranch.ward_no ? `Ward ${selectedBranch.ward_no}: ${selectedBranch.name}` : selectedBranch.name}
+                </p>
+                <p className="text-[10px] sm:text-xs text-blue-600/80 dark:text-blue-400/80 truncate">
+                  {selectedBranch.contact_person ? `Candidate: ${selectedBranch.contact_person} • ` : ''}Showing ward-specific inventory, contracts, and revenue.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedBranch(null)}
+              className="px-3 py-1 text-xs font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shrink-0 cursor-pointer shadow-2xs"
+            >
+              All Wards
+            </button>
+          </div>
+        )}
+
         {/* KPI Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
           {/* Available Stock */}

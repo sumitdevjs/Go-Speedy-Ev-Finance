@@ -494,3 +494,51 @@ ON CONFLICT (email) DO UPDATE SET
   role = EXCLUDED.role,
   ward_area = EXCLUDED.ward_area,
   is_active = EXCLUDED.is_active;
+
+-- ── TABLE 8: bike_transfers ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS bike_transfers (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  transfer_id      TEXT UNIQUE NOT NULL,
+  from_branch_id   UUID REFERENCES branches(id),
+  to_branch_id     UUID REFERENCES branches(id),
+  ev_model_id      UUID REFERENCES ev_models(id),
+  quantity         INTEGER NOT NULL DEFAULT 1,
+  status           TEXT NOT NULL DEFAULT 'requested' CHECK (status IN ('requested', 'in_transit', 'received', 'cancelled')),
+  challan_number   TEXT,
+  driver_name      TEXT,
+  driver_phone     TEXT,
+  dispatch_notes   TEXT,
+  receive_notes    TEXT,
+  condition_received TEXT DEFAULT 'Good',
+  initiated_by     UUID REFERENCES users(id),
+  dispatched_by    UUID REFERENCES users(id),
+  received_by      UUID REFERENCES users(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_transfers_from ON bike_transfers(from_branch_id);
+CREATE INDEX IF NOT EXISTS idx_transfers_to   ON bike_transfers(to_branch_id);
+CREATE INDEX IF NOT EXISTS idx_transfers_status ON bike_transfers(status);
+
+-- ── TABLE 9: penalties ───────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS penalties (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  penalty_id      TEXT UNIQUE NOT NULL,
+  tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  amount          NUMERIC(10,2) NOT NULL CHECK (amount > 0),
+  reason          TEXT NOT NULL,
+  notes           TEXT,
+  penalty_date    DATE NOT NULL DEFAULT CURRENT_DATE,
+  status          TEXT NOT NULL DEFAULT 'unpaid' CHECK (status IN ('unpaid', 'paid', 'waived')),
+  waived_reason   TEXT,
+  waived_by       UUID REFERENCES users(id),
+  waived_at       TIMESTAMPTZ,
+  created_by      UUID REFERENCES users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_penalties_tenant ON penalties(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_penalties_status ON penalties(status);
+

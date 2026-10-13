@@ -347,7 +347,7 @@ export default function AuditPage() {
 
   return (
     <ProtectedRoute adminOnly={true}>
-      <div>
+      <div className="flex-1 flex flex-col min-w-0 w-full">
         <Header
           title={role === 'ho_admin' ? "Department Activity Log" : "Activity Log"}
           subtitle={role === 'ho_admin' ? "Audit trail of actions taken by and on staff under your Head Office" : "A clear record of every action taken in the system"}
@@ -371,6 +371,8 @@ export default function AuditPage() {
             data={logs}
             loading={loading}
             emptyText="No activity recorded yet."
+            minWidth="min-w-[760px]"
+            tableLayout="table-fixed"
           />
 
           <Pagination

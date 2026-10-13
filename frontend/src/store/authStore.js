@@ -78,7 +78,6 @@ export const useAuthStore = create((set, get) => ({
         let storedHo = null;
 
         if (typeof window !== 'undefined' && (isSuperAdmin || isHoAdmin)) {
-          // Restore selected branch from localStorage
           try {
             const raw = localStorage.getItem('gospeedy_selected_branch');
             if (raw) {

@@ -152,8 +152,6 @@ class BranchesService {
         } else if (user.ward_area) {
           queryBuilder = queryBuilder.ilike('name', `%${user.ward_area}%`);
         }
-      } else if (user && user.role === 'ho_admin' && user.head_office_id) {
-        queryBuilder = queryBuilder.eq('head_office_id', user.head_office_id);
       } else if (query.head_office_id) {
         queryBuilder = queryBuilder.eq('head_office_id', query.head_office_id);
       }
@@ -187,9 +185,7 @@ class BranchesService {
         filtered = [myWard];
       }
     } else {
-      if (user && user.role === 'ho_admin' && user.head_office_id) {
-        filtered = filtered.filter(w => w.head_office_id === user.head_office_id);
-      } else if (query.head_office_id) {
+      if (query.head_office_id) {
         filtered = filtered.filter(w => w.head_office_id === query.head_office_id);
       }
     }

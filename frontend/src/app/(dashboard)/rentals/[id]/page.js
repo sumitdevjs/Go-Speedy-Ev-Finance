@@ -36,6 +36,8 @@ import Select from '../../../../components/ui/Select';
 import Spinner from '../../../../components/ui/Spinner';
 import FileUpload from '../../../../components/ui/FileUpload';
 import api from '../../../../lib/api';
+import { useAuthStore } from '../../../../store/authStore';
+import AddPenaltyModal from '../../../../components/penalties/AddPenaltyModal';
 import {
   formatCurrency,
   formatDate,
@@ -50,10 +52,14 @@ export default function TenantDetailPage() {
   const router = useRouter();
   const tenantId = params.id;
 
+  const { user } = useAuthStore();
+  const isSuperAdmin = user?.role === 'super_admin' || (user?.role === 'admin' && !user?.ward_area);
+
   const [tenant, setTenant] = useState(null);
   const [payments, setPayments] = useState([]);
   const [signedDocs, setSignedDocs] = useState({});
   const [loading, setLoading] = useState(true);
+  const [isPenaltyModalOpen, setIsPenaltyModalOpen] = useState(false);
 
   // Edit Mode
   const [isEditMode, setIsEditMode] = useState(false);
@@ -368,6 +374,19 @@ export default function TenantDetailPage() {
                       </Button>
                     )}
                   </>
+                )}
+                {isSuperAdmin && (
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    icon={ShieldAlert}
+                    onClick={() => setIsPenaltyModalOpen(true)}
+                    className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-2.5 xs:py-1.5"
+                    title="Add Custom Penalty"
+                  >
+                    <span className="hidden sm:inline">Add Penalty</span>
+                    <span className="hidden xs:inline sm:hidden">Penalty</span>
+                  </Button>
                 )}
                 {tenant.status !== 'cancelled' && (
                   <Button
@@ -1502,6 +1521,23 @@ export default function TenantDetailPage() {
           />
         </div>
       </Modal>
+
+      {/* Add Penalty Modal */}
+      {isPenaltyModalOpen && tenant && (
+        <AddPenaltyModal
+          isOpen={isPenaltyModalOpen}
+          target={{
+            id: tenant.id,
+            name: tenant.name,
+            phone: tenant.phone,
+            vehicle_number: tenant.vehicle_number,
+            outstanding: balance.outstanding,
+            days_overdue: balance.daysOverdue
+          }}
+          onClose={() => setIsPenaltyModalOpen(false)}
+          onSuccess={() => loadAllData()}
+        />
+      )}
     </div>
   );
 }

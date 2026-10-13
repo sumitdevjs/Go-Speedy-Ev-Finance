@@ -249,7 +249,7 @@ export default function RentalsListPage() {
   ];
 
   return (
-    <div>
+    <div className="flex-1 flex flex-col min-w-0 w-full">
       <Header
         title="EV Rentals & Tenants"
         subtitle="Live registry of active contracts, daily collections, and overdue accounts"
@@ -357,6 +357,7 @@ export default function RentalsListPage() {
           data={tenants}
           loading={loading}
           emptyText="No rental records match your filter criteria."
+          minWidth="min-w-[960px]"
         />
 
         <Pagination

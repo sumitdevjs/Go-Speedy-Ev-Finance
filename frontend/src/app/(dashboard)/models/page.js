@@ -605,7 +605,7 @@ export default function ModelsPage() {
   const activeWardsCount = wardBreakdown.filter(w => w.total_stock > 0).length;
 
   return (
-    <div className="min-h-screen">
+    <div className="flex-1 flex flex-col min-w-0 w-full min-h-screen">
       <Header
         title="EV Models & Fleet Stock"
         subtitle="Manage fleet vehicle catalog, master models, and municipal ward allocations"
@@ -719,6 +719,7 @@ export default function ModelsPage() {
                 data={models}
                 loading={loading}
                 emptyText="No EV models registered yet. Click 'Add New EV Model' to add inventory."
+                minWidth="min-w-[800px]"
               />
             </div>
 
@@ -1055,6 +1056,7 @@ export default function ModelsPage() {
               data={oldEvs}
               loading={loadingOldEvs}
               emptyText="No returned/refurbished EVs found."
+              minWidth="min-w-[800px]"
             />
           </div>
         )}

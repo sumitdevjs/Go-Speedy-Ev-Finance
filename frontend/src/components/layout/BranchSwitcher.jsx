@@ -82,31 +82,31 @@ export default function BranchSwitcher({ isMobileBar = false }) {
     );
   }
 
-  // Filter branches by search and strict HO isolation
+  // Filter branches by search query across names, codes, wards, areas, candidates, and phones
   const filteredBranches = branches.filter((b) => {
-    // If user is HO admin, strictly only show branches under their assigned head office
-    if (isHoAdmin) {
-      if (!user?.head_office_id || b.head_office_id !== user.head_office_id) return false;
-    }
     if (!search.trim()) return true;
-    const query = search.toLowerCase();
+    const query = search.trim().toLowerCase();
+    
+    const wardNoStr = b.ward_no ? String(b.ward_no) : '';
+    const wardNoPadded = b.ward_no ? String(b.ward_no).padStart(2, '0') : '';
+    const wardLabel = b.ward_no ? `ward ${b.ward_no}` : '';
+    const wardLabelPadded = b.ward_no ? `ward ${wardNoPadded}` : '';
+    const hoName = b.head_office?.name || b.head_offices?.name || '';
+
     return (
-      b.name.toLowerCase().includes(query) ||
-      b.code.toLowerCase().includes(query) ||
-      (b.ward_no && String(b.ward_no).includes(query)) ||
+      (b.name && b.name.toLowerCase().includes(query)) ||
+      (b.code && b.code.toLowerCase().includes(query)) ||
+      wardNoStr.includes(query) ||
+      wardNoPadded.includes(query) ||
+      wardLabel.includes(query) ||
+      wardLabelPadded.includes(query) ||
       (b.ward_area && b.ward_area.toLowerCase().includes(query)) ||
-      (b.contact_person && b.contact_person.toLowerCase().includes(query))
+      (b.contact_person && b.contact_person.toLowerCase().includes(query)) ||
+      (b.phone && String(b.phone).includes(query)) ||
+      (b.address && b.address.toLowerCase().includes(query)) ||
+      hoName.toLowerCase().includes(query)
     );
   });
-
-  // Auto-reset if active branch is from another HO
-  useEffect(() => {
-    if (isHoAdmin && user?.head_office_id && selectedBranch) {
-      if (selectedBranch.head_office_id && selectedBranch.head_office_id !== user.head_office_id) {
-        setSelectedBranch(null);
-      }
-    }
-  }, [isHoAdmin, user?.head_office_id, selectedBranch]);
 
   // Group branches by Head Office
   const grouped = filteredBranches.reduce((acc, b) => {
@@ -116,21 +116,20 @@ export default function BranchSwitcher({ isMobileBar = false }) {
     return acc;
   }, {});
 
-  const currentHoName = headOffices.find(h => h.id === user?.head_office_id)?.name || 'Zone';
   const currentLabel = selectedBranch
     ? (selectedBranch.ward_no ? `Ward ${selectedBranch.ward_no}: ${selectedBranch.name}` : selectedBranch.name)
     : selectedHeadOffice
     ? `${selectedHeadOffice.name} (Zone)`
-    : (isHoAdmin ? `${currentHoName} (All Branches)` : 'All Wards (Global Master)');
+    : 'All Wards (Global Master)';
 
   return (
-    <div className={`relative ${isMobileBar ? 'w-full' : 'min-w-0 shrink'}`} ref={dropdownRef}>
+    <div className={`relative ${isMobileBar ? 'w-full' : 'min-w-0 shrink-0'}`} ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={isMobileBar
           ? "h-9 w-full flex items-center justify-between rounded-xl bg-white dark:bg-slate-800/90 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200/90 dark:border-slate-700/80 px-3 text-xs font-semibold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-2xs"
-          : "h-9 max-w-full flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 px-2.5 sm:px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-all cursor-pointer shadow-2xs"
+          : "h-9 max-w-full shrink-0 flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 px-2.5 sm:px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 transition-all cursor-pointer shadow-2xs"
         }
         title="Switch active branch/ward filter"
       >
@@ -160,8 +159,8 @@ export default function BranchSwitcher({ isMobileBar = false }) {
         <div
           data-lenis-prevent
           className={isMobileBar
-            ? "absolute left-0 right-0 mt-1.5 w-full max-h-[65vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
-            : "absolute left-0 sm:right-0 sm:left-auto mt-2 w-72 xs:w-84 max-h-[75vh] sm:max-h-[440px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+            ? "absolute left-0 right-0 top-full mt-1.5 w-full max-h-[65vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+            : "absolute left-0 sm:left-auto sm:right-0 lg:left-0 lg:right-auto top-full mt-2 w-80 sm:w-96 max-w-[calc(100vw-2rem)] max-h-[75vh] sm:max-h-[460px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
           }
           onWheel={(e) => e.stopPropagation()}
         >
@@ -174,9 +173,18 @@ export default function BranchSwitcher({ isMobileBar = false }) {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by ward or candidate name..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full pl-8 pr-7 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 autoFocus
               />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 rounded cursor-pointer"
+                >
+                  <span className="text-xs leading-none">×</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -200,6 +208,7 @@ export default function BranchSwitcher({ isMobileBar = false }) {
                     setSelectedBranch(null);
                     if (isSuperAdmin) setSelectedHeadOffice(null);
                     setIsOpen(false);
+                    setSearch('');
                   }}
                   className={`w-full flex items-center justify-between p-2 text-xs rounded-lg text-left transition-colors cursor-pointer ${
                     !selectedBranch && !selectedHeadOffice
@@ -210,8 +219,8 @@ export default function BranchSwitcher({ isMobileBar = false }) {
                   <div className="flex items-center gap-2">
                     <Globe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                     <div>
-                      <p className="font-semibold">{isHoAdmin ? `All ${currentHoName} Branches` : 'All Wards (Global Master)'}</p>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400">{isHoAdmin ? `Aggregated overview of ${currentHoName}` : 'Aggregated stats across all wards'}</p>
+                      <p className="font-semibold">All Wards (Global Master)</p>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">Aggregated stats across all wards</p>
                     </div>
                   </div>
                   {!selectedBranch && !selectedHeadOffice && <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
@@ -258,7 +267,7 @@ export default function BranchSwitcher({ isMobileBar = false }) {
             {/* Groups */}
             {Object.keys(grouped).length === 0 ? (
               <p className="text-xs text-slate-400 text-center py-6">
-                {isHoAdmin ? 'No branches found for this Head Office.' : 'No matching wards found.'}
+                No matching wards found.
               </p>
             ) : (
               Object.entries(grouped).map(([hoName, branchList]) => (
@@ -277,6 +286,7 @@ export default function BranchSwitcher({ isMobileBar = false }) {
                           onClick={() => {
                             setSelectedBranch(branch);
                             setIsOpen(false);
+                            setSearch('');
                           }}
                           className={`w-full flex items-center justify-between px-3 py-1.5 text-xs rounded-md text-left transition-colors cursor-pointer ${isSelected
                               ? 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold'

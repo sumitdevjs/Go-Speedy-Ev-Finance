@@ -203,7 +203,7 @@ export default function PurchasesPage() {
   ];
 
   return (
-    <div>
+    <div className="flex-1 flex flex-col min-w-0 w-full">
       <Header
         title="Purchases & Ownership"
         subtitle="Ledger of all vehicles fully paid and transferred to tenants"
@@ -296,6 +296,7 @@ export default function PurchasesPage() {
           data={purchases}
           loading={loading}
           emptyText="No completed purchases yet. When tenant balance reaches ₹0, contracts auto-complete here."
+          minWidth="min-w-[880px]"
         />
 
         <Pagination
