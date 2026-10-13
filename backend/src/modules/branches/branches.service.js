@@ -104,6 +104,35 @@ class BranchesService {
       data = filtered.slice(offset, offset + limit);
     }
 
+    // Safely batch-enrich branches with their governing HO Admin
+    if (data && data.length > 0) {
+      try {
+        const { data: hoAdmins } = await supabase
+          .from('users')
+          .select('id, name, phone, email, head_office_id, branch_id, ward_area, role')
+          .eq('role', 'ho_admin')
+          .eq('is_active', true);
+
+        if (hoAdmins && hoAdmins.length > 0) {
+          data.forEach(branch => {
+            let matched = hoAdmins.find(u => 
+              (u.branch_id && String(u.branch_id).toLowerCase() === String(branch.id).toLowerCase()) ||
+              (u.ward_area && branch.name && u.ward_area.toLowerCase().includes(branch.name.toLowerCase()))
+            );
+            if (!matched && branch.head_office_id) {
+              matched = hoAdmins.find(u => u.head_office_id === branch.head_office_id);
+            }
+            branch.ho_admin = matched ? {
+              id: matched.id,
+              name: matched.name,
+              phone: matched.phone,
+              email: matched.email,
+            } : null;
+          });
+        }
+      } catch (err) {}
+    }
+
     const meta = getPaginationMeta(count, page, limit);
     return { data, meta };
   }
@@ -316,6 +345,31 @@ class BranchesService {
     } catch (e) {
       // Keep sensible default stats for demo
     }
+
+    // Enrich branch with governing HO Admin for overview modal
+    try {
+      const { data: hoAdmins } = await supabase
+        .from('users')
+        .select('id, name, phone, email, head_office_id, branch_id, ward_area, role')
+        .eq('role', 'ho_admin')
+        .eq('is_active', true);
+
+      if (hoAdmins && hoAdmins.length > 0) {
+        let matched = hoAdmins.find(u => 
+          (u.branch_id && String(u.branch_id).toLowerCase() === String(branch.id).toLowerCase()) ||
+          (u.ward_area && branch.name && u.ward_area.toLowerCase().includes(branch.name.toLowerCase()))
+        );
+        if (!matched && branch.head_office_id) {
+          matched = hoAdmins.find(u => u.head_office_id === branch.head_office_id);
+        }
+        branch.ho_admin = matched ? {
+          id: matched.id,
+          name: matched.name,
+          phone: matched.phone,
+          email: matched.email,
+        } : null;
+      }
+    } catch (err) {}
 
     return {
       branch,

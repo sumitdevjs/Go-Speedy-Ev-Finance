@@ -6,7 +6,7 @@ import { useAuthStore } from '../../store/authStore';
 import api from '../../lib/api';
 
 export default function BranchSwitcher({ isMobileBar = false }) {
-  const { user, role, selectedBranch, setSelectedBranch } = useAuthStore();
+  const { user, role, selectedBranch, setSelectedBranch, selectedHeadOffice, setSelectedHeadOffice } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
   const [branches, setBranches] = useState([]);
   const [headOffices, setHeadOffices] = useState([]);
@@ -119,6 +119,8 @@ export default function BranchSwitcher({ isMobileBar = false }) {
   const currentHoName = headOffices.find(h => h.id === user?.head_office_id)?.name || 'Zone';
   const currentLabel = selectedBranch
     ? (selectedBranch.ward_no ? `Ward ${selectedBranch.ward_no}: ${selectedBranch.name}` : selectedBranch.name)
+    : selectedHeadOffice
+    ? `${selectedHeadOffice.name} (Zone)`
     : (isHoAdmin ? `${currentHoName} (All Branches)` : 'All Wards (Global Master)');
 
   return (
@@ -135,6 +137,8 @@ export default function BranchSwitcher({ isMobileBar = false }) {
         <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate pr-0.5">
           {selectedBranch ? (
             <MapPin className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+          ) : selectedHeadOffice ? (
+            <Building2 className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
           ) : (
             <Globe className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
           )}
@@ -194,12 +198,14 @@ export default function BranchSwitcher({ isMobileBar = false }) {
                   type="button"
                   onClick={() => {
                     setSelectedBranch(null);
+                    if (isSuperAdmin) setSelectedHeadOffice(null);
                     setIsOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between p-2 text-xs rounded-lg text-left transition-colors cursor-pointer ${!selectedBranch
+                  className={`w-full flex items-center justify-between p-2 text-xs rounded-lg text-left transition-colors cursor-pointer ${
+                    !selectedBranch && !selectedHeadOffice
                       ? 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold'
                       : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                    }`}
+                  }`}
                 >
                   <div className="flex items-center gap-2">
                     <Globe className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
@@ -208,8 +214,44 @@ export default function BranchSwitcher({ isMobileBar = false }) {
                       <p className="text-[10px] text-slate-500 dark:text-slate-400">{isHoAdmin ? `Aggregated overview of ${currentHoName}` : 'Aggregated stats across all wards'}</p>
                     </div>
                   </div>
-                  {!selectedBranch && <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
+                  {!selectedBranch && !selectedHeadOffice && <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
                 </button>
+              </div>
+            )}
+
+            {/* HO-Level Zone View (Super Admin only) */}
+            {isSuperAdmin && headOffices.length > 0 && !search.trim() && (
+              <div className="py-1 border-t border-slate-100 dark:border-slate-800/60">
+                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <Building2 className="h-3 w-3" />
+                  <span>Switch Head Office Zone</span>
+                </div>
+                <div className="space-y-0.5">
+                  {headOffices.map((ho) => {
+                    const isSelectedHo = selectedHeadOffice?.id === ho.id && !selectedBranch;
+                    return (
+                      <button
+                        key={ho.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedHeadOffice(ho);
+                          setIsOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-1.5 text-xs rounded-md text-left transition-colors cursor-pointer ${
+                          isSelectedHo
+                            ? 'bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 font-bold'
+                            : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <div>
+                          <span className="font-semibold">{ho.name}</span>
+                          <span className="ml-1 text-[10px] text-slate-400">({ho.code})</span>
+                        </div>
+                        {isSelectedHo && <Check className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 

@@ -73,7 +73,8 @@ export default function ModelViewPage({ params }) {
           name: data.name || '',
           company: data.company || '',
           total_price: data.total_price?.toString() || '',
-          stock_count: data.stock_count?.toString() || ''
+          stock_count: data.stock_count?.toString() || '',
+          kilometres: data.kilometres?.toString() || '0'
         });
         const fetchedLogs = data.stock_logs || [];
         // Sort logs descending by date
@@ -94,7 +95,8 @@ export default function ModelViewPage({ params }) {
       await api.patch(`/api/models/${id}`, {
         name: formData.name,
         company: formData.company,
-        total_price: Number(formData.total_price)
+        total_price: Number(formData.total_price),
+        kilometres: Number(formData.kilometres) || 0,
       });
       toast.success('Model details updated successfully');
       setIsEditMode(false);
@@ -341,7 +343,7 @@ export default function ModelViewPage({ params }) {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6 mt-6">
             <div>
               {isEditMode ? (
                 <Input
@@ -372,6 +374,24 @@ export default function ModelViewPage({ params }) {
               )}
             </div>
 
+            <div>
+              {isEditMode ? (
+                <Input
+                  label="Kilometres"
+                  type="number"
+                  min={0}
+                  value={formData.kilometres}
+                  onChange={(e) => setFormData({ ...formData, kilometres: e.target.value })}
+                />
+              ) : (
+                <>
+                  <p className="font-bold text-slate-400 uppercase text-[10px]">Kilometres</p>
+                  <p className="text-sm font-bold font-mono text-slate-800 dark:text-slate-200 mt-0.5">
+                    {model.kilometres !== undefined && model.kilometres !== null ? `${model.kilometres} km` : '0 km'}
+                  </p>
+                </>
+              )}
+            </div>
 
             <div>
               {isEditMode ? (

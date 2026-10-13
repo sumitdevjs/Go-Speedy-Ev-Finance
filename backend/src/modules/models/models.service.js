@@ -198,7 +198,22 @@ class ModelsService {
   }
 
   async createModel(modelData, createdBy, req = null) {
-    const { initial_stock_date, ward = 'Delhi Central', branch_id, head_office_id, ...restData } = modelData;
+    const { initial_stock_date, ward = 'Delhi Central', branch_id, head_office_id, kilometres, ...restData } = modelData;
+    const kmValue = Number(kilometres) || 0;
+    const trimmedName = String(modelData.name || '').trim().toLowerCase();
+
+    // Check for unique (name + kilometres) combination among active models
+    const { data: existing } = await supabase
+      .from('ev_models')
+      .select('id, name, kilometres')
+      .ilike('name', trimmedName)
+      .eq('kilometres', kmValue)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (existing) {
+      throw new Error(`An active EV model with name "${modelData.name}" and ${kmValue} km already exists. Model + Kilometres combination must be unique.`);
+    }
 
     let assignedBranchId = branch_id || null;
     let assignedHoId = head_office_id || null;
@@ -221,21 +236,41 @@ class ModelsService {
       });
     }
 
-    const { data, error } = await supabase
+    const insertRow = {
+      ...restData,
+      stock_count: Number(restData.stock_count) || 0,
+      kilometres: kmValue,
+      ward,
+      branch_id: assignedBranchId,
+      head_office_id: assignedHoId,
+      created_by: createdBy,
+      stock_logs: initialLogs
+    };
+
+    let { data, error } = await supabase
       .from('ev_models')
-      .insert([{
-        ...restData,
-        stock_count: Number(restData.stock_count) || 0,
-        ward,
-        branch_id: assignedBranchId,
-        head_office_id: assignedHoId,
-        created_by: createdBy,
-        stock_logs: initialLogs
-      }])
+      .insert([insertRow])
       .select('*')
       .single();
 
-    if (error) throw error;
+    // Fallback if kilometres column doesn't exist yet on live DB
+    if (error && (error.code === '42703' || error.message?.includes('kilometres'))) {
+      delete insertRow.kilometres;
+      const retry = await supabase
+        .from('ev_models')
+        .insert([insertRow])
+        .select('*')
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
+
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error(`An EV model with name "${modelData.name}" and ${kmValue} km already exists. Model + Kilometres combination must be unique.`);
+      }
+      throw error;
+    }
     return data;
   }
 
@@ -334,15 +369,53 @@ class ModelsService {
   }
 
   async updateModel(id, updateData) {
-    const { data, error } = await supabase
+    if (updateData.name || updateData.kilometres !== undefined) {
+      const { data: current } = await supabase
+        .from('ev_models')
+        .select('name, kilometres')
+        .eq('id', id)
+        .single();
+
+      const nameToCheck = String(updateData.name || current?.name || '').trim().toLowerCase();
+      const kmToCheck = updateData.kilometres !== undefined ? Number(updateData.kilometres) : Number(current?.kilometres || 0);
+
+      const { data: existing } = await supabase
+        .from('ev_models')
+        .select('id')
+        .ilike('name', nameToCheck)
+        .eq('kilometres', kmToCheck)
+        .eq('is_active', true)
+        .neq('id', id)
+        .maybeSingle();
+
+      if (existing) {
+        throw new Error(`Another active EV model with name "${updateData.name || current?.name}" and ${kmToCheck} km already exists.`);
+      }
+    }
+
+    const payload = {
+      ...updateData,
+      updated_at: new Date().toISOString()
+    };
+
+    let { data, error } = await supabase
       .from('ev_models')
-      .update({
-        ...updateData,
-        updated_at: new Date().toISOString()
-      })
+      .update(payload)
       .eq('id', id)
       .select('*')
       .single();
+
+    if (error && (error.code === '42703' || error.message?.includes('kilometres'))) {
+      delete payload.kilometres;
+      const retry = await supabase
+        .from('ev_models')
+        .update(payload)
+        .eq('id', id)
+        .select('*')
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw error;
     return data;

@@ -437,7 +437,11 @@ class HeadOfficesService {
       };
     });
 
-    const depletedStockWards = wardPerformance.filter(w => w.stock_count === 0).length;
+    // Only alert if the HO has total stock but specific branches are zero
+    // (avoids false positives when no stock has been distributed yet across the zone)
+    const depletedStockWards = totalStock > 0
+      ? wardPerformance.filter(w => w.stock_count === 0).length
+      : 0;
 
     const summary = {
       totalWards: branches.length,

@@ -87,6 +87,7 @@ export default function ModelsPage() {
   const [ward, setWard] = useState('Delhi Central');
   const [totalPrice, setTotalPrice] = useState('80000');
   const [stockCount, setStockCount] = useState('5');
+  const [kilometres, setKilometres] = useState('0');
   const [initialStockDate, setInitialStockDate] = useState(new Date().toISOString().split('T')[0]);
 
   const { selectedBranch, setSelectedBranch } = useAuthStore();
@@ -218,6 +219,7 @@ export default function ModelsPage() {
           'Model Name': m.name,
           Company: m.company,
           'Total Price': m.total_price,
+          'Kilometres (KM)': m.kilometres ?? 0,
           'Total Global Stock': m.total_stock,
           Status: m.is_active ? 'Active' : 'Cancelled',
           Created: formatDate(m.created_at)
@@ -311,6 +313,7 @@ export default function ModelsPage() {
     setWard('Delhi Central');
     setTotalPrice('80000');
     setStockCount('5');
+    setKilometres('0');
     setInitialStockDate(new Date().toISOString().split('T')[0]);
     setIsAddModalOpen(true);
   };
@@ -332,6 +335,7 @@ export default function ModelsPage() {
         ward: ward.trim(),
         total_price: Number(totalPrice),
         stock_count: Number(stockCount),
+        kilometres: Number(kilometres) || 0,
       };
 
       let res;
@@ -347,6 +351,7 @@ export default function ModelsPage() {
         setEditingModelId(null);
         setName('');
         setCompany('');
+        setKilometres('0');
         fetchModels();
         if (activeTab === 'ward_breakdown') {
           fetchWardBreakdown();
@@ -402,7 +407,12 @@ export default function ModelsPage() {
       key: 'name',
       render: (row) => (
         <div>
-          <p className="font-bold text-slate-900 dark:text-white">{row.name}</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="font-bold text-slate-900 dark:text-white">{row.name}</p>
+            <span className="text-[11px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+              {row.kilometres !== undefined && row.kilometres !== null ? `${row.kilometres} km` : '0 km'}
+            </span>
+          </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">{row.company}</p>
         </div>
       ),
@@ -1088,6 +1098,17 @@ export default function ModelsPage() {
             placeholder="e.g. 80000"
             value={totalPrice}
             onChange={(e) => setTotalPrice(e.target.value)}
+            required
+          />
+
+          <Input
+            label="Kilometres (KM) *"
+            type="number"
+            min={0}
+            placeholder="e.g. 0 (Brand New) or 15000"
+            value={kilometres}
+            onChange={(e) => setKilometres(e.target.value)}
+            helperText="Every EV model + kilometres reading will be a unique combination."
             required
           />
 

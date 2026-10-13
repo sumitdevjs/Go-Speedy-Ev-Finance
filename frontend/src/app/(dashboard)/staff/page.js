@@ -56,6 +56,7 @@ export default function StaffPage() {
   const [wardArea, setWardArea] = useState('');
   const [headOfficeId, setHeadOfficeId] = useState(isHoAdmin ? (currentUser?.head_office_id || '') : '');
   const [branchId, setBranchId] = useState('');
+  const [verificationDoc, setVerificationDoc] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -68,6 +69,7 @@ export default function StaffPage() {
   const [editWardArea, setEditWardArea] = useState('');
   const [editHeadOfficeId, setEditHeadOfficeId] = useState('');
   const [editBranchId, setEditBranchId] = useState('');
+  const [editVerificationDoc, setEditVerificationDoc] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -136,6 +138,7 @@ export default function StaffPage() {
           'Ward/Area': user.ward_area,
           'Branch Name': user.branches?.name,
           'Head Office': user.head_offices?.name,
+          'Verification Document': user.verification_doc || 'N/A',
           Status: user.is_active ? 'Active' : 'Deactivated',
           Created: formatDate(user.created_at)
         }));
@@ -179,6 +182,7 @@ export default function StaffPage() {
         ward_area: wardArea.trim() || null,
         head_office_id: effectiveHoId,
         branch_id: branchId || null,
+        verification_doc: verificationDoc.trim() || null,
       });
 
       if (res.data?.success) {
@@ -190,6 +194,7 @@ export default function StaffPage() {
         setWardArea('');
         setHeadOfficeId('');
         setBranchId('');
+        setVerificationDoc('');
         toast.success('Staff member registered.');
         fetchStaff();
       }
@@ -209,6 +214,7 @@ export default function StaffPage() {
     setEditWardArea(staffMember.ward_area || '');
     setEditHeadOfficeId(staffMember.head_office_id || '');
     setEditBranchId(staffMember.branch_id || '');
+    setEditVerificationDoc(staffMember.verification_doc || '');
     setEditError('');
   };
 
@@ -238,6 +244,7 @@ export default function StaffPage() {
         ward_area: editWardArea.trim() || null,
         head_office_id: effectiveHoId,
         branch_id: editBranchId || null,
+        verification_doc: editVerificationDoc.trim() || null,
       };
       // Omit role entirely when self-editing — the field is locked in the UI too,
       // and the backend also rejects a self role-change as a second line of defense.
@@ -385,6 +392,21 @@ export default function StaffPage() {
           </div>
         );
       },
+    },
+    {
+      header: 'Verification Document',
+      key: 'verification_doc',
+      render: (row) => (
+        <div>
+          {row.verification_doc ? (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 font-mono">
+              {row.verification_doc}
+            </span>
+          ) : (
+            <span className="text-xs text-slate-400 italic">Not provided</span>
+          )}
+        </div>
+      ),
     },
     {
       header: 'Status',
@@ -639,6 +661,13 @@ export default function StaffPage() {
             onChange={(e) => setWardArea(e.target.value)}
           />
 
+          <Input
+            label="Verification Document"
+            placeholder="Add verified doc like adhaar pan etc"
+            value={verificationDoc}
+            onChange={(e) => setVerificationDoc(e.target.value)}
+          />
+
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-white/10">
             <Button
               variant="outline"
@@ -772,6 +801,13 @@ export default function StaffPage() {
             placeholder="e.g. Rohini Sector 7 Hub"
             value={editWardArea}
             onChange={(e) => setEditWardArea(e.target.value)}
+          />
+
+          <Input
+            label="Verification Document"
+            placeholder="Add verified doc like adhaar pan etc"
+            value={editVerificationDoc}
+            onChange={(e) => setEditVerificationDoc(e.target.value)}
           />
 
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-white/10">

@@ -170,7 +170,8 @@ export default function BranchesPage() {
           'Candidate/Contact': branch.contact_person,
           Phone: branch.phone,
           Address: branch.address,
-          'Head Office': branch.head_offices?.name,
+          'Head Office': branch.head_offices?.name || branch.head_office?.name,
+          'Governing HO Admin': branch.ho_admin?.name || 'Zone Admin',
           'Total Stock': branch.total_stock || 0,
           'Active Rentals': branch.active_rentals_count || 0
         }));
@@ -257,6 +258,41 @@ export default function BranchesPage() {
         </div>
       ),
     },
+    ...(isSuperAdmin ? [{
+      header: 'Governing HO Admin',
+      key: 'ho_admin',
+      render: (row) => {
+        const hoAdmin = row.ho_admin;
+        const hoName = row.head_office?.name || row.head_offices?.name || 'Head Office';
+        const hoCode = row.head_office?.code || row.head_offices?.code || 'HO';
+        return (
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5">
+              <span className="h-6 w-6 rounded-full bg-purple-50 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center justify-center shrink-0">
+                <Building2 className="h-3 w-3" />
+              </span>
+              <div>
+                <p className="font-semibold text-xs text-slate-900 dark:text-white leading-tight">
+                  {hoAdmin?.name || `${hoName} Admin`}
+                </p>
+                <span className="font-mono text-[10px] text-purple-600 dark:text-purple-400 font-bold">
+                  {hoCode}
+                </span>
+              </div>
+            </div>
+            {hoAdmin?.phone && (
+              <a
+                href={`tel:${hoAdmin.phone}`}
+                className="inline-flex items-center gap-1 text-[11px] font-mono text-purple-600 dark:text-purple-400 hover:underline pl-7"
+              >
+                <Phone className="h-2.5 w-2.5" />
+                {hoAdmin.phone}
+              </a>
+            )}
+          </div>
+        );
+      },
+    }] : []),
     {
       header: 'In-Charge / Candidate',
       key: 'contact_person',
@@ -680,15 +716,13 @@ export default function BranchesPage() {
                   </div>
 
                   <div className="flex items-center justify-between pt-1">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[200px]">
-                      {b.head_offices?.name || 'Moti Nagar Head Office'}
+                    <span className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 truncate max-w-[200px] flex items-center gap-1">
+                      <Building2 className="w-3 h-3 shrink-0" />
+                      <span>{b.ho_admin?.name || b.head_offices?.name || 'Head Office'}</span>
                     </span>
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedBranch(b);
-                        setIsDetailOpen(true);
-                      }}
+                      onClick={() => handleOpenOverview(b)}
                       className="px-3 py-1 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors cursor-pointer"
                     >
                       View Details
@@ -919,14 +953,33 @@ export default function BranchesPage() {
             </div>
 
             {/* Region / HO summary */}
-            <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs">
-              <div className="flex justify-between">
+            <div className="space-y-2 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs border border-slate-200/60 dark:border-slate-700/60">
+              <div className="flex justify-between items-center">
                 <span className="text-slate-500">Parent Head Office:</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-indigo-500" />
                   {overviewData.branch.head_office?.name || 'Delhi Head Office'}
                 </span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Governing HO Admin:</span>
+                <span className="font-bold text-purple-700 dark:text-purple-300">
+                  {overviewData.branch.ho_admin?.name || 'Assigned Zone Admin'}
+                </span>
+              </div>
+              {overviewData.branch.ho_admin?.phone && (
+                <div className="flex justify-between items-center pt-1 border-t border-slate-200/50 dark:border-slate-700/50">
+                  <span className="text-slate-500">HO Admin Contact:</span>
+                  <a
+                    href={`tel:${overviewData.branch.ho_admin.phone}`}
+                    className="font-mono font-semibold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
+                  >
+                    <Phone className="w-3 h-3" />
+                    +91 {overviewData.branch.ho_admin.phone}
+                  </a>
+                </div>
+              )}
+              <div className="flex justify-between items-center">
                 <span className="text-slate-500">Official Ward Code:</span>
                 <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
                   {overviewData.branch.code}

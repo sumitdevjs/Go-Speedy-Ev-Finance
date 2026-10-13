@@ -25,9 +25,11 @@ class StaffService {
           queryBuilder = queryBuilder.ilike('ward_area', `%${userWard}%`);
         }
       }
-      // If caller is ho_admin, they govern branch admins and desk staff under this HO (exclude HO admin and Super Admin accounts)
+      // If caller is ho_admin, strictly scope to their own HO's staff only
       if (req.user?.role === 'ho_admin') {
-        queryBuilder = queryBuilder.in('role', ['branch_admin', 'staff', 'admin']);
+        queryBuilder = queryBuilder
+          .in('role', ['branch_admin', 'staff', 'admin'])
+          .eq('head_office_id', req.user.head_office_id);
       }
     }
 
@@ -91,7 +93,7 @@ class StaffService {
     return { data, meta };
   }
 
-  async createStaff({ name, phone, email, password, role, ward_area, branch_id, head_office_id }, createdBy, req = null) {
+  async createStaff({ name, phone, email, password, role, ward_area, branch_id, head_office_id, verification_doc }, createdBy, req = null) {
     if (req?.user?.role === 'ho_admin') {
       if (role === 'super_admin' || role === 'ho_admin') {
         throw new Error('Access denied: Head Office Admins can only create Branch Admins and Staff');
@@ -120,6 +122,7 @@ class StaffService {
       password_hash,
       role: role || 'staff',
       ward_area: ward_area || assignedBranchId || null,
+      verification_doc: verification_doc || null,
       is_active: true,
       created_by: createdBy
     };
@@ -132,10 +135,11 @@ class StaffService {
       .select('*')
       .single();
 
-    // Fallback if branch_id / head_office_id columns do not exist yet in DB schema
-    if (error && (error.code === '42703' || error.message?.includes('branch_id'))) {
+    // Fallback if branch_id / head_office_id / verification_doc columns do not exist yet in DB schema
+    if (error && (error.code === '42703' || error.message?.includes('branch_id') || error.message?.includes('verification_doc'))) {
       delete insertPayload.branch_id;
       delete insertPayload.head_office_id;
+      delete insertPayload.verification_doc;
       insertPayload.ward_area = ward_area || assignedBranchId || null;
       const retry = await supabase
         .from('users')
@@ -184,13 +188,14 @@ class StaffService {
       .select('*')
       .single();
 
-    // Fallback if branch_id/head_office_id column doesn't exist
-    if (error && (error.code === '42703' || error.message?.includes('branch_id'))) {
+    // Fallback if branch_id/head_office_id/verification_doc column doesn't exist
+    if (error && (error.code === '42703' || error.message?.includes('branch_id') || error.message?.includes('verification_doc'))) {
       if (cleanUpdates.branch_id) {
         cleanUpdates.ward_area = cleanUpdates.branch_id;
       }
       delete cleanUpdates.branch_id;
       delete cleanUpdates.head_office_id;
+      delete cleanUpdates.verification_doc;
       const retry = await supabase
         .from('users')
         .update(cleanUpdates)

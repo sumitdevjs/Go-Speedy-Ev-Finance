@@ -39,16 +39,19 @@ export default function HoDashboard() {
   const [data, setData] = useState({
     headOffice: null,
     summary: {
-      totalWards: 46,
-      activeWards: 46,
+      totalWards: 0,
+      activeWards: 0,
       depletedStockWards: 0,
       totalStock: 0,
       activeRentals: 0,
       overdueCount: 0,
       totalCollections: 0,
+      todayCollections: 0,
+      modeBreakdown: { cash: 0, online: 0, cashPercent: 50, onlinePercent: 50 },
     },
     wardPerformance: [],
     recentRentals: [],
+    recentOverdue: [],
   });
 
   const [search, setSearch] = useState('');
@@ -56,12 +59,23 @@ export default function HoDashboard() {
 
   useEffect(() => {
     fetchDashboard();
+  }, [selectedBranch]);
+
+  // Also listen to branchChange event for instant reactive refetch
+  useEffect(() => {
+    const handleBranchChange = () => fetchDashboard();
+    window.addEventListener('branchChange', handleBranchChange);
+    return () => window.removeEventListener('branchChange', handleBranchChange);
   }, []);
 
   const fetchDashboard = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/api/head-offices/my-dashboard');
+      // If a specific branch is drilled into, pass it as a query filter
+      const branchParam = selectedBranch
+        ? `?branch_id=${encodeURIComponent(selectedBranch.id || selectedBranch.code || selectedBranch.name)}`
+        : '';
+      const res = await api.get(`/api/head-offices/my-dashboard${branchParam}`);
       if (res.data?.success && res.data.data) {
         setData(res.data.data);
       }
