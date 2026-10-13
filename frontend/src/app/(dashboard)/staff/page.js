@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { UserCheck, Plus, Key, UserX, AlertCircle, Pencil, MapPin, Building2, Download } from 'lucide-react';
+import { UserCheck, Plus, Key, UserX, AlertCircle, Pencil, MapPin, Building2, Download, CheckCircle2, FileText } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
 import Button from '../../../components/ui/Button';
@@ -11,6 +11,7 @@ import Modal from '../../../components/ui/Modal';
 import Badge from '../../../components/ui/Badge';
 import Pagination from '../../../components/ui/Pagination';
 import SearchBar from '../../../components/ui/SearchBar';
+import FileUpload from '../../../components/ui/FileUpload';
 import ProtectedRoute from '../../../components/layout/ProtectedRoute';
 import api from '../../../lib/api';
 import { useAuthStore } from '../../../store/authStore';
@@ -399,8 +400,9 @@ export default function StaffPage() {
       render: (row) => (
         <div>
           {row.verification_doc ? (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 font-mono">
-              {row.verification_doc}
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 font-mono">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <span className="truncate max-w-[140px]">{row.verification_doc.split('/').pop()}</span>
             </span>
           ) : (
             <span className="text-xs text-slate-400 italic">Not provided</span>
@@ -661,12 +663,18 @@ export default function StaffPage() {
             onChange={(e) => setWardArea(e.target.value)}
           />
 
-          <Input
-            label="Verification Document"
-            placeholder="Add verified doc like adhaar pan etc"
-            value={verificationDoc}
-            onChange={(e) => setVerificationDoc(e.target.value)}
-          />
+          <div>
+            <FileUpload
+              label="Verification Document"
+              docType="verification_doc"
+              currentPath={verificationDoc}
+              onUploaded={(path) => setVerificationDoc(path)}
+              accept="image/*,application/pdf"
+            />
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+              Add verified doc like Aadhaar, PAN etc. Compressed automatically to save storage.
+            </p>
+          </div>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-white/10">
             <Button
@@ -803,12 +811,18 @@ export default function StaffPage() {
             onChange={(e) => setEditWardArea(e.target.value)}
           />
 
-          <Input
-            label="Verification Document"
-            placeholder="Add verified doc like adhaar pan etc"
-            value={editVerificationDoc}
-            onChange={(e) => setEditVerificationDoc(e.target.value)}
-          />
+          <div>
+            <FileUpload
+              label="Verification Document"
+              docType="verification_doc"
+              currentPath={editVerificationDoc}
+              onUploaded={(path) => setEditVerificationDoc(path)}
+              accept="image/*,application/pdf"
+            />
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+              Add verified doc like Aadhaar, PAN etc. Compressed automatically to save storage.
+            </p>
+          </div>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-white/10">
             <Button

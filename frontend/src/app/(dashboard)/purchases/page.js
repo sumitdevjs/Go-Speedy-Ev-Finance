@@ -131,7 +131,9 @@ export default function PurchasesPage() {
       key: 'model',
       render: (row) => (
         <span className="font-semibold text-slate-800 dark:text-slate-200">
-          {row.ev_models?.name || 'EV Scooter'}
+          {row.ev_models?.name
+            ? `${row.ev_models.name}${row.ev_models.kilometres !== undefined && row.ev_models.kilometres !== null ? ` (${row.ev_models.kilometres} KM)` : ''}`
+            : 'EV Scooter'}
         </span>
       ),
     },

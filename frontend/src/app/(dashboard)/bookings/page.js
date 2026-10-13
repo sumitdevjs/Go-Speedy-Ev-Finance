@@ -505,7 +505,9 @@ export default function BookingsPage() {
                     <div className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs">
                       <Bike className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                       <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
-                        {row.ev_models?.name || row.model_name_raw || 'Model N/A'}
+                        {row.ev_models?.name
+                          ? `${row.ev_models.name}${row.ev_models.kilometres !== undefined && row.ev_models.kilometres !== null ? ` — ${row.ev_models.kilometres} KM` : ''}`
+                          : (row.model_name_raw || 'Model N/A')}
                       </span>
                     </div>
 
@@ -745,7 +747,7 @@ export default function BookingsPage() {
             options={[
               ...models.filter((m) => m.is_active).map((m) => ({
                 value: m.id,
-                label: `${m.name} (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
+                label: `${m.name} (${m.company || 'GoSpeedy'}) — ${m.kilometres ?? 0} KM (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
               })),
               { value: 'other', label: 'Other / Future Model' },
             ]}
@@ -830,7 +832,7 @@ export default function BookingsPage() {
             options={[
               ...models.filter((m) => m.is_active || editData.modelId === m.id).map((m) => ({
                 value: m.id,
-                label: `${m.name} (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
+                label: `${m.name} (${m.company || 'GoSpeedy'}) — ${m.kilometres ?? 0} KM (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
               })),
               { value: 'other', label: 'Other / Future Model' },
             ]}

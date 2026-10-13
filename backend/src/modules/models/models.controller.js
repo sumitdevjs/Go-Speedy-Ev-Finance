@@ -51,8 +51,15 @@ class ModelsController {
       const data = await modelsService.createModel(req.body, req.user.id, req);
       return successResponse(res, 201, data, 'Model created successfully');
     } catch (error) {
+      if (
+        error.message?.includes('already exists') ||
+        error.code === '23505' ||
+        error.message?.includes('unique')
+      ) {
+        return errorResponse(res, 400, error.message || 'An active EV model with this name and kilometre reading already exists.');
+      }
       console.error(error);
-      return errorResponse(res, 500, 'Internal Server Error');
+      return errorResponse(res, 500, error.message || 'Internal Server Error');
     }
   }
 
@@ -62,11 +69,16 @@ class ModelsController {
       const data = await modelsService.updateModel(id, req.body);
       return successResponse(res, 200, data, 'Model updated successfully');
     } catch (error) {
-      if (error.message.startsWith('Cannot change price') || error.message.startsWith('Cannot deactivate')) {
+      if (
+        error.message?.startsWith('Cannot change price') || 
+        error.message?.startsWith('Cannot deactivate') ||
+        error.message?.includes('already exists') ||
+        error.code === '23505'
+      ) {
         return errorResponse(res, 400, error.message);
       }
       console.error(error);
-      return errorResponse(res, 500, 'Internal Server Error');
+      return errorResponse(res, 500, error.message || 'Internal Server Error');
     }
   }
 

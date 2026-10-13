@@ -9,7 +9,7 @@ class BookingsService {
 
     let queryBuilder = supabase
       .from('bookings')
-      .select('*, ev_models(name, company), users!bookings_created_by_fkey(name)', { count: 'exact' });
+      .select('*, ev_models(name, company, kilometres), users!bookings_created_by_fkey(name)', { count: 'exact' });
 
     if (query.status && query.status !== 'all') {
       queryBuilder = queryBuilder.eq('status', query.status);

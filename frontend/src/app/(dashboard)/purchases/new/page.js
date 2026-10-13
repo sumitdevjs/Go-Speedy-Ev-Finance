@@ -514,8 +514,13 @@ export default function NewPurchaseWizardPage() {
                             {m.stock_count} in stock
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{m.company} • {m.ward}</p>
-                        <p className="text-sm font-black text-blue-600 dark:text-blue-400 mt-3">
+                        <div className="flex items-center justify-between mt-1 text-xs">
+                          <p className="text-slate-500 dark:text-slate-400">{m.company} • {m.ward}</p>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-bold text-[11px]">
+                            {m.kilometres ?? 0} KM
+                          </span>
+                        </div>
+                        <p className="text-sm font-black text-blue-600 dark:text-blue-400 mt-2">
                           {formatCurrency(m.total_price)}
                         </p>
                       </div>

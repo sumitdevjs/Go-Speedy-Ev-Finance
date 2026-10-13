@@ -166,7 +166,7 @@ class ModelsService {
     const branches = await getLiveBranches();
     let queryBuilder = supabase
       .from('ev_models')
-      .select('id, name, company, total_price, stock_count, stock_logs, is_active')
+      .select('id, name, company, total_price, stock_count, stock_logs, is_active, kilometres')
       .eq('is_active', true)
       .order('name', { ascending: true });
 
@@ -417,7 +417,12 @@ class ModelsService {
       error = retry.error;
     }
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error(`An EV model with this name and kilometre reading already exists. Model + Kilometres combination must be unique.`);
+      }
+      throw error;
+    }
     return data;
   }
 

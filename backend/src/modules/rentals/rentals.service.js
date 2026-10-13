@@ -10,7 +10,7 @@ class RentalsService {
 
     let queryBuilder = supabase
       .from('tenants')
-      .select('*, ev_models(name, company, total_price), users!tenants_created_by_fkey(name)', { count: 'exact' });
+      .select('*, ev_models(name, company, total_price, kilometres), users!tenants_created_by_fkey(name)', { count: 'exact' });
 
     if (req) {
       queryBuilder = applyScope(queryBuilder, req);
@@ -102,7 +102,7 @@ class RentalsService {
   async getRentalById(id) {
     const { data: tenant, error } = await supabase
       .from('tenants')
-      .select('*, ev_models(name, company)')
+      .select('*, ev_models(name, company, kilometres)')
       .eq('id', id)
       .single();
 

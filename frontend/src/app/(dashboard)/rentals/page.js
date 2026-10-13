@@ -152,7 +152,11 @@ export default function RentalsListPage() {
       key: 'model',
       render: (row) => (
         <div>
-          <p className="font-semibold text-slate-800 dark:text-slate-200">{row.ev_models?.name || 'EV Scooter'}</p>
+          <p className="font-semibold text-slate-800 dark:text-slate-200">
+            {row.ev_models?.name
+              ? `${row.ev_models.name}${row.ev_models.kilometres !== undefined && row.ev_models.kilometres !== null ? ` (${row.ev_models.kilometres} KM)` : ''}`
+              : 'EV Scooter'}
+          </p>
           <p className="text-[11px] text-slate-400">Total: {formatCurrency(row.total_price)}</p>
         </div>
       ),
