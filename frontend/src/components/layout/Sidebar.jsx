@@ -20,6 +20,7 @@ import {
   Contact2,
   BarChart3,
   ArrowRightLeft,
+  Receipt,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Badge from '../ui/Badge';
@@ -117,7 +118,8 @@ function SidebarInner({ isOpen, onClose }) {
     { name: 'Issue Rental', href: '/rentals/new', icon: UserPlus },
     { name: 'Walk-in Bookings', href: '/bookings', icon: CalendarCheck },
     { name: 'EV Fleet & Stock', href: '/models', icon: Bike },
-    { name: 'Payments / Ledger', href: '/purchases', icon: ShoppingBag },
+    { name: 'Direct Purchases', href: '/purchases', icon: ShoppingBag },
+    { name: 'Payment Collections', href: '/payments', icon: Receipt },
   ];
 
   // Branch admin: same as staff but also sees their ward staff
@@ -128,7 +130,8 @@ function SidebarInner({ isOpen, onClose }) {
     { name: 'Issue Rental', href: '/rentals/new', icon: UserPlus },
     { name: 'Bookings', href: '/bookings', icon: CalendarCheck },
     { name: 'EV Models & Stock', href: '/models', icon: Bike },
-    { name: 'Payments / Ledger', href: '/purchases', icon: ShoppingBag },
+    { name: 'Direct Purchases', href: '/purchases', icon: ShoppingBag },
+    { name: 'Payment Collections', href: '/payments', icon: Receipt },
     { name: 'My Branch Staff', href: '/staff', icon: UserCheck },
   ];
 
@@ -138,7 +141,8 @@ function SidebarInner({ isOpen, onClose }) {
     { name: 'Rentals', href: '/rentals', icon: Users },
     { name: 'EV Models', href: '/models', icon: Bike },
     { name: 'Bookings', href: '/bookings', icon: CalendarCheck },
-    { name: 'Purchases', href: '/purchases', icon: ShoppingBag },
+    { name: 'Purchases & Sales', href: '/purchases', icon: ShoppingBag },
+    { name: 'Payment Collections', href: '/payments', icon: Receipt },
   ];
 
   const navItems = role === 'staff' ? staffNavItems

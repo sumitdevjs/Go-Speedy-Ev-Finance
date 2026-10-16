@@ -214,7 +214,31 @@ class RentalsService {
       modelTotalPrice = model.total_price;
     }
 
-    // 3. Compute dates
+    // 3. Compute dates and validate against back-dating
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Validate Contract Start Date for rentals (no back-dating)
+    if (tenantData.status !== 'direct_purchase' && tenantData.start_date) {
+      const sDate = tenantData.start_date.split('T')[0];
+      if (sDate < todayStr) {
+        throw new Error('Contract Start Date cannot be in the past (back date not allowed).');
+      }
+    }
+
+    // Validate AMC Dates (no back-dating, expire > start)
+    if (tenantData.amc_start_date) {
+      const amcStart = tenantData.amc_start_date.split('T')[0];
+      if (amcStart < todayStr) {
+        throw new Error('AMC Start Date cannot be in the past (back date not allowed).');
+      }
+      if (tenantData.amc_expire_date) {
+        const amcExpire = tenantData.amc_expire_date.split('T')[0];
+        if (amcExpire <= amcStart) {
+          throw new Error('AMC Expire Date must be strictly after AMC Start Date.');
+        }
+      }
+    }
+
     const startDate = tenantData.start_date ? new Date(tenantData.start_date) : new Date();
     const totalMonths = Number(tenantData.total_months) || 24;
     const expectedEndDate = new Date(startDate);
@@ -281,6 +305,55 @@ class RentalsService {
         updates[key] = null; // Use null for update to explicitly clear it
       }
     });
+
+    // Validate Dates in updates
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Fetch existing tenant record if needed to compare dates
+    const needsExistingCheck = updates.amc_start_date !== undefined || updates.amc_expire_date !== undefined || updates.start_date !== undefined || updates.scooty_policy_expiry !== undefined || updates.rider_policy_expiry !== undefined;
+    let existingTenant = null;
+    if (needsExistingCheck) {
+      const { data: ex } = await supabase
+        .from('tenants')
+        .select('start_date, amc_start_date, amc_expire_date, scooty_insurance_start, scooty_policy_expiry, rider_insurance_start, rider_policy_expiry, status')
+        .eq('id', id)
+        .maybeSingle();
+      existingTenant = ex;
+    }
+
+    if (updates.amc_start_date) {
+      const s = String(updates.amc_start_date).split('T')[0];
+      const origS = existingTenant?.amc_start_date ? String(existingTenant.amc_start_date).split('T')[0] : null;
+      if (s !== origS && s < todayStr) {
+        throw new Error('AMC Start Date cannot be set to a past date (no back date allowed).');
+      }
+    }
+
+    const effectiveAmcStart = updates.amc_start_date !== undefined ? (updates.amc_start_date ? String(updates.amc_start_date).split('T')[0] : null) : (existingTenant?.amc_start_date ? String(existingTenant.amc_start_date).split('T')[0] : null);
+    const effectiveAmcExpire = updates.amc_expire_date !== undefined ? (updates.amc_expire_date ? String(updates.amc_expire_date).split('T')[0] : null) : (existingTenant?.amc_expire_date ? String(existingTenant.amc_expire_date).split('T')[0] : null);
+    if (effectiveAmcStart && effectiveAmcExpire && effectiveAmcExpire <= effectiveAmcStart) {
+      throw new Error('AMC Expire Date must be strictly after AMC Start Date.');
+    }
+
+    if (updates.start_date && existingTenant?.status !== 'direct_purchase') {
+      const sDate = String(updates.start_date).split('T')[0];
+      const origSDate = existingTenant?.start_date ? String(existingTenant.start_date).split('T')[0] : null;
+      if (sDate !== origSDate && sDate < todayStr) {
+        throw new Error('Contract Start Date cannot be set to a past date (no back date allowed).');
+      }
+    }
+
+    const effectiveScootyStart = updates.scooty_insurance_start !== undefined ? updates.scooty_insurance_start : existingTenant?.scooty_insurance_start;
+    const effectiveScootyExpire = updates.scooty_policy_expiry !== undefined ? updates.scooty_policy_expiry : existingTenant?.scooty_policy_expiry;
+    if (effectiveScootyStart && effectiveScootyExpire && effectiveScootyExpire <= effectiveScootyStart) {
+      throw new Error('Scooty Policy Expiry must be strictly after Scooty Insurance Start Date.');
+    }
+
+    const effectiveRiderStart = updates.rider_insurance_start !== undefined ? updates.rider_insurance_start : existingTenant?.rider_insurance_start;
+    const effectiveRiderExpire = updates.rider_policy_expiry !== undefined ? updates.rider_policy_expiry : existingTenant?.rider_policy_expiry;
+    if (effectiveRiderStart && effectiveRiderExpire && effectiveRiderExpire <= effectiveRiderStart) {
+      throw new Error('Rider Policy Expiry must be strictly after Rider Insurance Start Date.');
+    }
 
     // Handle expected_end_date recalculation if start_date changes
     if (updates.start_date || updates.total_months) {

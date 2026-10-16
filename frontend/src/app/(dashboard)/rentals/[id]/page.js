@@ -54,6 +54,7 @@ export default function TenantDetailPage() {
 
   const { user } = useAuthStore();
   const isSuperAdmin = user?.role === 'super_admin' || (user?.role === 'admin' && !user?.ward_area);
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const [tenant, setTenant] = useState(null);
   const [payments, setPayments] = useState([]);
@@ -240,6 +241,72 @@ export default function TenantDetailPage() {
     if (editData.guarantors?.some(g => g.phone && !/^\d{10}$/.test(g.phone.trim()))) {
       toast.error('All guarantor phone numbers must be exactly 10 digits');
       return;
+    }
+
+    // Contract Start Date
+    if (editData.start_date) {
+      const origStartDate = tenant?.start_date ? tenant.start_date.split('T')[0] : null;
+      if (editData.start_date !== origStartDate && editData.start_date < todayStr) {
+        toast.error('Contract Start Date cannot be set to a past date (no back date allowed).');
+        return;
+      }
+    }
+
+    // Insurance Start & Expiry dates
+    if (editData.scooty_insurance_start) {
+      const origScootyStart = tenant?.scooty_insurance_start ? tenant.scooty_insurance_start.split('T')[0] : null;
+      if (editData.scooty_insurance_start !== origScootyStart && editData.scooty_insurance_start < todayStr) {
+        toast.error('Scooty Insurance Start Date cannot be set to a past date.');
+        return;
+      }
+    }
+    if (editData.scooty_insurance_start && editData.scooty_policy_expiry) {
+      if (editData.scooty_policy_expiry <= editData.scooty_insurance_start) {
+        toast.error('Scooty Policy Expiry must be strictly after Scooty Insurance Start Date.');
+        return;
+      }
+    }
+
+    if (editData.rider_insurance_start) {
+      const origRiderStart = tenant?.rider_insurance_start ? tenant.rider_insurance_start.split('T')[0] : null;
+      if (editData.rider_insurance_start !== origRiderStart && editData.rider_insurance_start < todayStr) {
+        toast.error('Rider Insurance Start Date cannot be set to a past date.');
+        return;
+      }
+    }
+    if (editData.rider_insurance_start && editData.rider_policy_expiry) {
+      if (editData.rider_policy_expiry <= editData.rider_insurance_start) {
+        toast.error('Rider Policy Expiry must be strictly after Rider Insurance Start Date.');
+        return;
+      }
+    }
+
+    // AMC Dates
+    if (editData.amc_start_date) {
+      const origAmcStart = tenant?.amc_start_date ? tenant.amc_start_date.split('T')[0] : null;
+      if (editData.amc_start_date !== origAmcStart && editData.amc_start_date < todayStr) {
+        toast.error('AMC Start Date cannot be set to a past date (no back date allowed).');
+        return;
+      }
+    }
+    if (editData.amc_start_date && editData.amc_expire_date) {
+      if (editData.amc_expire_date <= editData.amc_start_date) {
+        toast.error('AMC Expire Date must be strictly after AMC Start Date.');
+        return;
+      }
+    }
+    if (editData.amc_service_log?.length > 0) {
+      const origLogs = Array.isArray(tenant?.amc_service_log) ? tenant.amc_service_log : [];
+      const hasInvalidNewPastLog = editData.amc_service_log.some((log, idx) => {
+        if (!log.date) return false;
+        const origDate = origLogs[idx]?.date;
+        if (origDate === log.date) return false;
+        return log.date < todayStr;
+      });
+      if (hasInvalidNewPastLog) {
+        toast.error('AMC Service Log Date cannot be set to a past date (no back date allowed).');
+        return;
+      }
     }
     try {
       setIsSaving(true);
@@ -694,6 +761,7 @@ export default function TenantDetailPage() {
                   <Input
                     label="Scooty Policy Expiry"
                     type="date"
+                    min={editData.scooty_insurance_start || todayStr}
                     value={editData.scooty_policy_expiry}
                     onChange={(e) => setEditData({ ...editData, scooty_policy_expiry: e.target.value })}
                   />
@@ -742,6 +810,7 @@ export default function TenantDetailPage() {
                   <Input
                     label="Scooty Ins. Start Date"
                     type="date"
+                    min={tenant?.scooty_insurance_start && tenant.scooty_insurance_start.split('T')[0] < todayStr ? tenant.scooty_insurance_start.split('T')[0] : todayStr}
                     value={editData.scooty_insurance_start}
                     onChange={(e) => setEditData({ ...editData, scooty_insurance_start: e.target.value })}
                   />
@@ -789,6 +858,7 @@ export default function TenantDetailPage() {
                   <Input
                     label="Rider Policy Expiry"
                     type="date"
+                    min={editData.rider_insurance_start || todayStr}
                     value={editData.rider_policy_expiry}
                     onChange={(e) => setEditData({ ...editData, rider_policy_expiry: e.target.value })}
                   />
@@ -837,6 +907,7 @@ export default function TenantDetailPage() {
                   <Input
                     label="Rider Ins. Start Date"
                     type="date"
+                    min={tenant?.rider_insurance_start && tenant.rider_insurance_start.split('T')[0] < todayStr ? tenant.rider_insurance_start.split('T')[0] : todayStr}
                     value={editData.rider_insurance_start}
                     onChange={(e) => setEditData({ ...editData, rider_insurance_start: e.target.value })}
                   />
@@ -911,6 +982,7 @@ export default function TenantDetailPage() {
                   <Input
                     label="AMC Start Date"
                     type="date"
+                    min={tenant?.amc_start_date && tenant.amc_start_date.split('T')[0] < todayStr ? tenant.amc_start_date.split('T')[0] : todayStr}
                     value={editData.amc_start_date}
                     onChange={(e) => setEditData({ ...editData, amc_start_date: e.target.value })}
                   />
@@ -927,6 +999,7 @@ export default function TenantDetailPage() {
                   <Input
                     label="AMC Expire Date"
                     type="date"
+                    min={editData.amc_start_date || todayStr}
                     value={editData.amc_expire_date}
                     onChange={(e) => setEditData({ ...editData, amc_expire_date: e.target.value })}
                   />
@@ -950,6 +1023,7 @@ export default function TenantDetailPage() {
                         <Input
                           type="date"
                           label="Start Date"
+                          min={tenant?.start_date && tenant.start_date.split('T')[0] < todayStr ? tenant.start_date.split('T')[0] : todayStr}
                           value={editData.start_date}
                           onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
                         />
@@ -1214,7 +1288,7 @@ export default function TenantDetailPage() {
                             {editData.amc_service_log.map((log, i) => (
                               <tr key={i} className="bg-white dark:bg-slate-900/40 hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
                                 <td className="px-3 py-2">
-                                  <input type="date" className="w-full bg-transparent border border-slate-200 dark:border-white/10 rounded px-2 py-1 focus:outline-none focus:border-blue-500" value={log.date || ''} onChange={(e) => { const logs = [...editData.amc_service_log]; logs[i].date = e.target.value; setEditData({ ...editData, amc_service_log: logs }); }} />
+                                  <input type="date" min={log.date && log.date < todayStr ? log.date : todayStr} className="w-full bg-transparent border border-slate-200 dark:border-white/10 rounded px-2 py-1 focus:outline-none focus:border-blue-500" value={log.date || ''} onChange={(e) => { const logs = [...editData.amc_service_log]; logs[i].date = e.target.value; setEditData({ ...editData, amc_service_log: logs }); }} />
                                 </td>
                                 <td className="px-3 py-2">
                                   <input type="text" className="w-full bg-transparent border border-slate-200 dark:border-white/10 rounded px-2 py-1 focus:outline-none focus:border-blue-500" value={log.what_change || ''} onChange={(e) => { const logs = [...editData.amc_service_log]; logs[i].what_change = e.target.value; setEditData({ ...editData, amc_service_log: logs }); }} placeholder="e.g. Battery" />

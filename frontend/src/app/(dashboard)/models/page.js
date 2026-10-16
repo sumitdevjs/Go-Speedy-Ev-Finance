@@ -40,9 +40,11 @@ import { staggerFadeIn } from '../../../lib/gsap';
 import { toast } from '../../../lib/toast';
 import { confirmDialog } from '../../../lib/confirmDialog';
 import { useAuthStore } from '../../../store/authStore';
-import { exportToExcel } from '../../../lib/exportToExcel';
+import { exportToExcel, fetchAllForExport } from '../../../lib/exportToExcel';
+import CustomExportModal from '../../../components/ui/CustomExportModal';
 
 export default function ModelsPage() {
+  const todayStr = new Date().toISOString().split('T')[0];
   const [activeTab, setActiveTab] = useState('new'); // 'new', 'old', or 'ward_breakdown'
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +54,9 @@ export default function ModelsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
+  const [oldEvSearch, setOldEvSearch] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingModelId, setEditingModelId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -203,46 +208,108 @@ export default function ModelsPage() {
     }
   };
 
-  const handleDownloadNewModels = async () => {
-    try {
-      let query = `/api/models?page=1&limit=9999`;
-      if (search) query += `&search=${encodeURIComponent(search)}`;
-      if (stockStatus) query += `&stockStatus=${encodeURIComponent(stockStatus)}`;
-      if (activeFilter !== '') query += `&is_active=${activeFilter}`;
-      
-      const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
-      query += `&branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`;
+  const MODEL_EXPORT_COLUMNS = [
+    'Model Name',
+    'Manufacturer / Company',
+    'Sticker Total Price (₹)',
+    'Kilometres (KM)',
+    'Available Stock (Current Scope)',
+    'Total Global Fleet Stock',
+    'Scoped Filter View',
+    'Ward-Wise Stock Distribution',
+    'Catalog Status',
+    'Registered On',
+    'Last Updated'
+  ];
 
-      const res = await api.get(query);
-      if (res.data?.success) {
-        const dataToExport = res.data.data.map(m => ({
-          'Model Name': m.name,
-          Company: m.company,
-          'Total Price': m.total_price,
-          'Kilometres (KM)': m.kilometres ?? 0,
-          'Total Global Stock': m.total_stock,
-          Status: m.is_active ? 'Active' : 'Cancelled',
-          Created: formatDate(m.created_at)
-        }));
-        exportToExcel(dataToExport, 'Master_Fleet_Models.xlsx');
-      }
-    } catch (err) {
-      console.error('Failed to download new models:', err);
-      alert('Failed to download data.');
-    }
+  const fetchModelsForExport = async () => {
+    const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
+    const params = {
+      branch_id: branchParam,
+    };
+    if (search) params.search = search;
+    if (stockStatus) params.stockStatus = stockStatus;
+    if (activeFilter !== '') params.is_active = activeFilter;
+
+    return await fetchAllForExport(api, '/api/models', params);
+  };
+
+  const transformModelRow = (m) => {
+    const scopedWardName = selectedBranch
+      ? (selectedBranch.ward_no ? `Ward ${selectedBranch.ward_no}: ${selectedBranch.name}` : selectedBranch.name)
+      : 'All Wards (Global Master)';
+
+    const wardStockStr = Array.isArray(m.ward_stock_summary) && m.ward_stock_summary.length > 0
+      ? m.ward_stock_summary.map((w) => `${w.ward_label}: ${w.stock}`).join(' | ')
+      : (m.ward ? `Default Ward: ${m.ward}` : '—');
+
+    return {
+      'Model Name': m.name || '—',
+      'Manufacturer / Company': m.company || '—',
+      'Sticker Total Price (₹)': m.total_price ?? 0,
+      'Kilometres (KM)': m.kilometres ?? 0,
+      'Available Stock (Current Scope)': m.stock_count ?? 0,
+      'Total Global Fleet Stock': m.total_global_stock ?? m.stock_count ?? 0,
+      'Scoped Filter View': scopedWardName,
+      'Ward-Wise Stock Distribution': wardStockStr,
+      'Catalog Status': m.is_active ? 'Active' : 'Cancelled / Inactive',
+      'Registered On': formatDate(m.created_at),
+      'Last Updated': formatDate(m.updated_at),
+    };
+  };
+
+  const handleDownloadNewModels = () => {
+    setIsCustomExportOpen(true);
   };
 
   const handleDownloadWardBreakdown = () => {
-    if (!wardBreakdown || wardBreakdown.length === 0) return;
-    const dataToExport = filteredWards.map(w => ({
-      'Ward ID': w.ward_id,
-      'Ward Name': w.ward_name,
-      'Area': w.area_name,
-      'Candidate Name': w.candidate_name,
-      'Total Stock': w.total_stock,
-      'Active Models': w.models_count
+    if (!filteredWards || filteredWards.length === 0) {
+      toast.info('No ward stock data to export');
+      return;
+    }
+    const dataToExport = filteredWards.map((w) => {
+      const modelBreakdownStr = Array.isArray(w.models)
+        ? w.models.map((m) => `${m.name}: ${m.stock ?? 0}`).join(' | ')
+        : '—';
+
+      return {
+        'Ward Number': w.ward_no ?? '—',
+        'Ward / Branch Name': w.name || '—',
+        'Branch Code': w.code || '—',
+        'Ward Area / Zone': w.ward_area || 'Delhi Zone',
+        'Ward In-Charge / Contact Person': w.contact_person || '—',
+        'Contact Phone': w.phone || '—',
+        'Total Allocated Stock (EVs)': w.total_stock ?? 0,
+        'Active Models Count': Array.isArray(w.models) ? w.models.length : 0,
+        'Models Breakdown': modelBreakdownStr,
+      };
+    });
+    exportToExcel(dataToExport, `Ward_Stock_Matrix_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success(`Exported ${dataToExport.length} municipal wards stock matrix successfully!`);
+  };
+
+  const handleDownloadOldEvs = () => {
+    const listToExport = filteredOldEvs;
+    if (!listToExport || listToExport.length === 0) {
+      toast.info('No returned/refurbished EVs to export');
+      return;
+    }
+    const dataToExport = listToExport.map((row) => ({
+      'Original Model Name': row.original_ev_model?.name || 'Unknown',
+      'Manufacturer / Company': row.original_ev_model?.company || '—',
+      'Used Selling Price (₹)': row.custom_price || row.original_ev_model?.total_price || 0,
+      'Pricing Valuation': row.custom_price ? 'Custom Valued' : 'Original Sticker Price',
+      'Previous Tenant Name': row.tenant?.full_name || '—',
+      'Tenant Mobile': row.tenant?.phone || '—',
+      'Rental Contract Number': row.tenant?.contract_number || '—',
+      'Return Date': formatDate(row.returned_at),
+      'Condition Notes / Remarks': row.condition_notes || 'None recorded',
+      'Branch / Ward Location': row.branch?.name || (row.branch?.ward_no ? `Ward ${row.branch.ward_no}` : '—'),
+      'Inventory Status': row.status || 'Returned / In Stock',
+      'Entry Recorded Date': formatDate(row.created_at),
     }));
-    exportToExcel(dataToExport, 'Ward_Stock_Matrix.xlsx');
+    exportToExcel(dataToExport, `Returned_Refurbished_EVs_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success(`Exported ${dataToExport.length} returned/refurbished EVs successfully!`);
   };
 
   const handleEditClick = (model) => {
@@ -281,6 +348,10 @@ export default function ModelsPage() {
     }
     if (!stockBranchId) {
       toast.error('Please select the target Ward / Branch');
+      return;
+    }
+    if (stockDate && stockDate < todayStr) {
+      toast.error('Date received cannot be in the past (back date not allowed).');
       return;
     }
     const chosenBranch = branches.find((b) => b.id === stockBranchId);
@@ -324,6 +395,11 @@ export default function ModelsPage() {
 
     if (!name.trim() || !company.trim()) {
       setError('Model name and company are required');
+      return;
+    }
+
+    if (!editingModelId && initialStockDate && initialStockDate < todayStr) {
+      setError('Initial Stock Date cannot be in the past (back date not allowed).');
       return;
     }
 
@@ -601,6 +677,18 @@ export default function ModelsPage() {
     );
   });
 
+  const filteredOldEvs = oldEvs.filter((ev) => {
+    if (!oldEvSearch.trim()) return true;
+    const term = oldEvSearch.toLowerCase().trim();
+    return (
+      (ev.original_ev_model?.name && ev.original_ev_model.name.toLowerCase().includes(term)) ||
+      (ev.original_ev_model?.company && ev.original_ev_model.company.toLowerCase().includes(term)) ||
+      (ev.tenant?.full_name && ev.tenant.full_name.toLowerCase().includes(term)) ||
+      (ev.tenant?.contract_number && ev.tenant.contract_number.toLowerCase().includes(term)) ||
+      (ev.tenant?.phone && ev.tenant.phone.includes(term))
+    );
+  });
+
   const totalAllocatedFleet = wardBreakdown.reduce((sum, w) => sum + (w.total_stock || 0), 0);
   const activeWardsCount = wardBreakdown.filter(w => w.total_stock > 0).length;
 
@@ -681,11 +769,13 @@ export default function ModelsPage() {
                   variant="outline"
                   size="sm"
                   icon={Download}
+                  loading={isExporting}
+                  disabled={isExporting}
                   className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 whitespace-nowrap"
                   onClick={handleDownloadNewModels}
                   title="Download Data as Excel"
                 >
-                  <span className="hidden sm:inline">Download Data</span>
+                  <span className="hidden sm:inline">{isExporting ? 'Exporting...' : 'Export Excel'}</span>
                 </Button>
               </div>
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -896,7 +986,7 @@ export default function ModelsPage() {
                   onClick={handleDownloadWardBreakdown}
                   title="Download Data as Excel"
                 >
-                  <span className="hidden sm:inline">Download Data</span>
+                  <span className="hidden sm:inline">Export Excel</span>
                 </Button>
               </div>
               <div className="flex items-center gap-2">
@@ -1050,10 +1140,32 @@ export default function ModelsPage() {
           </div>
         ) : (
           /* Returned / Refurbished EVs Tab */
-          <div className="animate-in fade-in zoom-in-95 duration-300">
+          <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+            {/* Filter & Search Bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-white/10">
+              <div className="flex w-full sm:max-w-md sm:flex-1 min-w-0 gap-2 items-center">
+                <SearchBar
+                  value={oldEvSearch}
+                  onChange={setOldEvSearch}
+                  placeholder="Search model, tenant, or contract number..."
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon={Download}
+                  className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  onClick={handleDownloadOldEvs}
+                  title="Download Data as Excel"
+                >
+                  <span className="hidden sm:inline">Export Excel</span>
+                </Button>
+              </div>
+            </div>
+
             <Table
               columns={oldEvsColumns}
-              data={oldEvs}
+              data={filteredOldEvs}
               loading={loadingOldEvs}
               emptyText="No returned/refurbished EVs found."
               minWidth="min-w-[800px]"
@@ -1129,6 +1241,7 @@ export default function ModelsPage() {
               <Input
                 label="Initial Stock Date"
                 type="date"
+                min={todayStr}
                 value={initialStockDate}
                 onChange={(e) => setInitialStockDate(e.target.value)}
                 required
@@ -1204,6 +1317,7 @@ export default function ModelsPage() {
           <Input
             label="Date Received"
             type="date"
+            min={todayStr}
             value={stockDate}
             onChange={(e) => setStockDate(e.target.value)}
             required
@@ -1286,6 +1400,19 @@ export default function ModelsPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Universal Custom Export Modal */}
+      <CustomExportModal
+        isOpen={isCustomExportOpen}
+        onClose={() => setIsCustomExportOpen(false)}
+        title="Export EV Models & Fleet Catalog"
+        subtitle="Download master model fleet, pricing, and live ward stock distribution (Excel / CSV)"
+        defaultFilename="GoSpeedy_Master_Fleet_Models"
+        columns={MODEL_EXPORT_COLUMNS}
+        dateAccessor="created_at"
+        onFetchData={fetchModelsForExport}
+        transformRow={transformModelRow}
+      />
     </div>
   );
 }

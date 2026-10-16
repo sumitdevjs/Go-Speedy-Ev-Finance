@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/authStore';
 import AddPenaltyModal from '../../../components/penalties/AddPenaltyModal';
+import CustomExportModal from '../../../components/ui/CustomExportModal';
 
 export default function ReportsPage() {
   const { user } = useAuthStore();
@@ -29,6 +30,7 @@ export default function ReportsPage() {
   const [datePreset, setDatePreset] = useState('this_month'); // today, last_7_days, this_month, custom
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Data states
@@ -116,39 +118,94 @@ export default function ReportsPage() {
     }
   };
 
-  const exportCurrentReport = () => {
-    let rows = [];
-    let headers = [];
-    let filename = `report_${activeTab}_${startDate}_to_${endDate}.csv`;
+  const getReportExportConfig = () => {
+    if (activeTab === 'collections') {
+      return {
+        title: 'Collections MIS Report',
+        filename: 'GoSpeedy_Collections_MIS',
+        columns: ['Category', 'Name / Identifier', 'Amount Collected (₹)', 'Date / Period'],
+      };
+    }
+    if (activeTab === 'overdue') {
+      return {
+        title: 'Overdue Ageing Buckets Report',
+        filename: 'GoSpeedy_Overdue_Ageing_MIS',
+        columns: ['Bucket', 'Customer', 'Phone', 'Vehicle', 'Branch', 'Days Overdue', 'Outstanding', 'Late Fee', 'Manual Penalty', 'Net Due'],
+      };
+    }
+    if (activeTab === 'penalties') {
+      return {
+        title: 'Fines & Penalties Register',
+        filename: 'GoSpeedy_Penalties_Register',
+        columns: ['Penalty ID', 'Date', 'Customer', 'Phone', 'Vehicle', 'Reason', 'Amount', 'Status', 'Added By'],
+      };
+    }
+    return {
+      title: 'Sales & Inventory Report',
+      filename: 'GoSpeedy_Sales_MIS',
+      columns: ['Model Name', 'Units Delivered', 'Total Revenue (₹)', 'Average Price (₹)'],
+    };
+  };
 
+  const fetchReportsForExport = async () => {
+    const rows = [];
     if (activeTab === 'collections' && collectionsData) {
-      headers = ['Category,Name/Date,Amount (INR)'];
-      collectionsData.by_collector?.forEach(c => rows.push(`Collector,"${c.name}",${c.total}`));
-      collectionsData.by_branch?.forEach(b => rows.push(`Branch,"${b.name}",${b.total}`));
-      collectionsData.daily_trend?.forEach(d => rows.push(`Daily Trend,${d.date},${d.total}`));
+      collectionsData.by_collector?.forEach(c => rows.push({
+        'Category': 'Staff Collector',
+        'Name / Identifier': c.name,
+        'Amount Collected (₹)': c.total || 0,
+        'Date / Period': `${startDate} to ${endDate}`,
+        created_at: new Date().toISOString(),
+      }));
+      collectionsData.by_branch?.forEach(b => rows.push({
+        'Category': 'Ward / Branch',
+        'Name / Identifier': b.name,
+        'Amount Collected (₹)': b.total || 0,
+        'Date / Period': `${startDate} to ${endDate}`,
+        created_at: new Date().toISOString(),
+      }));
+      collectionsData.daily_trend?.forEach(d => rows.push({
+        'Category': 'Daily Trend',
+        'Name / Identifier': d.date,
+        'Amount Collected (₹)': d.total || 0,
+        'Date / Period': d.date,
+        created_at: d.date || new Date().toISOString(),
+      }));
     } else if (activeTab === 'overdue' && overdueData) {
-      headers = ['Bucket,Customer,Phone,Vehicle,Branch,Days Overdue,Outstanding,Late Fee,Manual Penalty,Net Due'];
       Object.entries(overdueData.buckets || {}).forEach(([key, b]) => {
         b.customers?.forEach(c => {
-          rows.push(`"${b.label}","${c.name}","${c.phone}","${c.vehicle_number}","${c.branch_name}",${c.days_overdue},${c.outstanding_installments},${c.auto_late_fee},${c.manual_penalties},${c.net_total_due}`);
+          rows.push({
+            'Bucket': b.label,
+            'Customer': c.name || '—',
+            'Phone': c.phone || '—',
+            'Vehicle': c.vehicle_number || '—',
+            'Branch': c.branch_name || '—',
+            'Days Overdue': c.days_overdue || 0,
+            'Outstanding': c.outstanding_installments || 0,
+            'Late Fee': c.auto_late_fee || 0,
+            'Manual Penalty': c.manual_penalties || 0,
+            'Net Due': c.net_total_due || 0,
+            created_at: new Date().toISOString(),
+          });
         });
       });
     } else if (activeTab === 'penalties' && penaltiesData) {
-      headers = ['Penalty ID,Date,Customer,Phone,Vehicle,Reason,Amount,Status,Added By'];
       penaltiesData.data?.forEach(p => {
-        rows.push(`"${p.penalty_id}","${p.penalty_date}","${p.tenant_name}","${p.customer_phone}","${p.vehicle_number}","${p.reason}",${p.amount},"${p.status}","${p.created_by_name}"`);
+        rows.push({
+          'Penalty ID': p.penalty_id || '—',
+          'Date': p.penalty_date || '—',
+          'Customer': p.tenant_name || '—',
+          'Phone': p.customer_phone || '—',
+          'Vehicle': p.vehicle_number || '—',
+          'Reason': p.reason || '—',
+          'Amount': p.amount || 0,
+          'Status': p.status || '—',
+          'Added By': p.created_by_name || '—',
+          created_at: p.penalty_date || new Date().toISOString(),
+        });
       });
     }
-
-    if (rows.length === 0) return toast.error('No rows to export for this view');
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join('\n'), ...rows].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    return rows;
   };
 
   return (
@@ -174,11 +231,12 @@ export default function ReportsPage() {
             Print Report
           </button>
           <button
-            onClick={exportCurrentReport}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs shadow-sm transition-all"
+            onClick={() => setIsCustomExportOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs shadow-sm transition-all cursor-pointer"
+            title="Download Report Data (Excel / CSV)"
           >
             <Download className="w-4 h-4" />
-            Export CSV
+            Export Report
           </button>
         </div>
       </div>
@@ -662,6 +720,18 @@ export default function ReportsPage() {
           onSuccess={() => fetchReports()}
         />
       )}
+
+      {/* Universal Custom Export Modal */}
+      <CustomExportModal
+        isOpen={isCustomExportOpen}
+        onClose={() => setIsCustomExportOpen(false)}
+        title={getReportExportConfig().title}
+        subtitle="Download collections breakdown, overdue ageing buckets, and penalties (Excel / CSV)"
+        defaultFilename={getReportExportConfig().filename}
+        columns={getReportExportConfig().columns}
+        dateAccessor="created_at"
+        onFetchData={fetchReportsForExport}
+      />
     </div>
   );
 }

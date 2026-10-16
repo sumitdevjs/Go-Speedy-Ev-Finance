@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { UserCheck, Plus, Key, UserX, AlertCircle, Pencil, MapPin, Building2, Download, CheckCircle2, FileText } from 'lucide-react';
+import { UserCheck, Plus, Key, UserX, AlertCircle, Pencil, MapPin, Building2, Download, CheckCircle2, FileText, RotateCcw, Filter, Shield } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
 import Button from '../../../components/ui/Button';
@@ -19,7 +19,8 @@ import { formatDate } from '../../../lib/constants';
 import { toast } from '../../../lib/toast';
 import { confirmDialog } from '../../../lib/confirmDialog';
 import { staggerFadeIn } from '../../../lib/gsap';
-import { exportToExcel } from '../../../lib/exportToExcel';
+import { exportToExcel, fetchAllForExport } from '../../../lib/exportToExcel';
+import CustomExportModal from '../../../components/ui/CustomExportModal';
 
 const ROLE_OPTIONS = [
   { value: 'staff', label: 'Staff / Field Operator (Ward Fleet & Collections)' },
@@ -39,9 +40,14 @@ export default function StaffPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('true'); // '' | 'true' | 'false'
+  const [selectedHoFilter, setSelectedHoFilter] = useState(isHoAdmin ? (currentUser?.head_office_id || '') : '');
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState(selectedBranch?.id || '');
+  const [roleFilter, setRoleFilter] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
 
   // Reference data for assignments
   const [headOffices, setHeadOffices] = useState([]);
@@ -96,9 +102,33 @@ export default function StaffPage() {
     fetchDropdowns();
   }, []);
 
+  // Sync if HO Admin logs in or user details update
+  useEffect(() => {
+    if (isHoAdmin && currentUser?.head_office_id) {
+      setSelectedHoFilter(currentUser.head_office_id);
+    }
+  }, [isHoAdmin, currentUser?.head_office_id]);
+
+  // Listen to branch change from top header switcher
+  useEffect(() => {
+    const handleBranchChange = (e) => {
+      if (e.detail?.id) {
+        setSelectedBranchFilter(e.detail.id);
+        if (e.detail.head_office_id && !isHoAdmin) {
+          setSelectedHoFilter(e.detail.head_office_id);
+        }
+      } else {
+        setSelectedBranchFilter('');
+      }
+      setPage(1);
+    };
+    window.addEventListener('branchChange', handleBranchChange);
+    return () => window.removeEventListener('branchChange', handleBranchChange);
+  }, [isHoAdmin]);
+
   useEffect(() => {
     fetchStaff();
-  }, [search, activeFilter, page, selectedBranch]);
+  }, [search, activeFilter, selectedHoFilter, selectedBranchFilter, roleFilter, page, selectedBranch]);
 
   // One-time entrance animation for the filter bar
   useEffect(() => {
@@ -111,6 +141,10 @@ export default function StaffPage() {
       let query = `/api/staff?page=${page}&limit=15`;
       if (search) query += `&search=${encodeURIComponent(search)}`;
       if (activeFilter !== '') query += `&is_active=${activeFilter}`;
+      if (selectedHoFilter) query += `&head_office_id=${encodeURIComponent(selectedHoFilter)}`;
+      if (selectedBranchFilter) query += `&branch_id=${encodeURIComponent(selectedBranchFilter)}`;
+      if (roleFilter) query += `&role=${encodeURIComponent(roleFilter)}`;
+
       const res = await api.get(query);
       if (res.data?.success) {
         setStaffList(res.data.data || []);
@@ -124,31 +158,110 @@ export default function StaffPage() {
     }
   };
 
-  const handleDownloadData = async () => {
-    try {
-      let query = `/api/staff?page=1&limit=9999`;
-      if (search) query += `&search=${encodeURIComponent(search)}`;
-      if (activeFilter !== '') query += `&is_active=${activeFilter}`;
-      const res = await api.get(query);
-      if (res.data?.success) {
-        const dataToExport = res.data.data.map(user => ({
-          Name: user.name,
-          Email: user.email,
-          Phone: user.phone,
-          Role: ROLE_OPTIONS.find(r => r.value === user.role)?.label || user.role,
-          'Ward/Area': user.ward_area,
-          'Branch Name': user.branches?.name,
-          'Head Office': user.head_offices?.name,
-          'Verification Document': user.verification_doc || 'N/A',
-          Status: user.is_active ? 'Active' : 'Deactivated',
-          Created: formatDate(user.created_at)
-        }));
-        exportToExcel(dataToExport, 'Staff_Data.xlsx');
-      }
-    } catch (err) {
-      console.error('Failed to download staff data:', err);
-      alert('Failed to download data.');
+  const STAFF_EXPORT_COLUMNS = [
+    'Staff Name',
+    'Phone Number',
+    'Email Address',
+    'Role',
+    'System Role Code',
+    'Head Office / Zone',
+    'Head Office City',
+    'Assigned Branch / Ward',
+    'Ward Number',
+    'Branch Code',
+    'Ward Area / Location',
+    'Verification Document',
+    'Account Status',
+    'Created On',
+    'Last Updated'
+  ];
+
+  const fetchStaffForExport = async () => {
+    const params = {};
+    if (search) params.search = search;
+    if (activeFilter !== '') params.is_active = activeFilter;
+    if (selectedHoFilter) params.head_office_id = selectedHoFilter;
+    if (selectedBranchFilter) params.branch_id = selectedBranchFilter;
+    if (roleFilter) params.role = roleFilter;
+    return await fetchAllForExport(api, '/api/staff', params, 250);
+  };
+
+  const transformStaffRow = (user) => {
+    const hoName = user.head_offices?.name
+      ? `${user.head_offices.name}${user.head_offices.city ? ` (${user.head_offices.city})` : ''}`
+      : '—';
+    const branchLabel = user.branches
+      ? (user.branches.ward_no ? `Ward ${user.branches.ward_no}: ${user.branches.name}` : user.branches.name)
+      : (user.ward_area ? `${user.ward_area} Ward` : '—');
+
+    return {
+      'Staff Name': user.name || '—',
+      'Phone Number': user.phone || '—',
+      'Email Address': user.email || '—',
+      'Role': user.display_role || ROLE_OPTIONS.find((r) => r.value === user.role)?.label || user.role,
+      'System Role Code': user.role || '—',
+      'Head Office / Zone': hoName,
+      'Head Office City': user.head_offices?.city || '—',
+      'Assigned Branch / Ward': branchLabel,
+      'Ward Number': user.branches?.ward_no || '—',
+      'Branch Code': user.branches?.code || '—',
+      'Ward Area / Location': user.branches?.ward_area || user.ward_area || '—',
+      'Verification Document': user.verification_doc || 'Not provided',
+      'Account Status': user.is_active ? 'Active' : 'Deactivated',
+      'Created On': formatDate(user.created_at),
+      'Last Updated': formatDate(user.updated_at),
+      created_at: user.created_at,
+    };
+  };
+
+  // Filter available branches based on chosen Head Office
+  const filteredBranches = branches.filter((b) => {
+    if (isHoAdmin) {
+      return b.head_office_id === currentUser?.head_office_id;
     }
+    if (!selectedHoFilter) return true;
+    return b.head_office_id === selectedHoFilter;
+  });
+
+  const handleHoFilterChange = (hoId) => {
+    setSelectedHoFilter(hoId);
+    setPage(1);
+    // If the currently selected branch doesn't belong to the new HO, clear it
+    if (hoId && selectedBranchFilter) {
+      const match = branches.find((b) => b.id === selectedBranchFilter);
+      if (match && match.head_office_id !== hoId) {
+        setSelectedBranchFilter('');
+      }
+    }
+  };
+
+  const handleBranchFilterChange = (brId) => {
+    setSelectedBranchFilter(brId);
+    setPage(1);
+    // If a branch is picked and no HO was selected yet, auto-select its HO for clarity
+    if (brId && !selectedHoFilter && !isHoAdmin) {
+      const match = branches.find((b) => b.id === brId);
+      if (match?.head_office_id) {
+        setSelectedHoFilter(match.head_office_id);
+      }
+    }
+  };
+
+  const hasActiveFilters = Boolean(
+    search ||
+    activeFilter !== 'true' ||
+    (selectedHoFilter && !isHoAdmin) ||
+    selectedBranchFilter ||
+    roleFilter
+  );
+
+  const handleResetFilters = () => {
+    setSearch('');
+    setActiveFilter('true');
+    if (!isHoAdmin) setSelectedHoFilter('');
+    setSelectedBranchFilter('');
+    setRoleFilter('');
+    setPage(1);
   };
 
   const handleCreateStaff = async (e) => {
@@ -501,48 +614,148 @@ export default function StaffPage() {
 
       <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Search & Filter Bar */}
-        <div className="gsap-filter-bar flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-between gap-3 sm:gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
-          <div className="flex w-full sm:max-w-md sm:flex-1 min-w-0 gap-2 items-center">
-            <SearchBar
-              value={search}
-              onChange={(val) => {
-                setSearch(val);
-                setPage(1);
-              }}
-              placeholder="Search name, phone or email..."
-              className="flex-1"
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              icon={Download}
-              className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
-              onClick={handleDownloadData}
-              title="Download Data as Excel"
-            >
-              <span className="hidden sm:inline">Download Data</span>
-            </Button>
+        <div className="gsap-filter-bar flex flex-col gap-3.5 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
+          {/* Top Row: Search & Export */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex w-full sm:max-w-md sm:flex-1 min-w-0 gap-2 items-center">
+              <SearchBar
+                value={search}
+                onChange={(val) => {
+                  setSearch(val);
+                  setPage(1);
+                }}
+                placeholder="Search name, phone or email..."
+                className="flex-1"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                icon={Download}
+                className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                onClick={() => setIsCustomExportOpen(true)}
+                title="Custom Export Staff Records (Excel / CSV)"
+              >
+                <span className="hidden sm:inline">Export</span>
+              </Button>
+            </div>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="self-end sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 border border-rose-200/70 dark:border-rose-500/30 rounded-xl transition-all cursor-pointer active:scale-95 shadow-2xs"
+                title="Reset all filters"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Filters</span>
+              </button>
+            )}
           </div>
 
-          <select
-            value={activeFilter}
-            onChange={(e) => {
-              setActiveFilter(e.target.value);
-              setPage(1);
-            }}
-            className="w-full sm:w-auto shrink-0 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2.5 px-3.5 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
-          >
-            <option value="true" className="dark:bg-slate-900">Active Only</option>
-            <option value="" className="dark:bg-slate-900">All Staff</option>
-            <option value="false" className="dark:bg-slate-900">Deactivated Only</option>
-          </select>
+          {/* Bottom Filter Controls: Head Office, Ward/Branch, Role, and Status */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-2 border-t border-slate-100 dark:border-white/5">
+            {/* 1. Head Office Filter */}
+            {!isHoAdmin ? (
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-500">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <select
+                  value={selectedHoFilter}
+                  onChange={(e) => handleHoFilterChange(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-colors shadow-2xs"
+                >
+                  <option value="" className="dark:bg-slate-900">All Head Offices (Zone)</option>
+                  {headOffices.map((ho) => (
+                    <option key={ho.id} value={ho.id} className="dark:bg-slate-900">
+                      {ho.name} ({ho.city || ho.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="h-[38px] px-3 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-800/40 text-xs font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-2 truncate shadow-2xs">
+                <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span className="truncate">
+                  {headOffices.find((h) => h.id === currentUser?.head_office_id)?.name || 'Assigned Head Office'}
+                </span>
+              </div>
+            )}
+
+            {/* 2. Branch / Ward Filter */}
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-500">
+                <MapPin className="w-4 h-4" />
+              </div>
+              <select
+                value={selectedBranchFilter}
+                onChange={(e) => handleBranchFilterChange(e.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-colors shadow-2xs"
+              >
+                <option value="" className="dark:bg-slate-900">
+                  {selectedHoFilter ? 'All Wards in Selected HO' : 'All Wards & Branches'}
+                </option>
+                {filteredBranches.map((b) => (
+                  <option key={b.id} value={b.id} className="dark:bg-slate-900">
+                    {b.ward_no ? `Ward ${b.ward_no}: ${b.name}` : b.name} ({b.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 3. Role Privilege Filter */}
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-500">
+                <Shield className="w-4 h-4" />
+              </div>
+              <select
+                value={roleFilter}
+                onChange={(e) => {
+                  setRoleFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full pl-9 pr-3 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-colors shadow-2xs"
+              >
+                <option value="" className="dark:bg-slate-900">All Roles</option>
+                <option value="staff" className="dark:bg-slate-900">Staff / Field Operator</option>
+                <option value="branch_admin" className="dark:bg-slate-900">Branch Admin (Ward)</option>
+                {!isHoAdmin && <option value="ho_admin" className="dark:bg-slate-900">Head Office Admin</option>}
+                {!isHoAdmin && <option value="super_admin" className="dark:bg-slate-900">Super Admin</option>}
+              </select>
+            </div>
+
+            {/* 4. Active Status Filter */}
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-500">
+                <UserCheck className="w-4 h-4" />
+              </div>
+              <select
+                value={activeFilter}
+                onChange={(e) => {
+                  setActiveFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full pl-9 pr-3 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-colors shadow-2xs"
+              >
+                <option value="true" className="dark:bg-slate-900">Active Accounts</option>
+                <option value="" className="dark:bg-slate-900">All Status (Active + Inactive)</option>
+                <option value="false" className="dark:bg-slate-900">Deactivated Only</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <Table
           columns={columns}
           data={staffList}
           loading={loading}
-          emptyText={isHoAdmin ? "No branch admins or staff registered under this Head Office yet." : "No staff members registered."}
+          emptyText={
+            hasActiveFilters
+              ? "No staff members match the selected filter criteria."
+              : isHoAdmin
+                ? "No branch admins or staff registered under this Head Office yet."
+                : "No staff members registered."
+          }
           minWidth="min-w-[920px]"
         />
 
@@ -894,6 +1107,19 @@ export default function StaffPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Universal Custom Export Modal */}
+      <CustomExportModal
+        isOpen={isCustomExportOpen}
+        onClose={() => setIsCustomExportOpen(false)}
+        title="Export Staff & Operators Directory"
+        subtitle="Download staff roster, assigned branches/wards, and system permissions (Excel / CSV)"
+        defaultFilename="GoSpeedy_Staff_Directory"
+        columns={STAFF_EXPORT_COLUMNS}
+        dateAccessor="created_at"
+        onFetchData={fetchStaffForExport}
+        transformRow={transformStaffRow}
+      />
     </div>
     </ProtectedRoute>
   );

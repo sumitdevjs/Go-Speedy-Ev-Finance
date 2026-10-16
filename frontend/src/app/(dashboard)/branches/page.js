@@ -17,6 +17,7 @@ import {
   Copy,
   Check,
   Download,
+  ChevronDown,
 } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Card from '../../../components/ui/Card';
@@ -31,7 +32,9 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import api from '../../../lib/api';
 import { staggerFadeIn } from '../../../lib/gsap';
 import { useAuthStore } from '../../../store/authStore';
-import { exportToExcel } from '../../../lib/exportToExcel';
+import { exportToExcel, fetchAllForExport } from '../../../lib/exportToExcel';
+import { toast } from '../../../lib/toast';
+import CustomExportModal from '../../../components/ui/CustomExportModal';
 
 export default function BranchesPage() {
   const router = useRouter();
@@ -41,6 +44,7 @@ export default function BranchesPage() {
   const isHoAdmin = role === 'ho_admin';
 
   const [branches, setBranches] = useState([]);
+  const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
   const [headOffices, setHeadOffices] = useState([]);
   const [selectedHoFilter, setSelectedHoFilter] = useState('');
   const [search, setSearch] = useState(searchParams?.get('search') || '');
@@ -167,36 +171,63 @@ export default function BranchesPage() {
     }
   };
 
-  const handleDownloadData = async () => {
-    try {
-      const effectiveHoId = isHoAdmin ? (user?.head_office_id || selectedHoFilter) : (selectedHoFilter || undefined);
-      const params = {
-        page: 1,
-        limit: 9999,
-        search: search.trim() || undefined,
-        head_office_id: effectiveHoId || undefined,
-      };
-      const res = await api.get('/api/branches', { params });
-      if (res.data?.success) {
-        const dataToExport = res.data.data.map(branch => ({
-          'Ward No': branch.ward_no,
-          'Ward Name': branch.name,
-          'Ward Code': branch.code,
-          'Area': branch.ward_area,
-          'Candidate/Contact': branch.contact_person,
-          Phone: branch.phone,
-          Address: branch.address,
-          'Head Office': branch.head_offices?.name || branch.head_office?.name,
-          'Governing HO Admin': branch.ho_admin?.name || 'Zone Admin',
-          'Total Stock': branch.total_stock || 0,
-          'Active Rentals': branch.active_rentals_count || 0
-        }));
-        exportToExcel(dataToExport, 'Branches_Wards_Data.xlsx');
-      }
-    } catch (err) {
-      console.error('Failed to download branches data:', err);
-      alert('Failed to download data.');
-    }
+  const [exporting, setExporting] = useState(false);
+
+  const BRANCH_EXPORT_COLUMNS = [
+    'Ward No',
+    'Ward Name',
+    'Ward Code',
+    'Ward Area / District',
+    'Candidate / In-Charge',
+    'Contact Phone',
+    'Branch Address',
+    'Governing Head Office',
+    'Head Office Code',
+    'Head Office City / State',
+    'Governing HO Admin',
+    'HO Admin Contact',
+    'Total Fleet Stock',
+    'Available Stock',
+    'Active Rentals / Deployed',
+    'Status'
+  ];
+
+  const fetchBranchesForExport = async () => {
+    const effectiveHoId = isHoAdmin ? (user?.head_office_id || selectedHoFilter) : (selectedHoFilter || undefined);
+    const params = {
+      search: search.trim() || undefined,
+      head_office_id: effectiveHoId || undefined,
+    };
+    return await fetchAllForExport(api, '/api/branches', params, 250);
+  };
+
+  const transformBranchRow = (branch) => {
+    const hoObj = branch.head_offices || branch.head_office || headOffices.find(h => h.id === branch.head_office_id);
+    const totalStock = branch.total_stock ?? 0;
+    const activeCount = branch.active_rentals_count ?? 0;
+    const availStock = branch.available_stock ?? Math.max(0, totalStock - activeCount);
+    return {
+      'Ward No': branch.ward_no ?? '—',
+      'Ward Name': branch.name || 'Unnamed Branch',
+      'Ward Code': branch.code || '—',
+      'Ward Area / District': branch.ward_area || 'Delhi',
+      'Candidate / In-Charge': branch.contact_person || 'Assigned Candidate',
+      'Contact Phone': branch.phone || 'N/A',
+      'Branch Address': branch.address || 'N/A',
+      'Governing Head Office': hoObj?.name || 'Moti Nagar Head Office',
+      'Head Office Code': hoObj?.code || 'DEL-HO',
+      'Head Office City / State': hoObj?.city || hoObj?.state || 'Delhi',
+      'Governing HO Admin': branch.ho_admin?.name || 'Zone Admin',
+      'HO Admin Contact': branch.ho_admin?.phone || 'N/A',
+      'Total Fleet Stock': totalStock,
+      'Available Stock': availStock,
+      'Active Rentals / Deployed': activeCount,
+      'Status': branch.is_active ? 'Active' : 'Inactive',
+    };
+  };
+
+  const handleDownloadData = () => {
+    setIsCustomExportOpen(true);
   };
 
   const handleOpenOverview = async (branch) => {
@@ -253,59 +284,108 @@ export default function BranchesPage() {
     }
   };
 
+  const getBranchHo = (row) => {
+    return (
+      row?.head_office ||
+      row?.head_offices ||
+      headOffices.find((h) => h.id === row?.head_office_id) ||
+      null
+    );
+  };
+
   const columns = [
     {
       header: 'Ward / Branch',
       key: 'name',
-      className: 'min-w-[200px]',
-      render: (row) => (
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500/15 to-indigo-500/15 border border-blue-500/25 flex items-center justify-center text-blue-600 dark:text-blue-400 font-black text-xs shrink-0 shadow-2xs">
-            {row.ward_no ? `#${row.ward_no}` : 'BR'}
+      className: 'min-w-[220px]',
+      render: (row) => {
+        const hoObj = getBranchHo(row);
+        const hoName = hoObj?.name || (row.head_office_id ? 'Head Office' : 'Central HQ');
+        const hoCode = hoObj?.code || '';
+
+        return (
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500/15 to-indigo-500/15 border border-blue-500/25 flex items-center justify-center text-blue-600 dark:text-blue-400 font-black text-xs shrink-0 shadow-2xs">
+              {row.ward_no ? `#${row.ward_no}` : 'BR'}
+            </div>
+            <div className="min-w-0 flex-1">
+              {/* Governing Head Office Pill Above Branch Name */}
+              <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60 shadow-2xs">
+                  <Building2 className="h-2.5 w-2.5 shrink-0 text-purple-600 dark:text-purple-400" />
+                  <span className="truncate max-w-[180px]">{hoName}</span>
+                </span>
+                {hoCode && (
+                  <span className="font-mono text-[9px] font-bold text-slate-500 dark:text-slate-400">
+                    ({hoCode})
+                  </span>
+                )}
+              </div>
+              <p className="font-bold text-slate-900 dark:text-white text-sm tracking-tight truncate">
+                {row.name}
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5 truncate">
+                <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
+                <span className="truncate">{row.ward_area || 'Standard Ward'}</span>
+              </p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="font-bold text-slate-900 dark:text-white text-sm tracking-tight truncate">
-              {row.name}
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5 truncate">
-              <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
-              <span className="truncate">{row.ward_area || 'Standard Ward'}</span>
-            </p>
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     ...(isSuperAdmin ? [{
-      header: 'Governing HO Admin',
+      header: 'Governing Head Office',
       key: 'ho_admin',
+      className: 'min-w-[230px]',
       render: (row) => {
+        const hoObj = getBranchHo(row);
+        const hoName = hoObj?.name || 'Head Office';
+        const hoCode = hoObj?.code || 'DEL-HO';
+        const hoCity = hoObj?.city || '';
         const hoAdmin = row.ho_admin;
-        const hoName = row.head_office?.name || row.head_offices?.name || 'Head Office';
-        const hoCode = row.head_office?.code || row.head_offices?.code || 'HO';
+
         return (
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-1.5">
-              <span className="h-6 w-6 rounded-full bg-purple-50 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center justify-center shrink-0">
-                <Building2 className="h-3 w-3" />
+          <div className="space-y-1.5 py-0.5">
+            {/* 1. Prominent Head Office Name & Code */}
+            <div className="flex items-center gap-2">
+              <span className="h-7 w-7 rounded-lg bg-gradient-to-br from-purple-500/15 to-indigo-500/20 text-purple-700 dark:text-purple-300 border border-purple-300/80 dark:border-purple-700/80 flex items-center justify-center shrink-0 shadow-2xs">
+                <Building2 className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
               </span>
-              <div>
-                <p className="font-semibold text-xs text-slate-900 dark:text-white leading-tight">
-                  {hoAdmin?.name || `${hoName} Admin`}
+              <div className="min-w-0">
+                <p className="font-bold text-xs text-slate-900 dark:text-white leading-tight truncate" title={hoName}>
+                  {hoName}
                 </p>
-                <span className="font-mono text-[10px] text-purple-600 dark:text-purple-400 font-bold">
-                  {hoCode}
-                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="font-mono text-[9px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-950/70 px-1.5 py-0.2 rounded border border-purple-200/80 dark:border-purple-800/80">
+                    {hoCode}
+                  </span>
+                  {hoCity && (
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[120px]">
+                      {hoCity}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-            {hoAdmin?.phone && (
-              <a
-                href={`tel:${hoAdmin.phone}`}
-                className="inline-flex items-center gap-1 text-[11px] font-mono text-purple-600 dark:text-purple-400 hover:underline pl-7"
-              >
-                <Phone className="h-2.5 w-2.5" />
-                {hoAdmin.phone}
-              </a>
-            )}
+
+            {/* 2. Governing HO Admin Person & Contact */}
+            <div className="pl-9 text-xs space-y-0.5 border-l-2 border-purple-200 dark:border-purple-800/50 ml-3.5">
+              <p className="text-slate-600 dark:text-slate-300 font-medium flex items-center gap-1 text-[11px]">
+                <span className="text-slate-400">Admin:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                  {hoAdmin?.name || `${hoName} Admin`}
+                </span>
+              </p>
+              {hoAdmin?.phone && (
+                <a
+                  href={`tel:${hoAdmin.phone}`}
+                  className="inline-flex items-center gap-1 text-[11px] font-mono text-purple-600 dark:text-purple-400 hover:underline"
+                >
+                  <Phone className="h-2.5 w-2.5 shrink-0" />
+                  <span>{hoAdmin.phone}</span>
+                </a>
+              )}
+            </div>
           </div>
         );
       },
@@ -317,12 +397,12 @@ export default function BranchesPage() {
       render: (row) => {
         const initials = row.contact_person
           ? row.contact_person
-              .replace(/^(S\.|Sh\.|Dr\.|Mr\.)\s*/i, '')
-              .split(' ')
-              .slice(0, 2)
-              .map((n) => n[0])
-              .join('')
-              .toUpperCase()
+            .replace(/^(S\.|Sh\.|Dr\.|Mr\.)\s*/i, '')
+            .split(' ')
+            .slice(0, 2)
+            .map((n) => n[0])
+            .join('')
+            .toUpperCase()
           : 'IC';
 
         return (
@@ -337,11 +417,10 @@ export default function BranchesPage() {
                 </p>
                 {row.status_label && (
                   <span
-                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase ${
-                      row.status_label.toLowerCase() === 'won'
+                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase ${row.status_label.toLowerCase() === 'won'
                         ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
                         : 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700'
-                    }`}
+                      }`}
                   >
                     {row.status_label}
                   </span>
@@ -420,11 +499,10 @@ export default function BranchesPage() {
       className: 'min-w-[115px] whitespace-nowrap text-center',
       cellClassName: 'whitespace-nowrap text-center',
       render: (row) => (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
-          row.is_active
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${row.is_active
             ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
             : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25'
-        }`}>
+          }`}>
           <span className={`h-1.5 w-1.5 rounded-full ${row.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
           <span>{row.is_active ? 'ACTIVE' : 'INACTIVE'}</span>
         </span>
@@ -599,40 +677,48 @@ export default function BranchesPage() {
 
         {/* Filters & Head Office Tabs */}
         <div className="gsap-filter-bar flex flex-col lg:flex-row flex-wrap items-stretch lg:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs min-w-0">
-          {/* HO Tabs: Rendered exclusively for Super Admin */}
+          {/* Head Office Filter: Dropdown selector for Super Admin */}
           {isSuperAdmin ? (
-            <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 lg:pb-0 scrollbar-thin min-w-0">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedHoFilter('');
-                  setPage(1);
-                }}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
-                  selectedHoFilter === ''
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-              >
-                All Regions (46 Delhi + NCR)
-              </button>
-              {headOffices.map((ho) => (
-                <button
-                  key={ho.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedHoFilter(ho.id);
+            <div className="flex items-center gap-2 w-full lg:w-auto min-w-0">
+              <div className="relative w-full sm:w-72 min-w-0">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-500">
+                  <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <select
+                  value={selectedHoFilter}
+                  onChange={(e) => {
+                    setSelectedHoFilter(e.target.value);
                     setPage(1);
                   }}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
-                    selectedHoFilter === ho.id
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                  }`}
+                  className="w-full pl-9 pr-8 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all shadow-2xs h-[38px] cursor-pointer appearance-none"
+                  aria-label="Filter branches by Head Office region"
                 >
-                  {ho.name}
+                  <option value="" className="dark:bg-slate-900 font-semibold">
+                    All Regions (46 Delhi + NCR)
+                  </option>
+                  {headOffices.map((ho) => (
+                    <option key={ho.id} value={ho.id} className="dark:bg-slate-900 font-semibold">
+                      {ho.name} ({ho.city || ho.code || 'Zone'})
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 pointer-events-none">
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              {selectedHoFilter && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedHoFilter('');
+                    setPage(1);
+                  }}
+                  className="px-2.5 py-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 border border-rose-200/70 dark:border-rose-500/30 rounded-xl transition-all cursor-pointer shrink-0 active:scale-95 shadow-2xs"
+                  title="Clear Head Office filter"
+                >
+                  Clear
                 </button>
-              ))}
+              )}
             </div>
           ) : (
             /* HO Admin gets a dedicated badge indicating their assigned Head Office jurisdiction */
@@ -669,11 +755,12 @@ export default function BranchesPage() {
               variant="outline"
               size="sm"
               icon={Download}
+              loading={exporting}
               className="shrink-0 h-[38px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
               onClick={handleDownloadData}
-              title="Download Data as Excel"
+              title="Download Complete Branches Data as Excel"
             >
-              <span className="hidden sm:inline">Export</span>
+              <span className="hidden sm:inline">{exporting ? 'Exporting...' : 'Export Excel'}</span>
             </Button>
           </div>
         </div>
@@ -717,6 +804,12 @@ export default function BranchesPage() {
                         #{b.ward_no || '•'}
                       </div>
                       <div>
+                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60">
+                            <Building2 className="w-2.5 h-2.5 shrink-0 text-purple-600 dark:text-purple-400" />
+                            <span className="truncate max-w-[170px]">{getBranchHo(b)?.name || 'Head Office'}</span>
+                          </span>
+                        </div>
                         <h4 className="font-extrabold text-sm text-slate-900 dark:text-white leading-tight">
                           {b.name}
                         </h4>
@@ -728,13 +821,12 @@ export default function BranchesPage() {
                     </div>
 
                     {b.status_label && (
-                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 ${
-                        isWon
+                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 ${isWon
                           ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
                           : isLost
-                          ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25'
-                          : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25'
-                      }`}>
+                            ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25'
+                            : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25'
+                        }`}>
                         {b.status_label}
                       </span>
                     )}
@@ -762,7 +854,7 @@ export default function BranchesPage() {
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 truncate max-w-[200px] flex items-center gap-1">
                       <Building2 className="w-3 h-3 shrink-0" />
-                      <span>{b.ho_admin?.name || b.head_offices?.name || 'Head Office'}</span>
+                      <span>{getBranchHo(b)?.name || 'Head Office'} • {b.ho_admin?.name || 'Admin'}</span>
                     </span>
                     <button
                       type="button"
@@ -1000,9 +1092,9 @@ export default function BranchesPage() {
             <div className="space-y-2 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs border border-slate-200/60 dark:border-slate-700/60">
               <div className="flex justify-between items-center">
                 <span className="text-slate-500">Parent Head Office:</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-indigo-500" />
-                  {overviewData.branch.head_office?.name || 'Delhi Head Office'}
+                <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                  {overviewData.branch.head_office?.name || getBranchHo(overviewData.branch)?.name || 'Head Office'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
@@ -1090,6 +1182,19 @@ export default function BranchesPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Universal Custom Export Modal */}
+      <CustomExportModal
+        isOpen={isCustomExportOpen}
+        onClose={() => setIsCustomExportOpen(false)}
+        title="Export Branches & Wards Stock"
+        subtitle="Download municipal ward allocations, governing head offices, and live fleet stock (Excel / CSV)"
+        defaultFilename="GoSpeedy_Branches_Wards_Stock"
+        columns={BRANCH_EXPORT_COLUMNS}
+        dateAccessor="created_at"
+        onFetchData={fetchBranchesForExport}
+        transformRow={transformBranchRow}
+      />
     </div>
   );
 }

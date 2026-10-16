@@ -24,6 +24,7 @@ import { formatCurrency, formatDate } from '../../../../lib/constants';
 export default function ModelViewPage({ params }) {
   const router = useRouter();
   const { id } = params;
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const [model, setModel] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -144,6 +145,17 @@ export default function ModelViewPage({ params }) {
   };
 
   const handleSaveLogs = async () => {
+    const hasInvalidPastLog = editableLogs.some((l, idx) => {
+      if (!l.date) return false;
+      const origDate = logs[idx]?.date;
+      if (origDate === l.date) return false;
+      return l.date < todayStr;
+    });
+    if (hasInvalidPastLog) {
+      toast.error('Stock log date cannot be set to a past date (back date not allowed).');
+      return;
+    }
+
     try {
       setSavingLogs(true);
       await api.patch(`/api/models/${id}`, {
@@ -172,6 +184,10 @@ export default function ModelViewPage({ params }) {
     }
     if (!stockBranchId) {
       toast.error('Please select the target Ward / Branch');
+      return;
+    }
+    if (stockDate && stockDate < todayStr) {
+      toast.error('Date received cannot be in the past (back date not allowed).');
       return;
     }
     const chosenBranch = branches.find((b) => b.id === stockBranchId);
@@ -222,6 +238,7 @@ export default function ModelViewPage({ params }) {
         isEditingLogs ? (
           <Input 
             type="date" 
+            min={logs[idx]?.date && logs[idx].date < todayStr ? logs[idx].date : todayStr}
             value={editableLogs[idx].date} 
             onChange={(e) => handleLogChange(idx, 'date', e.target.value)}
             className="w-full min-w-[140px]"
@@ -492,6 +509,7 @@ export default function ModelViewPage({ params }) {
           <Input
             label="Date Received"
             type="date"
+            min={todayStr}
             value={stockDate}
             onChange={(e) => setStockDate(e.target.value)}
             required

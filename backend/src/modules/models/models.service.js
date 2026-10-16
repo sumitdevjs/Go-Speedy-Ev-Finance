@@ -223,12 +223,17 @@ class ModelsService {
       assignedBranchId = scope.branch_id;
       assignedHoId = scope.head_office_id;
     }
-    
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (initial_stock_date && String(initial_stock_date).split('T')[0] < todayStr) {
+      throw new Error('Initial stock date cannot be in the past (back date not allowed).');
+    }
+
     let initialLogs = [];
     if (restData.stock_count && Number(restData.stock_count) > 0) {
       initialLogs.push({
         id: crypto.randomUUID(),
-        date: initial_stock_date || new Date().toISOString().split('T')[0],
+        date: initial_stock_date || todayStr,
         stock_added: Number(restData.stock_count),
         ward_area: ward || 'Delhi Central',
         branch_id: assignedBranchId,
@@ -322,6 +327,11 @@ class ModelsService {
     const branches = await getLiveBranches();
     const { date, stock_added, ward_area, branch_id, ward_no } = payload;
     
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (date && String(date).split('T')[0] < todayStr) {
+      throw new Error('Stock received date cannot be in the past (back date not allowed).');
+    }
+
     // Resolve target ward:
     // If caller is a branch_admin / ward_admin, strictly lock to their own ward!
     let targetWard = null;
@@ -390,6 +400,21 @@ class ModelsService {
 
       if (existing) {
         throw new Error(`Another active EV model with name "${updateData.name || current?.name}" and ${kmToCheck} km already exists.`);
+      }
+    }
+
+    if (updateData.stock_logs && Array.isArray(updateData.stock_logs)) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const { data: current } = await supabase.from('ev_models').select('stock_logs').eq('id', id).single();
+      const currentLogs = Array.isArray(current?.stock_logs) ? current.stock_logs : [];
+      const hasInvalidNewPastDate = updateData.stock_logs.some((l, idx) => {
+        if (!l.date) return false;
+        const curDate = currentLogs[idx]?.date;
+        if (curDate === l.date) return false;
+        return String(l.date).split('T')[0] < todayStr;
+      });
+      if (hasInvalidNewPastDate) {
+        throw new Error('Stock log date cannot be set to a past date (back date not allowed).');
       }
     }
 

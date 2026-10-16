@@ -9,8 +9,10 @@ import Badge from '../../../components/ui/Badge';
 import ProtectedRoute from '../../../components/layout/ProtectedRoute';
 import api from '../../../lib/api';
 import Button from '../../../components/ui/Button';
-import { exportToExcel } from '../../../lib/exportToExcel';
+import { exportToExcel, fetchAllForExport } from '../../../lib/exportToExcel';
+import CustomExportModal from '../../../components/ui/CustomExportModal';
 import { useAuthStore } from '../../../store/authStore';
+import { toast } from '../../../lib/toast';
 
 // ── Human-readable action descriptions ──────────────────────────────────────
 const ACTION_LABELS = {
@@ -122,6 +124,26 @@ function formatValue(val, key) {
   return String(val);
 }
 
+function formatChangesForExport(changes) {
+  if (!changes || typeof changes !== 'object') return '—';
+  const parts = [];
+  for (const [key, val] of Object.entries(changes)) {
+    const label = FIELD_LABELS[key] || key;
+    if (val && typeof val === 'object' && ('from' in val || 'to' in val)) {
+      const fromStr = val.from !== null && val.from !== undefined ? String(val.from) : 'None';
+      const toStr = val.to !== null && val.to !== undefined ? String(val.to) : 'None';
+      parts.push(`${label}: ${fromStr} -> ${toStr}`);
+    } else if (val !== null && val !== undefined) {
+      if (typeof val === 'object') {
+        parts.push(`${label}: ${JSON.stringify(val)}`);
+      } else {
+        parts.push(`${label}: ${val}`);
+      }
+    }
+  }
+  return parts.length > 0 ? parts.join(' | ') : 'No details recorded';
+}
+
 // ── Change diff renderer ─────────────────────────────────────────────────────
 // Shown expanded by default (admin should see "who changed what" without an
 // extra click) — the toggle only lets them collapse a noisy row if they want.
@@ -214,6 +236,8 @@ export default function AuditPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
   // Track only rows the admin has *manually expanded* — everything starts collapsed.
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   const toggleRow = (id) => {
@@ -242,25 +266,45 @@ export default function AuditPage() {
     }
   };
 
-  const handleDownloadData = async () => {
-    try {
-      const res = await api.get(`/api/audit?page=1&limit=9999`);
-      if (res.data?.success) {
-        const dataToExport = res.data.data.map(log => ({
-          'When': new Date(log.created_at).toLocaleString('en-IN'),
-          'Done By': log.users?.name || 'System',
-          'Role': log.user_role,
-          'Action': log.action,
-          'Section': log.entity_type,
-          'Changes': JSON.stringify(log.changes)
-        }));
-        exportToExcel(dataToExport, 'Audit_Logs.xlsx');
-      }
-    } catch (err) {
-      console.error('Failed to download audit logs:', err);
-      alert('Failed to download data.');
-    }
+  const AUDIT_EXPORT_COLUMNS = [
+    'Timestamp',
+    'Done By Staff',
+    'Staff Email',
+    'Staff Role',
+    'Staff Ward / Area',
+    'Action Performed',
+    'Action Code',
+    'Section / Entity',
+    'Target Subject / ID',
+    'Detailed Changes',
+    'IP Address'
+  ];
+
+  const fetchAuditForExport = async () => {
+    return await fetchAllForExport(api, '/api/audit', {}, 250);
   };
+
+  const transformAuditRow = (log) => ({
+    'Timestamp': new Date(log.created_at).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }),
+    'Done By Staff': log.users?.name || 'System / Automated',
+    'Staff Email': log.users?.email || '—',
+    'Staff Role': log.user_role || '—',
+    'Staff Ward / Area': log.users?.ward_area || '—',
+    'Action Performed': ACTION_LABELS[log.action] || log.action?.replace(/_/g, ' ') || '—',
+    'Action Code': log.action || '—',
+    'Section / Entity': ENTITY_LABELS[log.entity_type] || log.entity_type?.replace(/_/g, ' ') || '—',
+    'Target Subject / ID': log.entity_name || log.entity_id || '—',
+    'Detailed Changes': formatChangesForExport(log.changes),
+    'IP Address': log.ip_address || '—',
+    created_at: log.created_at,
+  });
 
   const columns = [
     {
@@ -360,10 +404,10 @@ export default function AuditPage() {
               size="sm"
               icon={Download}
               className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
-              onClick={handleDownloadData}
-              title="Download Data as Excel"
+              onClick={() => setIsCustomExportOpen(true)}
+              title="Download Audit Trail (Excel / CSV)"
             >
-              <span className="hidden sm:inline">Download Data</span>
+              <span className="hidden sm:inline">Export Audit Log</span>
             </Button>
           </div>
           <Table
@@ -382,6 +426,19 @@ export default function AuditPage() {
             onPageChange={setPage}
           />
         </div>
+
+        {/* Universal Custom Export Modal */}
+        <CustomExportModal
+          isOpen={isCustomExportOpen}
+          onClose={() => setIsCustomExportOpen(false)}
+          title="Export Audit Trail Logs"
+          subtitle="Download system activity audit trail, staff actions, and security logs (Excel / CSV)"
+          defaultFilename="GoSpeedy_Audit_Trail_Logs"
+          columns={AUDIT_EXPORT_COLUMNS}
+          dateAccessor="created_at"
+          onFetchData={fetchAuditForExport}
+          transformRow={transformAuditRow}
+        />
       </div>
     </ProtectedRoute>
   );

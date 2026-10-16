@@ -28,6 +28,7 @@ import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import Spinner from '../ui/Spinner';
 import Table from '../ui/Table';
+import Pagination from '../ui/Pagination';
 import api from '../../lib/api';
 import { formatCurrency, formatDate } from '../../lib/constants';
 import { useAuthStore } from '../../store/authStore';
@@ -56,6 +57,8 @@ export default function HoDashboard() {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'stock_alert' | 'overdue_alert'
+  const [hoPage, setHoPage] = useState(1);
+  const HO_WARDS_PER_PAGE = 8;
 
   useEffect(() => {
     fetchDashboard();
@@ -301,7 +304,10 @@ export default function HoDashboard() {
                 <input
                   type="text"
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setHoPage(1);
+                  }}
                   placeholder="Search ward or candidate..."
                   className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
                 />
@@ -310,7 +316,10 @@ export default function HoDashboard() {
               <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setStatusFilter('all')}
+                  onClick={() => {
+                    setStatusFilter('all');
+                    setHoPage(1);
+                  }}
                   className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
                     statusFilter === 'all'
                       ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs'
@@ -321,7 +330,10 @@ export default function HoDashboard() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setStatusFilter('overdue_alert')}
+                  onClick={() => {
+                    setStatusFilter('overdue_alert');
+                    setHoPage(1);
+                  }}
                   className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
                     statusFilter === 'overdue_alert'
                       ? 'bg-rose-500 text-white shadow-xs'
@@ -332,7 +344,10 @@ export default function HoDashboard() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setStatusFilter('stock_alert')}
+                  onClick={() => {
+                    setStatusFilter('stock_alert');
+                    setHoPage(1);
+                  }}
                   className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
                     statusFilter === 'stock_alert'
                       ? 'bg-amber-500 text-white shadow-xs'
@@ -373,7 +388,7 @@ export default function HoDashboard() {
                     </td>
                   </tr>
                 ) : (
-                  filteredWards.map((ward) => (
+                  filteredWards.slice((hoPage - 1) * HO_WARDS_PER_PAGE, hoPage * HO_WARDS_PER_PAGE).map((ward) => (
                     <tr
                       key={ward.id}
                       className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
@@ -482,6 +497,17 @@ export default function HoDashboard() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {Math.ceil(filteredWards.length / HO_WARDS_PER_PAGE) > 1 && (
+            <Pagination
+              currentPage={hoPage}
+              totalPages={Math.ceil(filteredWards.length / HO_WARDS_PER_PAGE)}
+              totalItems={filteredWards.length}
+              onPageChange={setHoPage}
+              className="mt-3 border border-slate-200/60 dark:border-slate-800 rounded-xl"
+            />
+          )}
         </div>
 
         {/* Territory Activity Section */}

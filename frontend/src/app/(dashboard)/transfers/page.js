@@ -21,6 +21,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/authStore';
+import CustomExportModal from '../../../components/ui/CustomExportModal';
 
 export default function TransfersPage() {
   const { user } = useAuthStore();
@@ -30,6 +31,7 @@ export default function TransfersPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
 
   // Dropdown lists
   const [models, setModels] = useState([]);
@@ -222,6 +224,14 @@ export default function TransfersPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setIsCustomExportOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground font-semibold text-sm transition-all shadow-sm cursor-pointer"
+            title="Download Stock Transfers (Excel / CSV)"
+          >
+            <Download className="w-4 h-4" />
+            Export
+          </button>
           <button
             onClick={() => setIsInitiateOpen(true)}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-sm shadow-sm transition-all"
@@ -782,6 +792,44 @@ export default function TransfersPage() {
           </div>
         </div>
       )}
+
+      {/* Universal Custom Export Modal */}
+      <CustomExportModal
+        isOpen={isCustomExportOpen}
+        onClose={() => setIsCustomExportOpen(false)}
+        title="Export Stock Transfers"
+        subtitle="Download inter-branch vehicle movements and transit gate pass records (Excel / CSV)"
+        defaultFilename="GoSpeedy_Stock_Transfers"
+        columns={[
+          'Transfer ID',
+          'Challan Number',
+          'From Ward / Branch',
+          'To Ward / Branch',
+          'EV Model',
+          'Quantity',
+          'Status',
+          'Driver Name',
+          'Driver Phone',
+          'Requested By',
+          'Created Date',
+        ]}
+        dateAccessor="created_at"
+        onFetchData={async () => transfers}
+        transformRow={(t) => ({
+          'Transfer ID': t.id || '—',
+          'Challan Number': t.challan_number || 'Pending Challan',
+          'From Ward / Branch': t.from_branch?.name || (t.from_ward_area ? `${t.from_ward_area} Ward` : 'Central HO'),
+          'To Ward / Branch': t.to_branch?.name || (t.to_ward_area ? `${t.to_ward_area} Ward` : 'Target Branch'),
+          'EV Model': t.ev_models?.name || 'EV Scooter',
+          'Quantity': t.quantity || 1,
+          'Status': t.status || 'requested',
+          'Driver Name': t.driver_name || 'N/A',
+          'Driver Phone': t.driver_phone || 'N/A',
+          'Requested By': t.requested_by_user?.name || 'Staff',
+          'Created Date': t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN') : '—',
+          created_at: t.created_at || new Date().toISOString(),
+        })}
+      />
     </div>
   );
 }

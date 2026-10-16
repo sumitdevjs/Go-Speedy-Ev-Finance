@@ -35,6 +35,7 @@ import { formatCurrency, formatDate } from '../../../lib/constants';
 import { staggerFadeIn } from '../../../lib/gsap';
 import { useAuthStore } from '../../../store/authStore';
 import { exportToExcel } from '../../../lib/exportToExcel';
+import CustomExportModal from '../../../components/ui/CustomExportModal';
 import { toast } from '../../../lib/toast';
 import AddPenaltyModal from '../../../components/penalties/AddPenaltyModal';
 
@@ -53,6 +54,7 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
+  const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
   const pageSize = 12;
 
   // 360 Profile Modal State
@@ -145,23 +147,56 @@ export default function CustomersPage() {
     }
   };
 
-  const handleExportData = () => {
-    if (customers.length === 0) return toast.error('No customers to export');
-    const dataToExport = customers.map((c) => ({
-      'Customer Name': c.name,
-      Phone: c.phone,
-      'Ward / Branch': c.branch?.name || 'Head Office',
-      'Active Contracts': c.active_contract_count,
-      'Contract Status': c.status,
-      'Total Amount Paid': c.total_paid,
-      'Principal Due': c.net_outstanding,
-      'Days Overdue': c.max_days_overdue,
-      'Late Fees & Fines': c.total_late_fee,
-      'Net Amount Due': c.net_total_due,
-      'Active Bike': c.contracts?.[0]?.vehicle_number || 'N/A',
-      'EV Model': c.contracts?.[0]?.model_name || 'EV Scooter',
-    }));
-    exportToExcel(dataToExport, `GoSpeedy_Customer_Directory_${new Date().toISOString().split('T')[0]}`);
+  const CUSTOMER_EXPORT_COLUMNS = [
+    'Customer Name',
+    'Phone Number',
+    'Assigned Branch / Ward',
+    'Branch Code',
+    'Customer Address',
+    'Active Contracts',
+    'Total Contracts',
+    'Customer Status',
+    'All Assigned Vehicles',
+    'All EV Models',
+    'Total Contract Value (₹)',
+    'Total Amount Paid (₹)',
+    'Principal Balance Due (₹)',
+    'Late Fees & Penalties (₹)',
+    'Net Total Due (₹)',
+    'Max Days Overdue',
+    'Aadhaar Status',
+  ];
+
+  const fetchCustomersForExport = async () => {
+    return customers;
+  };
+
+  const transformCustomerRow = (c) => {
+    const contractsList = c.contracts || [];
+    const vehicleNumbers = contractsList.map(k => k.vehicle_number).filter(Boolean).join(', ');
+    const modelNames = contractsList.map(k => k.model_name).filter(Boolean).join(', ');
+    const totalContractValue = contractsList.reduce((sum, k) => sum + (k.total_price || 0), 0);
+
+    return {
+      'Customer Name': c.name || '—',
+      'Phone Number': c.phone || '—',
+      'Assigned Branch / Ward': c.branch?.name || 'Head Office Central',
+      'Branch Code': c.branch?.code || 'DEL-HO',
+      'Customer Address': c.address || 'N/A',
+      'Active Contracts': c.active_contract_count || 0,
+      'Total Contracts': c.total_contracts || contractsList.length,
+      'Customer Status': c.status || 'Active',
+      'All Assigned Vehicles': vehicleNumbers || 'None',
+      'All EV Models': modelNames || 'None',
+      'Total Contract Value (₹)': totalContractValue,
+      'Total Amount Paid (₹)': c.total_paid || 0,
+      'Principal Balance Due (₹)': c.net_outstanding || 0,
+      'Late Fees & Penalties (₹)': c.total_late_fee || 0,
+      'Net Total Due (₹)': c.net_total_due || 0,
+      'Max Days Overdue': c.max_days_overdue || 0,
+      'Aadhaar Status': c.aadhar_path ? 'Uploaded' : 'Pending',
+      created_at: c.created_at || (contractsList[0]?.start_date) || new Date().toISOString(),
+    };
   };
 
   // Pagination slice
@@ -300,9 +335,9 @@ export default function CustomersPage() {
             variant="outline"
             size="sm"
             icon={Download}
-            onClick={handleExportData}
+            onClick={() => setIsCustomExportOpen(true)}
             className="h-9 px-3 sm:px-3.5 text-xs font-semibold shrink-0 shadow-xs border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
-            title="Download Customer Directory as Excel"
+            title="Download Customer Directory (Excel / CSV)"
           >
             <span className="hidden sm:inline">Export Directory</span>
             <span className="sm:hidden">Export</span>
@@ -768,6 +803,19 @@ export default function CustomersPage() {
           }}
         />
       )}
+
+      {/* Universal Custom Export Modal */}
+      <CustomExportModal
+        isOpen={isCustomExportOpen}
+        onClose={() => setIsCustomExportOpen(false)}
+        title="Export Customer Directory"
+        subtitle="Download customer profiles, assigned vehicles, and payment ledgers (Excel / CSV)"
+        defaultFilename="GoSpeedy_Customers_Directory"
+        columns={CUSTOMER_EXPORT_COLUMNS}
+        dateAccessor="created_at"
+        onFetchData={fetchCustomersForExport}
+        transformRow={transformCustomerRow}
+      />
     </div>
   );
 }

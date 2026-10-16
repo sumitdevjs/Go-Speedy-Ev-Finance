@@ -42,6 +42,11 @@ class StaffService {
       queryBuilder = queryBuilder.eq('is_active', query.is_active === 'true');
     }
 
+    // Filter by role if specified
+    if (query.role && query.role !== 'all') {
+      queryBuilder = queryBuilder.eq('role', query.role);
+    }
+
     const { data, count, error } = await queryBuilder
       .range(offset, offset + limit - 1);
 
@@ -49,6 +54,21 @@ class StaffService {
 
     // Safely batch-resolve branch & head office info if present
     if (data && data.length > 0) {
+      const branchIds = [...new Set(data.map(u => u.branch_id).filter(Boolean))];
+      const hoIds = [...new Set(data.map(u => u.head_office_id).filter(Boolean))];
+
+      const [branchesRes, hoRes] = await Promise.all([
+        branchIds.length > 0
+          ? supabase.from('branches').select('id, name, code, ward_no, ward_area, head_office_id').in('id', branchIds)
+          : { data: [] },
+        hoIds.length > 0
+          ? supabase.from('head_offices').select('id, name, code, city, state').in('id', hoIds)
+          : { data: [] },
+      ]);
+
+      const branchMap = new Map((branchesRes.data || []).map(b => [b.id, b]));
+      const hoMap = new Map((hoRes.data || []).map(h => [h.id, h]));
+
       data.forEach(u => {
         const isMaster = u.role === 'super_admin' || (u.role === 'admin' && !u.ward_area);
         if (isMaster) {
@@ -67,8 +87,10 @@ class StaffService {
           u.role = 'branch_admin';
         }
 
-        // Match ward_area to official Delhi Ward data
-        if (u.ward_area) {
+        // Attach resolved branch
+        if (u.branch_id && branchMap.has(u.branch_id)) {
+          u.branches = branchMap.get(u.branch_id);
+        } else if (u.ward_area) {
           const s = String(u.ward_area).trim().toLowerCase();
           const sNorm = s.replace(/[^a-z0-9]/g, '');
           const matched = ALL_WARDS.find(w =>
@@ -85,6 +107,13 @@ class StaffService {
               ward_area: matched.ward_area,
             };
           }
+        }
+
+        // Attach resolved head office
+        if (u.head_office_id && hoMap.has(u.head_office_id)) {
+          u.head_offices = hoMap.get(u.head_office_id);
+        } else if (u.branches?.head_office_id && hoMap.has(u.branches.head_office_id)) {
+          u.head_offices = hoMap.get(u.branches.head_office_id);
         }
       });
     }

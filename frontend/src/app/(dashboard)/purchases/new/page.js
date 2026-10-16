@@ -221,11 +221,32 @@ export default function NewPurchaseWizardPage() {
         setErrorMessage('All hardware and registration details are required');
         return false;
       }
+      if (formData.date_of_delivery && formData.date_of_purchase && formData.date_of_delivery < formData.date_of_purchase) {
+        setErrorMessage('Date of Delivery cannot be before Date of Purchase.');
+        return false;
+      }
     }
     if (step === 5) {
       if (!formData.scooty_insurance_company.trim() || !formData.scooty_policy_number.trim() || !formData.scooty_policy_expiry || !formData.scooty_insurance_amount || !formData.scooty_insurance_idv || !formData.scooty_insurance_start ||
           !formData.rider_insurance_company.trim() || !formData.rider_policy_number.trim() || !formData.rider_policy_expiry || !formData.rider_insurance_amount || !formData.rider_insurance_idv || !formData.rider_insurance_start) {
         setErrorMessage('All insurance details are required');
+        return false;
+      }
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (formData.scooty_insurance_start < todayStr) {
+        setErrorMessage('Scooty Insurance Start Date cannot be in the past (back date not allowed).');
+        return false;
+      }
+      if (formData.scooty_policy_expiry <= formData.scooty_insurance_start) {
+        setErrorMessage('Scooty Insurance Expiry Date must be strictly after Start Date.');
+        return false;
+      }
+      if (formData.rider_insurance_start < todayStr) {
+        setErrorMessage('Rider Insurance Start Date cannot be in the past (back date not allowed).');
+        return false;
+      }
+      if (formData.rider_policy_expiry <= formData.rider_insurance_start) {
+        setErrorMessage('Rider Insurance Expiry Date must be strictly after Start Date.');
         return false;
       }
     }
@@ -241,7 +262,21 @@ export default function NewPurchaseWizardPage() {
     }
     if (step === 7) {
       if (formData.amc_amount === '' || formData.amc_start_date === '' || formData.amc_expire_date === '') {
-        setErrorMessage('AMC amount and dates are required');
+        setErrorMessage('AMC amount, start date, and expire date are required');
+        return false;
+      }
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (formData.amc_start_date < todayStr) {
+        setErrorMessage('AMC Start Date cannot be in the past (back date not allowed).');
+        return false;
+      }
+      if (formData.amc_expire_date <= formData.amc_start_date) {
+        setErrorMessage('AMC Expire Date must be strictly after AMC Start Date.');
+        return false;
+      }
+      const hasPastServiceLog = (formData.amc_service_log || []).some(log => log.date && log.date < todayStr);
+      if (hasPastServiceLog) {
+        setErrorMessage('AMC Service Log Date cannot be in the past (back date not allowed).');
         return false;
       }
     }
@@ -812,6 +847,7 @@ export default function NewPurchaseWizardPage() {
                 <Input
                   label="Date of Handover / Delivery"
                   type="date"
+                  min={formData.date_of_purchase || undefined}
                   value={formData.date_of_delivery}
                   onChange={(e) => updateField('date_of_delivery', e.target.value)}
                   required
@@ -865,6 +901,7 @@ export default function NewPurchaseWizardPage() {
                   <Input
                     label="Start Date"
                     type="date"
+                    min={new Date().toISOString().split('T')[0]}
                     value={formData.scooty_insurance_start}
                     onChange={(e) => updateField('scooty_insurance_start', e.target.value)}
                     required
@@ -872,6 +909,7 @@ export default function NewPurchaseWizardPage() {
                   <Input
                     label="Expiry Date"
                     type="date"
+                    min={formData.scooty_insurance_start || new Date().toISOString().split('T')[0]}
                     value={formData.scooty_policy_expiry}
                     onChange={(e) => updateField('scooty_policy_expiry', e.target.value)}
                     required
@@ -915,6 +953,7 @@ export default function NewPurchaseWizardPage() {
                   <Input
                     label="Start Date"
                     type="date"
+                    min={new Date().toISOString().split('T')[0]}
                     value={formData.rider_insurance_start}
                     onChange={(e) => updateField('rider_insurance_start', e.target.value)}
                     required
@@ -922,6 +961,7 @@ export default function NewPurchaseWizardPage() {
                   <Input
                     label="Expiry Date"
                     type="date"
+                    min={formData.rider_insurance_start || new Date().toISOString().split('T')[0]}
                     value={formData.rider_policy_expiry}
                     onChange={(e) => updateField('rider_policy_expiry', e.target.value)}
                     required
@@ -1052,6 +1092,7 @@ export default function NewPurchaseWizardPage() {
                 <Input
                   label="AMC Start Date"
                   type="date"
+                  min={new Date().toISOString().split('T')[0]}
                   value={formData.amc_start_date}
                   onChange={(e) => updateField('amc_start_date', e.target.value)}
                   required
@@ -1059,6 +1100,7 @@ export default function NewPurchaseWizardPage() {
                 <Input
                   label="AMC Expire Date"
                   type="date"
+                  min={formData.amc_start_date || new Date().toISOString().split('T')[0]}
                   value={formData.amc_expire_date}
                   onChange={(e) => updateField('amc_expire_date', e.target.value)}
                   required
@@ -1091,6 +1133,7 @@ export default function NewPurchaseWizardPage() {
                         <Input
                           label="Date"
                           type="date"
+                          min={formData.amc_start_date || new Date().toISOString().split('T')[0]}
                           value={log.date}
                           onChange={(e) => {
                             const newLog = [...formData.amc_service_log];
