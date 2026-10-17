@@ -590,12 +590,12 @@ npm run lint
 
 ---
 
-## Production Deployment Considerations
+## Sub-Package Documentation
 
-1. **Proxy Trust**: The Express server is pre-configured with `app.set('trust proxy', 1)` to correctly inspect secure headers when deployed behind reverse proxies like Vercel, Railway, or AWS ALB.
-2. **Next.js Proxy Rewrites**: In production, Next.js rewrites route all client-side `/api/*` traffic to the backend, preventing cross-site cookie blocking and eliminating CORS configuration issues.
-3. **HTTP Method Override**: Some proxy layers strip request bodies from `PATCH` calls. The client transparently transforms `PATCH` into `PUT` with `X-HTTP-Method-Override: PATCH`, which the backend middleware reverts before hitting controllers.
-4. **Swagger In Production**: Swagger UI is automatically restricted to development environments to ensure zero endpoint enumeration surface in live production.
+This monorepo is divided into two decoupled packages, each maintained with its own dependencies, scripts, and documentation:
+
+- **Backend API Server**: See [`backend/README.md`](backend/README.md) for detailed Express setup, Supabase PostgreSQL configuration, testing, and API modules.
+- **Frontend Web Application**: See [`frontend/README.md`](frontend/README.md) for Next.js App Router setup, Zustand stores, GSAP animations, and UI architecture.
 
 ---
 
