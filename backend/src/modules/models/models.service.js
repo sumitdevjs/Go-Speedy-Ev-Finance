@@ -166,7 +166,7 @@ class ModelsService {
     const branches = await getLiveBranches();
     let queryBuilder = supabase
       .from('ev_models')
-      .select('id, name, company, total_price, stock_count, stock_logs, is_active')
+      .select('id, name, company, total_price, stock_count, stock_logs, is_active, kilometres')
       .eq('is_active', true)
       .order('name', { ascending: true });
 
@@ -198,7 +198,22 @@ class ModelsService {
   }
 
   async createModel(modelData, createdBy, req = null) {
-    const { initial_stock_date, ward = 'Delhi Central', branch_id, head_office_id, ...restData } = modelData;
+    const { initial_stock_date, ward = 'Delhi Central', branch_id, head_office_id, kilometres, ...restData } = modelData;
+    const kmValue = Number(kilometres) || 0;
+    const trimmedName = String(modelData.name || '').trim().toLowerCase();
+
+    // Check for unique (name + kilometres) combination among active models
+    const { data: existing } = await supabase
+      .from('ev_models')
+      .select('id, name, kilometres')
+      .ilike('name', trimmedName)
+      .eq('kilometres', kmValue)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (existing) {
+      throw new Error(`An active EV model with name "${modelData.name}" and ${kmValue} km already exists. Model + Kilometres combination must be unique.`);
+    }
 
     let assignedBranchId = branch_id || null;
     let assignedHoId = head_office_id || null;
@@ -208,12 +223,17 @@ class ModelsService {
       assignedBranchId = scope.branch_id;
       assignedHoId = scope.head_office_id;
     }
-    
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (initial_stock_date && String(initial_stock_date).split('T')[0] < todayStr) {
+      throw new Error('Initial stock date cannot be in the past (back date not allowed).');
+    }
+
     let initialLogs = [];
     if (restData.stock_count && Number(restData.stock_count) > 0) {
       initialLogs.push({
         id: crypto.randomUUID(),
-        date: initial_stock_date || new Date().toISOString().split('T')[0],
+        date: initial_stock_date || todayStr,
         stock_added: Number(restData.stock_count),
         ward_area: ward || 'Delhi Central',
         branch_id: assignedBranchId,
@@ -221,21 +241,41 @@ class ModelsService {
       });
     }
 
-    const { data, error } = await supabase
+    const insertRow = {
+      ...restData,
+      stock_count: Number(restData.stock_count) || 0,
+      kilometres: kmValue,
+      ward,
+      branch_id: assignedBranchId,
+      head_office_id: assignedHoId,
+      created_by: createdBy,
+      stock_logs: initialLogs
+    };
+
+    let { data, error } = await supabase
       .from('ev_models')
-      .insert([{
-        ...restData,
-        stock_count: Number(restData.stock_count) || 0,
-        ward,
-        branch_id: assignedBranchId,
-        head_office_id: assignedHoId,
-        created_by: createdBy,
-        stock_logs: initialLogs
-      }])
+      .insert([insertRow])
       .select('*')
       .single();
 
-    if (error) throw error;
+    // Fallback if kilometres column doesn't exist yet on live DB
+    if (error && (error.code === '42703' || error.message?.includes('kilometres'))) {
+      delete insertRow.kilometres;
+      const retry = await supabase
+        .from('ev_models')
+        .insert([insertRow])
+        .select('*')
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
+
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error(`An EV model with name "${modelData.name}" and ${kmValue} km already exists. Model + Kilometres combination must be unique.`);
+      }
+      throw error;
+    }
     return data;
   }
 
@@ -287,6 +327,11 @@ class ModelsService {
     const branches = await getLiveBranches();
     const { date, stock_added, ward_area, branch_id, ward_no } = payload;
     
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (date && String(date).split('T')[0] < todayStr) {
+      throw new Error('Stock received date cannot be in the past (back date not allowed).');
+    }
+
     // Resolve target ward:
     // If caller is a branch_admin / ward_admin, strictly lock to their own ward!
     let targetWard = null;
@@ -334,17 +379,75 @@ class ModelsService {
   }
 
   async updateModel(id, updateData) {
-    const { data, error } = await supabase
+    if (updateData.name || updateData.kilometres !== undefined) {
+      const { data: current } = await supabase
+        .from('ev_models')
+        .select('name, kilometres')
+        .eq('id', id)
+        .single();
+
+      const nameToCheck = String(updateData.name || current?.name || '').trim().toLowerCase();
+      const kmToCheck = updateData.kilometres !== undefined ? Number(updateData.kilometres) : Number(current?.kilometres || 0);
+
+      const { data: existing } = await supabase
+        .from('ev_models')
+        .select('id')
+        .ilike('name', nameToCheck)
+        .eq('kilometres', kmToCheck)
+        .eq('is_active', true)
+        .neq('id', id)
+        .maybeSingle();
+
+      if (existing) {
+        throw new Error(`Another active EV model with name "${updateData.name || current?.name}" and ${kmToCheck} km already exists.`);
+      }
+    }
+
+    if (updateData.stock_logs && Array.isArray(updateData.stock_logs)) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const { data: current } = await supabase.from('ev_models').select('stock_logs').eq('id', id).single();
+      const currentLogs = Array.isArray(current?.stock_logs) ? current.stock_logs : [];
+      const hasInvalidNewPastDate = updateData.stock_logs.some((l, idx) => {
+        if (!l.date) return false;
+        const curDate = currentLogs[idx]?.date;
+        if (curDate === l.date) return false;
+        return String(l.date).split('T')[0] < todayStr;
+      });
+      if (hasInvalidNewPastDate) {
+        throw new Error('Stock log date cannot be set to a past date (back date not allowed).');
+      }
+    }
+
+    const payload = {
+      ...updateData,
+      updated_at: new Date().toISOString()
+    };
+
+    let { data, error } = await supabase
       .from('ev_models')
-      .update({
-        ...updateData,
-        updated_at: new Date().toISOString()
-      })
+      .update(payload)
       .eq('id', id)
       .select('*')
       .single();
 
-    if (error) throw error;
+    if (error && (error.code === '42703' || error.message?.includes('kilometres'))) {
+      delete payload.kilometres;
+      const retry = await supabase
+        .from('ev_models')
+        .update(payload)
+        .eq('id', id)
+        .select('*')
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
+
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error(`An EV model with this name and kilometre reading already exists. Model + Kilometres combination must be unique.`);
+      }
+      throw error;
+    }
     return data;
   }
 

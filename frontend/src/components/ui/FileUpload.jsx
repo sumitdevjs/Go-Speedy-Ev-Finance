@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { UploadCloud, CheckCircle2, Image as ImageIcon, AlertCircle, RefreshCw } from 'lucide-react';
+import { UploadCloud, CheckCircle2, Image as ImageIcon, AlertCircle, RefreshCw, X } from 'lucide-react';
 import { useImageCompress } from '../../hooks/useImageCompress';
 import api from '../../lib/api';
 import Spinner from './Spinner';
@@ -103,23 +103,42 @@ export default function FileUpload({
               {compressing ? 'Compressing WebP...' : 'Uploading...'}
             </p>
           </div>
-        ) : preview ? (
+        ) : (preview || currentPath) ? (
           <div className="flex items-center gap-3 w-full">
-            <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800">
-              <img
-                src={preview}
-                alt={label}
-                className="h-full w-full object-cover"
-              />
+            <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 flex items-center justify-center">
+              {preview ? (
+                <img
+                  src={preview}
+                  alt={label}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <ImageIcon className="w-6 h-6 text-emerald-500" />
+              )}
             </div>
             <div className="flex-1 text-left min-w-0">
               <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">
                 {currentPath ? currentPath.split('/').pop() : 'Document attached'}
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center mt-0.5">
-                <RefreshCw className="w-3 h-3 mr-1" /> Click to replace photo
+                <RefreshCw className="w-3 h-3 mr-1" /> Click to replace file
               </p>
             </div>
+            {onUploaded && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPreview(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                  onUploaded('');
+                }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                title="Remove attached document"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center py-2">

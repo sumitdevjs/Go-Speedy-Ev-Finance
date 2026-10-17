@@ -9,7 +9,7 @@ class PurchasesService {
     
     let queryBuilder = supabase
       .from('tenants')
-      .select('*, ev_models(name, company)', { count: 'exact' });
+      .select('*, ev_models(name, company, kilometres)', { count: 'exact' });
 
     if (req) {
       queryBuilder = applyScope(queryBuilder, req);

@@ -15,9 +15,9 @@ export const metadata = {
   title: 'Go Speedy Pvt. Ltd — Welcome to The Future | The House of Ev',
   description: 'Production-grade EV Rent & Purchase Monitor System for Delhi operations.',
   icons: {
-    icon: '/favicon.png?v=3',
-    shortcut: '/favicon.ico?v=3',
-    apple: '/apple-icon.png?v=3',
+    icon: '/favicon.png',
+    shortcut: '/favicon.ico',
+    apple: '/apple-icon.png',
   },
 };
 

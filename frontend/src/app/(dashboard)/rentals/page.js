@@ -15,7 +15,9 @@ import api from '../../../lib/api';
 import { formatCurrency, formatDate } from '../../../lib/constants';
 import { staggerFadeIn } from '../../../lib/gsap';
 import { useAuthStore } from '../../../store/authStore';
-import { exportToExcel } from '../../../lib/exportToExcel';
+import { exportToExcel, fetchAllForExport } from '../../../lib/exportToExcel';
+import { toast } from '../../../lib/toast';
+import CustomExportModal from '../../../components/ui/CustomExportModal';
 
 export default function RentalsListPage() {
   const router = useRouter();
@@ -31,6 +33,7 @@ export default function RentalsListPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
   const { selectedBranch } = useAuthStore();
 
   useEffect(() => {
@@ -88,45 +91,100 @@ export default function RentalsListPage() {
     }
   };
 
-  const handleDownloadData = async () => {
-    try {
-      let query = `/api/rentals?page=1&limit=9999`;
-      if (search) query += `&search=${encodeURIComponent(search)}`;
-      if (showCancelled) {
-        query += `&status=cancelled`;
-      }
-      if (statusFilter === 'pending_docs') {
-        query += `&has_pending_docs=true`;
-      } else if (statusFilter === 'completed_docs') {
-        query += `&has_pending_docs=false`;
-      }
-      if (overdueFilter) query += `&overdue_days=${overdueFilter}`;
-      if (insuranceFilter) query += `&insurance_status=${insuranceFilter}`;
+  const [exporting, setExporting] = useState(false);
 
-      const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
-      query += `&branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`;
+  const RENTAL_EXPORT_COLUMNS = [
+    'Customer Name',
+    'Phone Number',
+    'Ward / Branch',
+    'Vehicle / Reg No',
+    'Chassis No',
+    'Battery No',
+    'Motor No',
+    'Charger No',
+    'EV Model',
+    'Company',
+    'Contract Status',
+    'Start Date',
+    'Expected End Date',
+    'Tenure (Months)',
+    'Monthly / Daily Rate',
+    'Total Contract Price (₹)',
+    'Downpayment Paid (₹)',
+    'Downpayment Mode',
+    'Total Amount Paid (₹)',
+    'Outstanding Balance (₹)',
+    'Days Overdue',
+    'Guarantor Name',
+    'Guarantor Phone',
+    'Customer Address',
+    'Scooty Insurance Expiry',
+    'Rider Insurance Expiry',
+    'AMC Amount (₹)',
+    'AMC Start Date',
+    'AMC Expire Date',
+    'Pending Docs',
+    'Agreement Signed',
+    'Created Date'
+  ];
 
-      const res = await api.get(query);
-      if (res.data?.success) {
-        const dataToExport = res.data.data.map(row => ({
-          Name: row.name,
-          Phone: row.phone,
-          'EV Model': row.ev_models?.name || 'EV Scooter',
-          'Total Price': row.total_price,
-          Downpayment: row.downpayment_paid,
-          'Downpayment Mode': row.downpayment_mode || 'Cash',
-          'Outstanding Balance': row.computed_balance?.outstanding || 0,
-          'Days Overdue': row.computed_balance?.daysOverdue || 0,
-          'Contract Status': row.status,
-          'Pending Docs': row.has_pending_docs ? 'Yes' : 'No',
-          Created: formatDate(row.created_at)
-        }));
-        exportToExcel(dataToExport, 'Rentals_Data.xlsx');
-      }
-    } catch (err) {
-      console.error('Failed to download data:', err);
-      alert('Failed to download data.');
+  const fetchRentalsForExport = async () => {
+    const params = {};
+    if (search) params.search = search;
+    if (showCancelled) {
+      params.status = 'cancelled';
     }
+    if (statusFilter === 'pending_docs') {
+      params.has_pending_docs = 'true';
+    } else if (statusFilter === 'completed_docs') {
+      params.has_pending_docs = 'false';
+    }
+    if (overdueFilter) params.overdue_days = overdueFilter;
+    if (insuranceFilter) params.insurance_status = insuranceFilter;
+
+    const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
+    params.branch_id = branchParam;
+
+    return await fetchAllForExport(api, '/api/rentals', params, 250);
+  };
+
+  const transformRentalRow = (row) => ({
+    'Customer Name': row.name,
+    'Phone Number': row.phone,
+    'Ward / Branch': row.branch ? (row.branch.ward_no ? `Ward ${row.branch.ward_no}: ${row.branch.name}` : row.branch.name) : 'Central Fleet',
+    'Vehicle / Reg No': row.vehicle_number || 'N/A',
+    'Chassis No': row.chassis_no || 'N/A',
+    'Battery No': row.battery_no || 'N/A',
+    'Motor No': row.motor_no || 'N/A',
+    'Charger No': row.charger_no || 'N/A',
+    'EV Model': row.ev_models?.name || 'EV Scooter',
+    'Company': row.ev_models?.company || 'GoSpeedy',
+    'Contract Status': row.status,
+    'Start Date': row.start_date ? formatDate(row.start_date) : 'N/A',
+    'Expected End Date': row.expected_end_date ? formatDate(row.expected_end_date) : 'N/A',
+    'Tenure (Months)': row.total_months || 'N/A',
+    'Monthly / Daily Rate': row.installment_daily_rate ? `₹${row.installment_daily_rate}/${row.installment_frequency || 'day'}` : (row.monthly_rent ? `₹${row.monthly_rent}/mo` : 'N/A'),
+    'Total Contract Price (₹)': row.total_price || 0,
+    'Downpayment Paid (₹)': row.downpayment_paid || 0,
+    'Downpayment Mode': row.downpayment_mode || 'Cash',
+    'Total Amount Paid (₹)': row.computed_balance?.totalPaid || 0,
+    'Outstanding Balance (₹)': row.computed_balance?.outstanding || 0,
+    'Days Overdue': row.computed_balance?.daysOverdue || 0,
+    'Guarantor Name': row.guarantors?.[0]?.name || row.guarantor_name || 'N/A',
+    'Guarantor Phone': row.guarantors?.[0]?.phone || row.guarantor_phone || 'N/A',
+    'Customer Address': row.address || 'N/A',
+    'Scooty Insurance Expiry': row.scooty_policy_expiry ? formatDate(row.scooty_policy_expiry) : 'N/A',
+    'Rider Insurance Expiry': row.rider_policy_expiry ? formatDate(row.rider_policy_expiry) : 'N/A',
+    'AMC Amount (₹)': row.amc_amount || 0,
+    'AMC Start Date': row.amc_start_date ? formatDate(row.amc_start_date) : 'N/A',
+    'AMC Expire Date': row.amc_expire_date ? formatDate(row.amc_expire_date) : 'N/A',
+    'Pending Docs': row.has_pending_docs ? 'Yes' : 'No',
+    'Agreement Signed': row.rent_agreement_signed ? 'Yes' : 'No',
+    'Created Date': formatDate(row.created_at)
+  });
+
+  const handleDownloadData = () => {
+    setIsCustomExportOpen(true);
   };
 
   const columns = [
@@ -152,7 +210,11 @@ export default function RentalsListPage() {
       key: 'model',
       render: (row) => (
         <div>
-          <p className="font-semibold text-slate-800 dark:text-slate-200">{row.ev_models?.name || 'EV Scooter'}</p>
+          <p className="font-semibold text-slate-800 dark:text-slate-200">
+            {row.ev_models?.name
+              ? `${row.ev_models.name}${row.ev_models.kilometres !== undefined && row.ev_models.kilometres !== null ? ` (${row.ev_models.kilometres} KM)` : ''}`
+              : 'EV Scooter'}
+          </p>
           <p className="text-[11px] text-slate-400">Total: {formatCurrency(row.total_price)}</p>
         </div>
       ),
@@ -245,7 +307,7 @@ export default function RentalsListPage() {
   ];
 
   return (
-    <div>
+    <div className="flex-1 flex flex-col min-w-0 w-full">
       <Header
         title="EV Rentals & Tenants"
         subtitle="Live registry of active contracts, daily collections, and overdue accounts"
@@ -282,11 +344,12 @@ export default function RentalsListPage() {
               variant="outline"
               size="sm"
               icon={Download}
+              loading={exporting}
               className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
               onClick={handleDownloadData}
-              title="Download Data as Excel"
+              title="Download Complete Data as Excel"
             >
-              <span className="hidden sm:inline">Download Data</span>
+              <span className="hidden sm:inline">{exporting ? 'Exporting...' : 'Export Excel'}</span>
             </Button>
           </div>
 
@@ -353,6 +416,7 @@ export default function RentalsListPage() {
           data={tenants}
           loading={loading}
           emptyText="No rental records match your filter criteria."
+          minWidth="min-w-[960px]"
         />
 
         <Pagination
@@ -362,6 +426,19 @@ export default function RentalsListPage() {
           onPageChange={setPage}
         />
       </div>
+
+      {/* Universal Custom Export Modal */}
+      <CustomExportModal
+        isOpen={isCustomExportOpen}
+        onClose={() => setIsCustomExportOpen(false)}
+        title="Export EV Rentals & Tenants Data"
+        subtitle="Download customer rental agreements, payment balances, and AMC schedule records (Excel / CSV)"
+        defaultFilename="GoSpeedy_Rentals_Data"
+        columns={RENTAL_EXPORT_COLUMNS}
+        dateAccessor="created_at"
+        onFetchData={fetchRentalsForExport}
+        transformRow={transformRentalRow}
+      />
     </div>
   );
 }

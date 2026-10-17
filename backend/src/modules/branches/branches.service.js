@@ -104,6 +104,88 @@ class BranchesService {
       data = filtered.slice(offset, offset + limit);
     }
 
+    // Safely batch-enrich branches with their governing Head Office & HO Admin
+    if (data && data.length > 0) {
+      try {
+        const missingHoIds = [...new Set(data.filter(b => !b.head_office && b.head_office_id).map(b => b.head_office_id))];
+        if (missingHoIds.length > 0) {
+          const { data: hoList } = await supabase
+            .from('head_offices')
+            .select('id, name, code, city, state')
+            .in('id', missingHoIds);
+          if (hoList && hoList.length > 0) {
+            const hoMap = new Map(hoList.map(h => [h.id, h]));
+            data.forEach(branch => {
+              if (!branch.head_office && branch.head_office_id) {
+                branch.head_office = hoMap.get(branch.head_office_id) || null;
+              }
+            });
+          }
+        }
+
+        const { data: hoAdmins } = await supabase
+          .from('users')
+          .select('id, name, phone, email, head_office_id, branch_id, ward_area, role')
+          .eq('role', 'ho_admin')
+          .eq('is_active', true);
+
+        if (hoAdmins && hoAdmins.length > 0) {
+          data.forEach(branch => {
+            let matched = hoAdmins.find(u => 
+              (u.branch_id && String(u.branch_id).toLowerCase() === String(branch.id).toLowerCase()) ||
+              (u.ward_area && branch.name && u.ward_area.toLowerCase().includes(branch.name.toLowerCase()))
+            );
+            if (!matched && branch.head_office_id) {
+              matched = hoAdmins.find(u => u.head_office_id === branch.head_office_id);
+            }
+            branch.ho_admin = matched ? {
+              id: matched.id,
+              name: matched.name,
+              phone: matched.phone,
+              email: matched.email,
+            } : null;
+          });
+        }
+
+        // Calculate live stock stats & active rentals for branches
+        const [allModelsRes, activeRentalsRes] = await Promise.all([
+          supabase.from('ev_models').select('stock_logs').eq('is_active', true),
+          supabase.from('tenants').select('branch_id').eq('status', 'rented')
+        ]);
+
+        const rentalsByBranch = {};
+        (activeRentalsRes.data || []).forEach(r => {
+          if (r.branch_id) {
+            rentalsByBranch[r.branch_id] = (rentalsByBranch[r.branch_id] || 0) + 1;
+          }
+        });
+
+        const allModels = allModelsRes.data || [];
+
+        data.forEach(branch => {
+          let totalStock = 0;
+          allModels.forEach(m => {
+            const logs = Array.isArray(m.stock_logs) ? m.stock_logs : [];
+            logs.forEach(l => {
+              if (
+                (l.branch_id && String(l.branch_id).toLowerCase() === String(branch.id).toLowerCase()) ||
+                (l.ward_no && branch.ward_no && Number(l.ward_no) === Number(branch.ward_no)) ||
+                (l.ward_area && branch.name && String(l.ward_area).toLowerCase().includes(String(branch.name).toLowerCase()))
+              ) {
+                totalStock += (Number(l.stock_added) || 0);
+              }
+            });
+          });
+          const activeCount = rentalsByBranch[branch.id] || 0;
+          branch.total_stock = totalStock;
+          branch.active_rentals_count = activeCount;
+          branch.available_stock = Math.max(0, totalStock - activeCount);
+        });
+      } catch (err) {
+        console.error('[getAllBranches] Enrichment error:', err);
+      }
+    }
+
     const meta = getPaginationMeta(count, page, limit);
     return { data, meta };
   }
@@ -123,8 +205,6 @@ class BranchesService {
         } else if (user.ward_area) {
           queryBuilder = queryBuilder.ilike('name', `%${user.ward_area}%`);
         }
-      } else if (user && user.role === 'ho_admin' && user.head_office_id) {
-        queryBuilder = queryBuilder.eq('head_office_id', user.head_office_id);
       } else if (query.head_office_id) {
         queryBuilder = queryBuilder.eq('head_office_id', query.head_office_id);
       }
@@ -158,9 +238,7 @@ class BranchesService {
         filtered = [myWard];
       }
     } else {
-      if (user && user.role === 'ho_admin' && user.head_office_id) {
-        filtered = filtered.filter(w => w.head_office_id === user.head_office_id);
-      } else if (query.head_office_id) {
+      if (query.head_office_id) {
         filtered = filtered.filter(w => w.head_office_id === query.head_office_id);
       }
     }
@@ -316,6 +394,31 @@ class BranchesService {
     } catch (e) {
       // Keep sensible default stats for demo
     }
+
+    // Enrich branch with governing HO Admin for overview modal
+    try {
+      const { data: hoAdmins } = await supabase
+        .from('users')
+        .select('id, name, phone, email, head_office_id, branch_id, ward_area, role')
+        .eq('role', 'ho_admin')
+        .eq('is_active', true);
+
+      if (hoAdmins && hoAdmins.length > 0) {
+        let matched = hoAdmins.find(u => 
+          (u.branch_id && String(u.branch_id).toLowerCase() === String(branch.id).toLowerCase()) ||
+          (u.ward_area && branch.name && u.ward_area.toLowerCase().includes(branch.name.toLowerCase()))
+        );
+        if (!matched && branch.head_office_id) {
+          matched = hoAdmins.find(u => u.head_office_id === branch.head_office_id);
+        }
+        branch.ho_admin = matched ? {
+          id: matched.id,
+          name: matched.name,
+          phone: matched.phone,
+          email: matched.email,
+        } : null;
+      }
+    } catch (err) {}
 
     return {
       branch,

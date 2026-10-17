@@ -8,6 +8,9 @@ export default function Table({
   loading = false,
   emptyText = 'No records found',
   onRowClick,
+  minWidth = 'min-w-[760px]',
+  tableLayout = 'table-auto',
+  className = '',
 }) {
   const tbodyRef = useRef(null);
   const prevSignature = useRef('');
@@ -36,15 +39,15 @@ export default function Table({
   }, [data, loading]);
 
   return (
-    <div className="w-full overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
-      <table className="w-full min-w-[760px] text-sm text-slate-600 dark:text-slate-300">
+    <div className={`w-full overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors scrollbar-thin ${className}`}>
+      <table className={`w-full ${tableLayout} ${minWidth} text-sm text-slate-600 dark:text-slate-300`}>
         <thead className="border-b border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-slate-800/60 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
           <tr>
             {columns.map((col, idx) => (
               <th
                 key={col.key || idx}
                 scope="col"
-                className={`px-3 md:px-4 py-3 md:py-4 text-left ${col.className || ''}`}
+                className={`px-2.5 sm:px-3.5 py-3 sm:py-3.5 text-left ${col.className || ''}`}
               >
                 {col.header}
               </th>
@@ -84,7 +87,7 @@ export default function Table({
                 {columns.map((col, colIdx) => (
                   <td
                     key={col.key || colIdx}
-                    className={`px-3 md:px-4 py-3 md:py-4 text-left align-middle ${col.cellClassName || ''}`}
+                    className={`px-2.5 sm:px-3.5 py-3 sm:py-3.5 text-left align-middle ${col.cellClassName || ''}`}
                   >
                     {col.render ? col.render(row, rowIdx) : row[col.key]}
                   </td>

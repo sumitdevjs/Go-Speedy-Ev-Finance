@@ -25,9 +25,11 @@ class StaffService {
           queryBuilder = queryBuilder.ilike('ward_area', `%${userWard}%`);
         }
       }
-      // If caller is ho_admin, they govern branch admins and desk staff under this HO (exclude HO admin and Super Admin accounts)
+      // If caller is ho_admin, strictly scope to their own HO's staff only
       if (req.user?.role === 'ho_admin') {
-        queryBuilder = queryBuilder.in('role', ['branch_admin', 'staff', 'admin']);
+        queryBuilder = queryBuilder
+          .in('role', ['branch_admin', 'staff', 'admin'])
+          .eq('head_office_id', req.user.head_office_id);
       }
     }
 
@@ -40,6 +42,11 @@ class StaffService {
       queryBuilder = queryBuilder.eq('is_active', query.is_active === 'true');
     }
 
+    // Filter by role if specified
+    if (query.role && query.role !== 'all') {
+      queryBuilder = queryBuilder.eq('role', query.role);
+    }
+
     const { data, count, error } = await queryBuilder
       .range(offset, offset + limit - 1);
 
@@ -47,6 +54,21 @@ class StaffService {
 
     // Safely batch-resolve branch & head office info if present
     if (data && data.length > 0) {
+      const branchIds = [...new Set(data.map(u => u.branch_id).filter(Boolean))];
+      const hoIds = [...new Set(data.map(u => u.head_office_id).filter(Boolean))];
+
+      const [branchesRes, hoRes] = await Promise.all([
+        branchIds.length > 0
+          ? supabase.from('branches').select('id, name, code, ward_no, ward_area, head_office_id').in('id', branchIds)
+          : { data: [] },
+        hoIds.length > 0
+          ? supabase.from('head_offices').select('id, name, code, city, state').in('id', hoIds)
+          : { data: [] },
+      ]);
+
+      const branchMap = new Map((branchesRes.data || []).map(b => [b.id, b]));
+      const hoMap = new Map((hoRes.data || []).map(h => [h.id, h]));
+
       data.forEach(u => {
         const isMaster = u.role === 'super_admin' || (u.role === 'admin' && !u.ward_area);
         if (isMaster) {
@@ -65,8 +87,10 @@ class StaffService {
           u.role = 'branch_admin';
         }
 
-        // Match ward_area to official Delhi Ward data
-        if (u.ward_area) {
+        // Attach resolved branch
+        if (u.branch_id && branchMap.has(u.branch_id)) {
+          u.branches = branchMap.get(u.branch_id);
+        } else if (u.ward_area) {
           const s = String(u.ward_area).trim().toLowerCase();
           const sNorm = s.replace(/[^a-z0-9]/g, '');
           const matched = ALL_WARDS.find(w =>
@@ -84,6 +108,13 @@ class StaffService {
             };
           }
         }
+
+        // Attach resolved head office
+        if (u.head_office_id && hoMap.has(u.head_office_id)) {
+          u.head_offices = hoMap.get(u.head_office_id);
+        } else if (u.branches?.head_office_id && hoMap.has(u.branches.head_office_id)) {
+          u.head_offices = hoMap.get(u.branches.head_office_id);
+        }
       });
     }
 
@@ -91,7 +122,7 @@ class StaffService {
     return { data, meta };
   }
 
-  async createStaff({ name, phone, email, password, role, ward_area, branch_id, head_office_id }, createdBy, req = null) {
+  async createStaff({ name, phone, email, password, role, ward_area, branch_id, head_office_id, verification_doc }, createdBy, req = null) {
     if (req?.user?.role === 'ho_admin') {
       if (role === 'super_admin' || role === 'ho_admin') {
         throw new Error('Access denied: Head Office Admins can only create Branch Admins and Staff');
@@ -120,6 +151,7 @@ class StaffService {
       password_hash,
       role: role || 'staff',
       ward_area: ward_area || assignedBranchId || null,
+      verification_doc: verification_doc || null,
       is_active: true,
       created_by: createdBy
     };
@@ -132,10 +164,11 @@ class StaffService {
       .select('*')
       .single();
 
-    // Fallback if branch_id / head_office_id columns do not exist yet in DB schema
-    if (error && (error.code === '42703' || error.message?.includes('branch_id'))) {
+    // Fallback if branch_id / head_office_id / verification_doc columns do not exist yet in DB schema
+    if (error && (error.code === '42703' || error.message?.includes('branch_id') || error.message?.includes('verification_doc'))) {
       delete insertPayload.branch_id;
       delete insertPayload.head_office_id;
+      delete insertPayload.verification_doc;
       insertPayload.ward_area = ward_area || assignedBranchId || null;
       const retry = await supabase
         .from('users')
@@ -184,13 +217,14 @@ class StaffService {
       .select('*')
       .single();
 
-    // Fallback if branch_id/head_office_id column doesn't exist
-    if (error && (error.code === '42703' || error.message?.includes('branch_id'))) {
+    // Fallback if branch_id/head_office_id/verification_doc column doesn't exist
+    if (error && (error.code === '42703' || error.message?.includes('branch_id') || error.message?.includes('verification_doc'))) {
       if (cleanUpdates.branch_id) {
         cleanUpdates.ward_area = cleanUpdates.branch_id;
       }
       delete cleanUpdates.branch_id;
       delete cleanUpdates.head_office_id;
+      delete cleanUpdates.verification_doc;
       const retry = await supabase
         .from('users')
         .update(cleanUpdates)

@@ -17,6 +17,10 @@ import {
   X,
   Building2,
   MapPin,
+  Contact2,
+  BarChart3,
+  ArrowRightLeft,
+  Receipt,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Badge from '../ui/Badge';
@@ -85,8 +89,8 @@ function NavGroup({ items, isActive }) {
               href={item.href}
               data-active={active}
               className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors duration-200 ${active
-                  ? 'text-blue-600 dark:text-blue-400 font-semibold'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
+                ? 'text-blue-600 dark:text-blue-400 font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
                 }`}
             >
               <Icon className={`h-4 w-4 shrink-0 ${active ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`} />
@@ -109,42 +113,48 @@ function SidebarInner({ isOpen, onClose }) {
 
   const staffNavItems = [
     { name: "Today's Desk", href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Customers', href: '/customers', icon: Contact2 },
     { name: 'Rentals', href: '/rentals', icon: Users },
     { name: 'Issue Rental', href: '/rentals/new', icon: UserPlus },
     { name: 'Walk-in Bookings', href: '/bookings', icon: CalendarCheck },
     { name: 'EV Fleet & Stock', href: '/models', icon: Bike },
-    { name: 'Payments / Ledger', href: '/purchases', icon: ShoppingBag },
+    { name: 'Direct Purchases', href: '/purchases', icon: ShoppingBag },
+    { name: 'Payment Collections', href: '/payments', icon: Receipt },
   ];
 
   // Branch admin: same as staff but also sees their ward staff
   const branchAdminNavItems = [
     { name: 'Ward Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Customers & Ledger', href: '/customers', icon: Contact2 },
     { name: 'Rentals', href: '/rentals', icon: Users },
     { name: 'Issue Rental', href: '/rentals/new', icon: UserPlus },
     { name: 'Bookings', href: '/bookings', icon: CalendarCheck },
     { name: 'EV Models & Stock', href: '/models', icon: Bike },
-    { name: 'Payments / Ledger', href: '/purchases', icon: ShoppingBag },
+    { name: 'Direct Purchases', href: '/purchases', icon: ShoppingBag },
+    { name: 'Payment Collections', href: '/payments', icon: Receipt },
     { name: 'My Branch Staff', href: '/staff', icon: UserCheck },
   ];
 
   const adminNavItemsList = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Customers & Ledger', href: '/customers', icon: Contact2 },
     { name: 'Rentals', href: '/rentals', icon: Users },
     { name: 'EV Models', href: '/models', icon: Bike },
     { name: 'Bookings', href: '/bookings', icon: CalendarCheck },
-    { name: 'Purchases', href: '/purchases', icon: ShoppingBag },
+    { name: 'Purchases & Sales', href: '/purchases', icon: ShoppingBag },
+    { name: 'Payment Collections', href: '/payments', icon: Receipt },
   ];
 
   const navItems = role === 'staff' ? staffNavItems
     : role === 'branch_admin' ? branchAdminNavItems
-    : adminNavItemsList;
+      : adminNavItemsList;
 
   const adminNavItems = [
     ...(isSuperAdmin
       ? [{ name: 'Branches & Wards', href: '/branches', icon: Building2 }]
       : isHoAdmin
-      ? [{ name: 'Governed Branches', href: '/branches', icon: Building2 }]
-      : []),
+        ? [{ name: 'Governed Branches', href: '/branches', icon: Building2 }]
+        : []),
     { name: isHoAdmin ? 'Branch Admins & Staff' : 'Staff Management', href: '/staff', icon: UserCheck },
     ...(isSuperAdmin || isHoAdmin ? [{ name: 'Audit Logs', href: '/audit', icon: ShieldCheck }] : []),
   ];
@@ -168,7 +178,7 @@ function SidebarInner({ isOpen, onClose }) {
     ? (selectedBranch.ward_no ? `Ward ${selectedBranch.ward_no}: ${selectedBranch.name}` : selectedBranch.name)
     : (user?.branch?.name
       ? (user.branch.ward_no ? `Ward ${user.branch.ward_no}: ${user.branch.name}` : user.branch.name)
-      : (isSuperAdmin ? 'All Wards (Global)' : (user?.ward_area || 'Central Branch')));
+      : (isSuperAdmin || role === 'ho_admin' ? 'All Wards (Global Master)' : (user?.ward_area || 'Central Branch')));
 
   const isActive = (href) => {
     if (href === '/dashboard') return pathname === '/dashboard';

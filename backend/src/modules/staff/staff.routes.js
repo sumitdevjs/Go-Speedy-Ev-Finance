@@ -33,6 +33,7 @@ const createStaffSchema = z.object({
   ward_area: z.string().optional().nullable(),
   branch_id: z.string().optional().nullable(),
   head_office_id: z.string().optional().nullable(),
+  verification_doc: z.string().optional().nullable(),
 });
 
 const updateStaffSchema = z.object({
@@ -43,6 +44,7 @@ const updateStaffSchema = z.object({
   ward_area: z.string().optional().nullable(),
   branch_id: z.string().optional().nullable(),
   head_office_id: z.string().optional().nullable(),
+  verification_doc: z.string().optional().nullable(),
 });
 
 const validateBody = (schema) => (req, res, next) => {

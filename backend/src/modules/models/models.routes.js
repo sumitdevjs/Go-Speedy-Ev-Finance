@@ -13,6 +13,7 @@ const createModelSchema = z.object({
   company: z.string().min(1),
   total_price: z.number().positive(),
   stock_count: z.number().min(0).default(0),
+  kilometres: z.number().min(0).default(0),
   initial_stock_date: z.string().optional(),
   // ward is extracted from payload and stored only in the initial stock log — not on the model row
   ward: z.string().optional(),
@@ -40,6 +41,7 @@ const updateModelSchema = z.object({
   company: z.string().min(1).optional(),
   total_price: z.number().positive().optional(),
   stock_count: z.number().min(0).optional(),
+  kilometres: z.number().min(0).optional(),
   is_active: z.boolean().optional(),
   stock_logs: z.array(stockLogSchema).optional(),
 });

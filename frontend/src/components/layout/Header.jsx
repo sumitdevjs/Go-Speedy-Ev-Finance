@@ -41,8 +41,8 @@ export default function Header({
   return (
     <header className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 sticky top-0 z-30 transition-colors">
       {/* Primary Bar: Hamburger, Back, Page Title, BranchSwitcher, ThemeToggle, Action */}
-      <div className="h-[56px] sm:h-[64px] md:h-[68px] px-2.5 xs:px-3.5 sm:px-5 md:px-6 flex items-center justify-between gap-2.5 sm:gap-3 md:gap-4 overflow-hidden">
-        <div className="flex items-center gap-2 xs:gap-2.5 sm:gap-3 min-w-0 flex-1 overflow-hidden">
+      <div className="h-[56px] sm:h-[64px] md:h-[68px] px-2.5 xs:px-3.5 sm:px-5 md:px-6 flex items-center justify-between gap-2.5 sm:gap-3 md:gap-4">
+        <div className="flex items-center gap-2 xs:gap-2.5 sm:gap-3 min-w-0 flex-1">
           {/* Hamburger Menu Toggle — only on mobile/tablet (< lg) */}
           <button
             type="button"
@@ -67,21 +67,27 @@ export default function Header({
             </button>
           )}
 
-          {/* Title & Subtitle block: gracefully wraps or truncates on narrow viewports */}
-          <div className="min-w-0 flex flex-col justify-center shrink-0">
-            <h1 className="text-sm xs:text-base md:text-lg font-black text-slate-900 dark:text-white tracking-tight truncate max-w-[145px] xs:max-w-[185px] sm:max-w-[260px] md:max-w-none">
+          {/* Title & Subtitle block: flex-1 min-w-0 so it expands smoothly and gracefully truncates without ever overlapping */}
+          <div className="min-w-0 flex-1 flex flex-col justify-center">
+            <h1
+              className="text-sm xs:text-base sm:text-lg lg:text-xl font-black text-slate-900 dark:text-white tracking-tight truncate leading-tight"
+              title={title || 'Dashboard'}
+            >
               {title || 'Dashboard'}
             </h1>
             {subtitle && (
-              <p className="text-[11px] md:text-xs text-slate-500 dark:text-slate-400 truncate hidden lg:block leading-tight mt-0.5">
+              <p
+                className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate hidden xl:block leading-tight mt-0.5"
+                title={subtitle}
+              >
                 {subtitle}
               </p>
             )}
           </div>
 
-          {/* Desktop inline BranchSwitcher: vertically centered on the main navbar axis with divider */}
+          {/* Desktop inline BranchSwitcher: cleanly placed on desktop screens (lg: and above) */}
           {showSwitcher && (
-            <div className="hidden md:flex items-center min-w-0 shrink pl-0.5">
+            <div className="hidden lg:flex items-center min-w-0 shrink-0 pl-1">
               <div className="h-5 w-px bg-slate-200 dark:bg-slate-800 mx-2 sm:mx-2.5 shrink-0" />
               <BranchSwitcher />
             </div>
@@ -108,9 +114,9 @@ export default function Header({
         </div>
       </div>
 
-      {/* Mobile Sub-Bar: Dedicated Full-Width Branch/Ward Switcher (< md only) */}
+      {/* Mobile/Tablet Sub-Bar: Dedicated Full-Width Branch/Ward Switcher (< lg only) */}
       {showSwitcher && (
-        <div className="md:hidden px-2.5 xs:px-3.5 py-1.5 bg-slate-50/90 dark:bg-slate-900/90 border-t border-slate-100/90 dark:border-slate-800/80">
+        <div className="lg:hidden px-3 sm:px-5 py-2 bg-slate-50/90 dark:bg-slate-900/90 border-t border-slate-200/70 dark:border-slate-800/80">
           <BranchSwitcher isMobileBar={true} />
         </div>
       )}

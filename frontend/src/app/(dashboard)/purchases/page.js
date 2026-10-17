@@ -13,7 +13,9 @@ import api from '../../../lib/api';
 import { formatCurrency, formatDate } from '../../../lib/constants';
 import { staggerFadeIn } from '../../../lib/gsap';
 import { useAuthStore } from '../../../store/authStore';
-import { exportToExcel } from '../../../lib/exportToExcel';
+import { exportToExcel, fetchAllForExport } from '../../../lib/exportToExcel';
+import { toast } from '../../../lib/toast';
+import CustomExportModal from '../../../components/ui/CustomExportModal';
 
 export default function PurchasesPage() {
   const [purchases, setPurchases] = useState([]);
@@ -25,6 +27,7 @@ export default function PurchasesPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
   const { selectedBranch } = useAuthStore();
 
   useEffect(() => {
@@ -76,36 +79,76 @@ export default function PurchasesPage() {
     }
   };
 
-  const handleDownloadData = async () => {
-    try {
-      let query = `/api/purchases?page=1&limit=9999`;
-      if (search) query += `&search=${encodeURIComponent(search)}`;
-      if (showCancelled) query += '&status=cancelled';
-      if (statusFilter === 'pending_docs') query += '&has_pending_docs=true';
-      if (statusFilter === 'completed_docs') query += '&has_pending_docs=false';
-      if (insuranceFilter) query += `&insurance_status=${insuranceFilter}`;
+  const [exporting, setExporting] = useState(false);
 
-      const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
-      query += `&branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`;
+  const PURCHASE_EXPORT_COLUMNS = [
+    'Owner Name',
+    'Phone Number',
+    'Ward / Branch',
+    'Vehicle / Reg No',
+    'Chassis No',
+    'Battery No',
+    'Motor No',
+    'Charger No',
+    'EV Model',
+    'Company',
+    'Total Value (₹)',
+    'Downpayment Paid (₹)',
+    'Payment Mode',
+    'Customer Address',
+    'Scooty Insurance Expiry',
+    'Rider Insurance Expiry',
+    'AMC Amount (₹)',
+    'AMC Start Date',
+    'AMC Expire Date',
+    'Pending Docs',
+    'Ownership Status',
+    'Purchase Date',
+    'Created Date'
+  ];
 
-      const res = await api.get(query);
-      if (res.data?.success) {
-        const dataToExport = res.data.data.map(row => ({
-          'Owner Name': row.name,
-          Phone: row.phone,
-          'EV Model': row.ev_models?.name || 'EV Scooter',
-          'Total Value': row.total_price,
-          'Downpayment Cleared': row.downpayment_paid,
-          'Purchase Date': formatDate(row.updated_at),
-          'Pending Docs': row.has_pending_docs ? 'Yes' : 'No',
-          Status: row.status === 'direct_purchase' ? 'Direct Purchase' : 'Fully Owned'
-        }));
-        exportToExcel(dataToExport, 'Purchases_Data.xlsx');
-      }
-    } catch (err) {
-      console.error('Failed to download data:', err);
-      alert('Failed to download data.');
-    }
+  const fetchPurchasesForExport = async () => {
+    const params = {};
+    if (search) params.search = search;
+    if (showCancelled) params.status = 'cancelled';
+    if (statusFilter === 'pending_docs') params.has_pending_docs = 'true';
+    if (statusFilter === 'completed_docs') params.has_pending_docs = 'false';
+    if (insuranceFilter) params.insurance_status = insuranceFilter;
+
+    const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
+    params.branch_id = branchParam;
+
+    return await fetchAllForExport(api, '/api/purchases', params, 250);
+  };
+
+  const transformPurchaseRow = (row) => ({
+    'Owner Name': row.name,
+    'Phone Number': row.phone,
+    'Ward / Branch': row.branch ? (row.branch.ward_no ? `Ward ${row.branch.ward_no}: ${row.branch.name}` : row.branch.name) : 'Central Fleet',
+    'Vehicle / Reg No': row.vehicle_number || 'N/A',
+    'Chassis No': row.chassis_no || 'N/A',
+    'Battery No': row.battery_no || 'N/A',
+    'Motor No': row.motor_no || 'N/A',
+    'Charger No': row.charger_no || 'N/A',
+    'EV Model': row.ev_models?.name || 'EV Scooter',
+    'Company': row.ev_models?.company || 'GoSpeedy',
+    'Total Value (₹)': row.total_price || 0,
+    'Downpayment Paid (₹)': row.downpayment_paid || 0,
+    'Payment Mode': row.downpayment_mode || 'Cash',
+    'Customer Address': row.address || 'N/A',
+    'Scooty Insurance Expiry': row.scooty_policy_expiry ? formatDate(row.scooty_policy_expiry) : 'N/A',
+    'Rider Insurance Expiry': row.rider_policy_expiry ? formatDate(row.rider_policy_expiry) : 'N/A',
+    'AMC Amount (₹)': row.amc_amount || 0,
+    'AMC Start Date': row.amc_start_date ? formatDate(row.amc_start_date) : 'N/A',
+    'AMC Expire Date': row.amc_expire_date ? formatDate(row.amc_expire_date) : 'N/A',
+    'Pending Docs': row.has_pending_docs ? 'Yes' : 'No',
+    'Ownership Status': row.status === 'direct_purchase' ? 'Direct Purchase' : 'Fully Owned',
+    'Purchase Date': formatDate(row.date_of_purchase || row.updated_at || row.created_at),
+    'Created Date': formatDate(row.created_at)
+  });
+
+  const handleDownloadData = () => {
+    setIsCustomExportOpen(true);
   };
 
   const columns = [
@@ -131,7 +174,9 @@ export default function PurchasesPage() {
       key: 'model',
       render: (row) => (
         <span className="font-semibold text-slate-800 dark:text-slate-200">
-          {row.ev_models?.name || 'EV Scooter'}
+          {row.ev_models?.name
+            ? `${row.ev_models.name}${row.ev_models.kilometres !== undefined && row.ev_models.kilometres !== null ? ` (${row.ev_models.kilometres} KM)` : ''}`
+            : 'EV Scooter'}
         </span>
       ),
     },
@@ -201,7 +246,7 @@ export default function PurchasesPage() {
   ];
 
   return (
-    <div>
+    <div className="flex-1 flex flex-col min-w-0 w-full">
       <Header
         title="Purchases & Ownership"
         subtitle="Ledger of all vehicles fully paid and transferred to tenants"
@@ -238,11 +283,12 @@ export default function PurchasesPage() {
               variant="outline"
               size="sm"
               icon={Download}
+              loading={exporting}
               className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
               onClick={handleDownloadData}
-              title="Download Data as Excel"
+              title="Download Complete Data as Excel"
             >
-              <span className="hidden sm:inline">Download Data</span>
+              <span className="hidden sm:inline">{exporting ? 'Exporting...' : 'Export Excel'}</span>
             </Button>
           </div>
 
@@ -294,6 +340,7 @@ export default function PurchasesPage() {
           data={purchases}
           loading={loading}
           emptyText="No completed purchases yet. When tenant balance reaches ₹0, contracts auto-complete here."
+          minWidth="min-w-[880px]"
         />
 
         <Pagination
@@ -303,6 +350,19 @@ export default function PurchasesPage() {
           onPageChange={setPage}
         />
       </div>
+
+      {/* Universal Custom Export Modal */}
+      <CustomExportModal
+        isOpen={isCustomExportOpen}
+        onClose={() => setIsCustomExportOpen(false)}
+        title="Export EV Purchases Data"
+        subtitle="Download fully-paid vehicle ownership and direct sale records (Excel / CSV)"
+        defaultFilename="GoSpeedy_Purchases_Data"
+        columns={PURCHASE_EXPORT_COLUMNS}
+        dateAccessor="created_at"
+        onFetchData={fetchPurchasesForExport}
+        transformRow={transformPurchaseRow}
+      />
     </div>
   );
 }

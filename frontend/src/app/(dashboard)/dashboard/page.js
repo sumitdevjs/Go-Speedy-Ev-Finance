@@ -16,6 +16,8 @@ import {
   Zap,
   MapPin,
   Layers,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Card from '../../../components/ui/Card';
@@ -32,7 +34,7 @@ import DashboardFooter from '../../../components/layout/Footer';
 import { gsap, animateCounter, staggerFadeIn } from '../../../lib/gsap';
 
 export default function DashboardPage() {
-  const { role } = useAuthStore();
+  const { role, selectedBranch } = useAuthStore();
   const isSuperAdmin = role === 'super_admin' || role === 'admin';
 
   return (
@@ -42,17 +44,17 @@ export default function DashboardPage() {
       ) : role === 'branch_admin' ? (
         <BranchDashboard />
       ) : role === 'ho_admin' ? (
-        <HoDashboard />
+        selectedBranch ? <AdminDashboard /> : <HoDashboard />
       ) : (
         <AdminDashboard />
       )}
-      {isSuperAdmin && <DashboardFooter />}
+      {(isSuperAdmin || role === 'ho_admin') && <DashboardFooter />}
     </div>
   );
 }
 
 function AdminDashboard() {
-  const { selectedBranch } = useAuthStore();
+  const { selectedBranch, setSelectedBranch } = useAuthStore();
   const [stats, setStats] = useState({
     totalStock: 0,
     oldStock: 0,
@@ -63,6 +65,8 @@ function AdminDashboard() {
   const [overdueTenants, setOverdueTenants] = useState([]);
   const [recentRentals, setRecentRentals] = useState([]);
   const [wardFleet, setWardFleet] = useState([]);
+  const [wardPage, setWardPage] = useState(1);
+  const WARDS_PER_PAGE = 4;
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -162,11 +166,34 @@ function AdminDashboard() {
   return (
     <div className="w-full">
       <Header
-        title="Operations Dashboard"
-        subtitle="Delhi Fleet & Finance Monitoring"
+        title={selectedBranch ? (selectedBranch.ward_no ? `Ward ${selectedBranch.ward_no}: ${selectedBranch.name}` : selectedBranch.name) : "Operations Dashboard"}
+        subtitle={selectedBranch ? `Active Ward Operations & Performance (${selectedBranch.ward_area || selectedBranch.code || 'Delhi'})` : "Delhi Fleet & Finance Monitoring"}
       />
 
       <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-6 pb-6">
+        {selectedBranch && (
+          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-800 dark:text-blue-300">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-bold truncate">
+                  Filtered View: {selectedBranch.ward_no ? `Ward ${selectedBranch.ward_no}: ${selectedBranch.name}` : selectedBranch.name}
+                </p>
+                <p className="text-[10px] sm:text-xs text-blue-600/80 dark:text-blue-400/80 truncate">
+                  {selectedBranch.contact_person ? `Candidate: ${selectedBranch.contact_person} • ` : ''}Showing ward-specific inventory, contracts, and revenue.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedBranch(null)}
+              className="px-3 py-1 text-xs font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-all shrink-0 cursor-pointer shadow-2xs"
+            >
+              All Wards
+            </button>
+          </div>
+        )}
+
         {/* KPI Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
           {/* Available Stock */}
@@ -299,61 +326,165 @@ function AdminDashboard() {
           </Link>
         </div>
 
-        {/* Live Delhi Ward Fleet Distribution */}
-        {!selectedBranch && wardFleet.length > 0 && (
-          <div className="p-5 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-emerald-500" />
-                  <span>Ward EV Fleet Distribution (Live)</span>
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Real-time stock readiness across active Delhi municipal wards
-                </p>
-              </div>
-              <Link
-                href="/models?tab=ward_breakdown"
-                className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-              >
-                <span>View All 46 Wards</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
+        {/* Live Delhi Ward Fleet Distribution (Paginated) */}
+        {!selectedBranch && wardFleet.length > 0 && (() => {
+          const totalWardPages = Math.ceil(wardFleet.length / WARDS_PER_PAGE) || 1;
+          const paginatedWardFleet = wardFleet.slice((wardPage - 1) * WARDS_PER_PAGE, wardPage * WARDS_PER_PAGE);
+          const startIndex = ((wardPage - 1) * WARDS_PER_PAGE) + 1;
+          const endIndex = Math.min(wardPage * WARDS_PER_PAGE, wardFleet.length);
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-              {wardFleet.map((w) => (
-                <Link
-                  key={w.id}
-                  href="/models?tab=ward_breakdown"
-                  className="p-3.5 rounded-xl border border-slate-200/80 dark:border-white/5 bg-slate-50/80 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all flex flex-col justify-between group"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className="text-[10px] font-bold text-blue-500 uppercase">
-                        Ward #{w.ward_no}
-                      </span>
-                      <p className="text-sm font-black text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors">
-                        {w.name}
-                      </p>
-                      <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                        <MapPin className="w-3 h-3" />
-                        <span>{w.ward_area || 'Delhi'}</span>
-                      </p>
-                    </div>
-                    <span className="text-xs font-black text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
-                      {w.total_stock} EVs
+          return (
+            <div className="p-4 sm:p-5 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
+                    <Layers className="w-4 h-4 text-emerald-500" />
+                    <span>Ward EV Fleet Distribution (Live)</span>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                      {wardFleet.length} Active Wards
                     </span>
-                  </div>
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Real-time stock readiness across active Delhi municipal wards
+                  </p>
+                </div>
 
-                  <div className="mt-3 pt-2.5 border-t border-slate-200/60 dark:border-white/5 text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                    {w.models.filter((m) => m.stock > 0).map((m) => `${m.name}: ${m.stock}`).join(' • ') || 'Allocated stock ready'}
+                <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+                  {/* Next / Prev quick switcher */}
+                  {totalWardPages > 1 && (
+                    <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60">
+                      <button
+                        type="button"
+                        disabled={wardPage <= 1}
+                        onClick={() => setWardPage((p) => Math.max(1, p - 1))}
+                        className="px-2 py-1 rounded-lg text-xs font-semibold hover:bg-white dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700 dark:text-slate-200 transition-all flex items-center gap-1 cursor-pointer"
+                        title="Previous Wards"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Prev</span>
+                      </button>
+
+                      <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 px-1.5 whitespace-nowrap">
+                        {wardPage} / {totalWardPages}
+                      </span>
+
+                      <button
+                        type="button"
+                        disabled={wardPage >= totalWardPages}
+                        onClick={() => setWardPage((p) => Math.min(totalWardPages, p + 1))}
+                        className="px-2 py-1 rounded-lg text-xs font-semibold hover:bg-white dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700 dark:text-slate-200 transition-all flex items-center gap-1 cursor-pointer"
+                        title="Next Wards"
+                      >
+                        <span className="hidden sm:inline">Next</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  <Link
+                    href="/models?tab=ward_breakdown"
+                    className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 ml-1"
+                  >
+                    <span>View All 46 Wards</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+
+              {/* Paginated 4-Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                {paginatedWardFleet.map((w) => (
+                  <Link
+                    key={w.id}
+                    href="/models?tab=ward_breakdown"
+                    className="p-3.5 rounded-xl border border-slate-200/80 dark:border-white/5 bg-slate-50/80 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all flex flex-col justify-between group"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="text-[10px] font-bold text-blue-500 uppercase">
+                          Ward #{w.ward_no}
+                        </span>
+                        <p className="text-sm font-black text-slate-900 dark:text-white group-hover:text-blue-500 transition-colors">
+                          {w.name}
+                        </p>
+                        <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                          <MapPin className="w-3 h-3" />
+                          <span>{w.ward_area || 'Delhi'}</span>
+                        </p>
+                      </div>
+                      <span className="text-xs font-black text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                        {w.total_stock} EVs
+                      </span>
+                    </div>
+
+                    <div className="mt-3 pt-2.5 border-t border-slate-200/60 dark:border-white/5 text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                      {w.models.filter((m) => m.stock > 0).map((m) => `${m.name}: ${m.stock}`).join(' • ') || 'Allocated stock ready'}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+
+              {/* Bottom Pagination Bar */}
+              {totalWardPages > 1 && (
+                <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-white/5 text-xs text-slate-500 dark:text-slate-400">
+                  <span>
+                    Showing <strong className="text-slate-700 dark:text-slate-300">{startIndex} - {endIndex}</strong> of <strong className="text-slate-700 dark:text-slate-300">{wardFleet.length}</strong> active wards
+                  </span>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={wardPage <= 1}
+                      onClick={() => setWardPage((p) => Math.max(1, p - 1))}
+                      className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                    >
+                      Previous
+                    </button>
+
+                    {Array.from({ length: totalWardPages }, (_, i) => i + 1).map((p) => {
+                      // Only show current, first, last and immediate neighbors if many pages
+                      if (
+                        totalWardPages > 6 &&
+                        p !== 1 &&
+                        p !== totalWardPages &&
+                        Math.abs(p - wardPage) > 1
+                      ) {
+                        if (p === 2 || p === totalWardPages - 1) {
+                          return <span key={p} className="px-1 text-slate-400">...</span>;
+                        }
+                        return null;
+                      }
+
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setWardPage(p)}
+                          className={`w-6 h-6 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            wardPage === p
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+
+                    <button
+                      type="button"
+                      disabled={wardPage >= totalWardPages}
+                      onClick={() => setWardPage((p) => Math.min(totalWardPages, p + 1))}
+                      className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-medium hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer"
+                    >
+                      Next
+                    </button>
                   </div>
-                </Link>
-              ))}
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Overdue Priority Alert Card */}

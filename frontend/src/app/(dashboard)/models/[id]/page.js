@@ -24,6 +24,7 @@ import { formatCurrency, formatDate } from '../../../../lib/constants';
 export default function ModelViewPage({ params }) {
   const router = useRouter();
   const { id } = params;
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const [model, setModel] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -73,7 +74,8 @@ export default function ModelViewPage({ params }) {
           name: data.name || '',
           company: data.company || '',
           total_price: data.total_price?.toString() || '',
-          stock_count: data.stock_count?.toString() || ''
+          stock_count: data.stock_count?.toString() || '',
+          kilometres: data.kilometres?.toString() || '0'
         });
         const fetchedLogs = data.stock_logs || [];
         // Sort logs descending by date
@@ -94,7 +96,8 @@ export default function ModelViewPage({ params }) {
       await api.patch(`/api/models/${id}`, {
         name: formData.name,
         company: formData.company,
-        total_price: Number(formData.total_price)
+        total_price: Number(formData.total_price),
+        kilometres: Number(formData.kilometres) || 0,
       });
       toast.success('Model details updated successfully');
       setIsEditMode(false);
@@ -142,6 +145,17 @@ export default function ModelViewPage({ params }) {
   };
 
   const handleSaveLogs = async () => {
+    const hasInvalidPastLog = editableLogs.some((l, idx) => {
+      if (!l.date) return false;
+      const origDate = logs[idx]?.date;
+      if (origDate === l.date) return false;
+      return l.date < todayStr;
+    });
+    if (hasInvalidPastLog) {
+      toast.error('Stock log date cannot be set to a past date (back date not allowed).');
+      return;
+    }
+
     try {
       setSavingLogs(true);
       await api.patch(`/api/models/${id}`, {
@@ -170,6 +184,10 @@ export default function ModelViewPage({ params }) {
     }
     if (!stockBranchId) {
       toast.error('Please select the target Ward / Branch');
+      return;
+    }
+    if (stockDate && stockDate < todayStr) {
+      toast.error('Date received cannot be in the past (back date not allowed).');
       return;
     }
     const chosenBranch = branches.find((b) => b.id === stockBranchId);
@@ -220,6 +238,7 @@ export default function ModelViewPage({ params }) {
         isEditingLogs ? (
           <Input 
             type="date" 
+            min={logs[idx]?.date && logs[idx].date < todayStr ? logs[idx].date : todayStr}
             value={editableLogs[idx].date} 
             onChange={(e) => handleLogChange(idx, 'date', e.target.value)}
             className="w-full min-w-[140px]"
@@ -341,7 +360,7 @@ export default function ModelViewPage({ params }) {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6 mt-6">
             <div>
               {isEditMode ? (
                 <Input
@@ -372,6 +391,24 @@ export default function ModelViewPage({ params }) {
               )}
             </div>
 
+            <div>
+              {isEditMode ? (
+                <Input
+                  label="Kilometres"
+                  type="number"
+                  min={0}
+                  value={formData.kilometres}
+                  onChange={(e) => setFormData({ ...formData, kilometres: e.target.value })}
+                />
+              ) : (
+                <>
+                  <p className="font-bold text-slate-400 uppercase text-[10px]">Kilometres</p>
+                  <p className="text-sm font-bold font-mono text-slate-800 dark:text-slate-200 mt-0.5">
+                    {model.kilometres !== undefined && model.kilometres !== null ? `${model.kilometres} km` : '0 km'}
+                  </p>
+                </>
+              )}
+            </div>
 
             <div>
               {isEditMode ? (
@@ -472,6 +509,7 @@ export default function ModelViewPage({ params }) {
           <Input
             label="Date Received"
             type="date"
+            min={todayStr}
             value={stockDate}
             onChange={(e) => setStockDate(e.target.value)}
             required

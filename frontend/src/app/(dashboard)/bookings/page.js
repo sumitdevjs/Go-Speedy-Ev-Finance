@@ -37,7 +37,8 @@ import { staggerFadeIn } from '../../../lib/gsap';
 import { toast } from '../../../lib/toast';
 import { confirmDialog } from '../../../lib/confirmDialog';
 import { useAuthStore } from '../../../store/authStore';
-import { exportToExcel } from '../../../lib/exportToExcel';
+import { exportToExcel, fetchAllForExport } from '../../../lib/exportToExcel';
+import CustomExportModal from '../../../components/ui/CustomExportModal';
 
 export default function BookingsPage() {
   const router = useRouter();
@@ -52,6 +53,7 @@ export default function BookingsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
 
   // Form fields
   const [name, setName] = useState('');
@@ -135,37 +137,53 @@ export default function BookingsPage() {
     }
   };
 
-  const handleDownloadData = async () => {
-    try {
-      let bookingsQuery = `/api/bookings?page=1&limit=9999`;
-      if (search) bookingsQuery += `&search=${encodeURIComponent(search)}`;
-      if (statusFilter && statusFilter !== 'all') {
-        bookingsQuery += `&status=${statusFilter}`;
-      } else if (statusFilter === 'all') {
-        bookingsQuery += `&status=all`;
-      }
+  const BOOKING_EXPORT_COLUMNS = [
+    'Customer Name',
+    'Phone Number',
+    'Ward / Branch',
+    'EV Model Requested',
+    'Manufacturer / Company',
+    'Booking Amount (₹)',
+    'Booking Status',
+    'Conversion Details',
+    'Booked By Staff',
+    'Booking Date',
+    'Aadhaar Provided',
+    'Special Notes',
+    'Created Timestamp'
+  ];
 
-      const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
-      bookingsQuery += `&branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`;
-
-      const res = await api.get(bookingsQuery);
-      if (res.data?.success) {
-        const dataToExport = res.data.data.map(b => ({
-          'Customer Name': b.name,
-          Phone: b.phone,
-          'EV Model': b.models?.name || b.custom_model_name || 'N/A',
-          'Booking Amount': b.booking_amount,
-          Status: b.status,
-          Notes: b.notes,
-          'Created At': formatDate(b.created_at)
-        }));
-        exportToExcel(dataToExport, 'Bookings_Data.xlsx');
-      }
-    } catch (err) {
-      console.error('Failed to download data:', err);
-      alert('Failed to download data.');
+  const fetchBookingsForExport = async () => {
+    const params = {};
+    if (search) params.search = search;
+    if (statusFilter && statusFilter !== 'all') {
+      params.status = statusFilter;
+    } else if (statusFilter === 'all') {
+      params.status = 'all';
     }
+
+    const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
+    params.branch_id = branchParam;
+
+    return await fetchAllForExport(api, '/api/bookings', params, 250);
   };
+
+  const transformBookingRow = (b) => ({
+    'Customer Name': b.name || '—',
+    'Phone Number': b.phone || '—',
+    'Ward / Branch': b.branch ? (b.branch.ward_no ? `Ward ${b.branch.ward_no}: ${b.branch.name}` : b.branch.name) : 'Central Fleet',
+    'EV Model Requested': b.ev_models?.name || b.model_name_raw || b.custom_model_name || 'N/A',
+    'Manufacturer / Company': b.ev_models?.company || 'GoSpeedy',
+    'Booking Amount (₹)': b.booking_amount || 0,
+    'Booking Status': b.status || 'pending',
+    'Conversion Details': b.converted_to ? `Converted to ${b.converted_type || 'Rental'} (#${b.converted_to})` : 'Pending Delivery',
+    'Booked By Staff': b.users?.name || 'Staff',
+    'Booking Date': b.booking_date ? formatDate(b.booking_date) : formatDate(b.created_at),
+    'Aadhaar Provided': b.aadhar_path ? 'Yes' : 'No',
+    'Special Notes': b.notes || 'None',
+    'Created Timestamp': formatDate(b.created_at),
+    created_at: b.booking_date || b.created_at || new Date().toISOString(),
+  });
 
   const handleCreateBooking = async (e) => {
     e.preventDefault();
@@ -374,7 +392,7 @@ export default function BookingsPage() {
   ];
 
   return (
-    <div>
+    <div className="flex-1 flex flex-col min-w-0 w-full">
       <Header
         title="Walk-in Bookings"
         subtitle="Manage token amounts and convert bookings to active rentals or direct sales"
@@ -411,10 +429,10 @@ export default function BookingsPage() {
               size="sm"
               icon={Download}
               className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
-              onClick={handleDownloadData}
-              title="Download Data as Excel"
+              onClick={() => setIsCustomExportOpen(true)}
+              title="Download Bookings Data (Excel / CSV)"
             >
-              <span className="hidden sm:inline">Download Data</span>
+              <span className="hidden sm:inline">Export</span>
             </Button>
           </div>
 
@@ -454,6 +472,7 @@ export default function BookingsPage() {
             data={bookings}
             loading={loading}
             emptyText="No bookings found. Click '+ New Booking' to record a reservation."
+            minWidth="min-w-[860px]"
           />
         </div>
 
@@ -505,7 +524,9 @@ export default function BookingsPage() {
                     <div className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs">
                       <Bike className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                       <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
-                        {row.ev_models?.name || row.model_name_raw || 'Model N/A'}
+                        {row.ev_models?.name
+                          ? `${row.ev_models.name}${row.ev_models.kilometres !== undefined && row.ev_models.kilometres !== null ? ` — ${row.ev_models.kilometres} KM` : ''}`
+                          : (row.model_name_raw || 'Model N/A')}
                       </span>
                     </div>
 
@@ -745,7 +766,7 @@ export default function BookingsPage() {
             options={[
               ...models.filter((m) => m.is_active).map((m) => ({
                 value: m.id,
-                label: `${m.name} (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
+                label: `${m.name} (${m.company || 'GoSpeedy'}) — ${m.kilometres ?? 0} KM (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
               })),
               { value: 'other', label: 'Other / Future Model' },
             ]}
@@ -830,7 +851,7 @@ export default function BookingsPage() {
             options={[
               ...models.filter((m) => m.is_active || editData.modelId === m.id).map((m) => ({
                 value: m.id,
-                label: `${m.name} (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
+                label: `${m.name} (${m.company || 'GoSpeedy'}) — ${m.kilometres ?? 0} KM (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
               })),
               { value: 'other', label: 'Other / Future Model' },
             ]}
@@ -879,6 +900,19 @@ export default function BookingsPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Universal Custom Export Modal */}
+      <CustomExportModal
+        isOpen={isCustomExportOpen}
+        onClose={() => setIsCustomExportOpen(false)}
+        title="Export Walk-in Bookings"
+        subtitle="Download customer token reservations, model requests, and conversion statuses (Excel / CSV)"
+        defaultFilename="GoSpeedy_Walkin_Bookings"
+        columns={BOOKING_EXPORT_COLUMNS}
+        dateAccessor="created_at"
+        onFetchData={fetchBookingsForExport}
+        transformRow={transformBookingRow}
+      />
     </div>
   );
 }

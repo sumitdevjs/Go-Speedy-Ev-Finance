@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS users (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS head_office_id UUID REFERENCES head_offices(id);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS ward_area TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_doc TEXT;
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 ALTER TABLE users ADD CONSTRAINT users_role_check 
   CHECK (role IN ('super_admin', 'ho_admin', 'branch_admin', 'staff', 'admin'));
@@ -87,6 +88,7 @@ CREATE TABLE IF NOT EXISTS ev_models (
   ward           TEXT NOT NULL,
   total_price    NUMERIC(12,2) NOT NULL CHECK (total_price > 0),
   stock_count    INTEGER NOT NULL DEFAULT 0 CHECK (stock_count >= 0),
+  kilometres     INTEGER NOT NULL DEFAULT 0 CHECK (kilometres >= 0),
   stock_logs     JSONB NOT NULL DEFAULT '[]',
   is_active      BOOLEAN NOT NULL DEFAULT true,
   created_by     UUID REFERENCES users(id),
@@ -97,9 +99,11 @@ CREATE TABLE IF NOT EXISTS ev_models (
 -- Ensure columns exist if table was already created earlier
 ALTER TABLE ev_models ADD COLUMN IF NOT EXISTS head_office_id UUID REFERENCES head_offices(id);
 ALTER TABLE ev_models ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id);
+ALTER TABLE ev_models ADD COLUMN IF NOT EXISTS kilometres INTEGER NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_ev_models_branch ON ev_models(branch_id);
 CREATE INDEX IF NOT EXISTS idx_ev_models_ho ON ev_models(head_office_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ev_models_unique_name_km ON ev_models (LOWER(TRIM(name)), kilometres) WHERE is_active = true;
 
 -- ── TABLE 3: old_evs ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS old_evs (
@@ -490,3 +494,51 @@ ON CONFLICT (email) DO UPDATE SET
   role = EXCLUDED.role,
   ward_area = EXCLUDED.ward_area,
   is_active = EXCLUDED.is_active;
+
+-- ── TABLE 8: bike_transfers ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS bike_transfers (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  transfer_id      TEXT UNIQUE NOT NULL,
+  from_branch_id   UUID REFERENCES branches(id),
+  to_branch_id     UUID REFERENCES branches(id),
+  ev_model_id      UUID REFERENCES ev_models(id),
+  quantity         INTEGER NOT NULL DEFAULT 1,
+  status           TEXT NOT NULL DEFAULT 'requested' CHECK (status IN ('requested', 'in_transit', 'received', 'cancelled')),
+  challan_number   TEXT,
+  driver_name      TEXT,
+  driver_phone     TEXT,
+  dispatch_notes   TEXT,
+  receive_notes    TEXT,
+  condition_received TEXT DEFAULT 'Good',
+  initiated_by     UUID REFERENCES users(id),
+  dispatched_by    UUID REFERENCES users(id),
+  received_by      UUID REFERENCES users(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_transfers_from ON bike_transfers(from_branch_id);
+CREATE INDEX IF NOT EXISTS idx_transfers_to   ON bike_transfers(to_branch_id);
+CREATE INDEX IF NOT EXISTS idx_transfers_status ON bike_transfers(status);
+
+-- ── TABLE 9: penalties ───────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS penalties (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  penalty_id      TEXT UNIQUE NOT NULL,
+  tenant_id       UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  amount          NUMERIC(10,2) NOT NULL CHECK (amount > 0),
+  reason          TEXT NOT NULL,
+  notes           TEXT,
+  penalty_date    DATE NOT NULL DEFAULT CURRENT_DATE,
+  status          TEXT NOT NULL DEFAULT 'unpaid' CHECK (status IN ('unpaid', 'paid', 'waived')),
+  waived_reason   TEXT,
+  waived_by       UUID REFERENCES users(id),
+  waived_at       TIMESTAMPTZ,
+  created_by      UUID REFERENCES users(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_penalties_tenant ON penalties(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_penalties_status ON penalties(status);
+

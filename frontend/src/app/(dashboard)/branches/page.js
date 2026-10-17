@@ -17,6 +17,7 @@ import {
   Copy,
   Check,
   Download,
+  ChevronDown,
 } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Card from '../../../components/ui/Card';
@@ -27,20 +28,26 @@ import Modal from '../../../components/ui/Modal';
 import Spinner from '../../../components/ui/Spinner';
 import Table from '../../../components/ui/Table';
 import Pagination from '../../../components/ui/Pagination';
+import { useSearchParams, useRouter } from 'next/navigation';
 import api from '../../../lib/api';
 import { staggerFadeIn } from '../../../lib/gsap';
 import { useAuthStore } from '../../../store/authStore';
-import { exportToExcel } from '../../../lib/exportToExcel';
+import { exportToExcel, fetchAllForExport } from '../../../lib/exportToExcel';
+import { toast } from '../../../lib/toast';
+import CustomExportModal from '../../../components/ui/CustomExportModal';
 
 export default function BranchesPage() {
-  const { role, user } = useAuthStore();
+  const router = useRouter();
+  const { role, user, setSelectedBranch } = useAuthStore();
+  const searchParams = useSearchParams();
   const isSuperAdmin = role === 'super_admin' || role === 'admin';
   const isHoAdmin = role === 'ho_admin';
 
   const [branches, setBranches] = useState([]);
+  const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
   const [headOffices, setHeadOffices] = useState([]);
-  const [selectedHoFilter, setSelectedHoFilter] = useState(isHoAdmin ? (user?.head_office_id || '') : '');
-  const [search, setSearch] = useState('');
+  const [selectedHoFilter, setSelectedHoFilter] = useState('');
+  const [search, setSearch] = useState(searchParams?.get('search') || '');
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -101,12 +108,25 @@ export default function BranchesPage() {
     fetchHeadOffices();
   }, []);
 
-  // Sync HO filter when user profile loads for ho_admin
+  const urlSearch = searchParams?.get('search');
   useEffect(() => {
-    if (isHoAdmin && user?.head_office_id && selectedHoFilter !== user.head_office_id) {
-      setSelectedHoFilter(user.head_office_id);
+    if (urlSearch !== undefined && urlSearch !== null) {
+      setSearch(urlSearch);
     }
-  }, [isHoAdmin, user?.head_office_id]);
+  }, [urlSearch]);
+
+  // Listen to branch change from top header switcher
+  useEffect(() => {
+    const handleBranchChange = (e) => {
+      if (e.detail?.name) {
+        setSearch(e.detail.name);
+      } else {
+        setSearch('');
+      }
+    };
+    window.addEventListener('branchChange', handleBranchChange);
+    return () => window.removeEventListener('branchChange', handleBranchChange);
+  }, []);
 
   // One-time entrance animation for the filter chrome
   useEffect(() => {
@@ -131,7 +151,7 @@ export default function BranchesPage() {
   const fetchBranches = async () => {
     try {
       setLoading(true);
-      const effectiveHoId = isHoAdmin ? (user?.head_office_id || selectedHoFilter) : (selectedHoFilter || undefined);
+      const effectiveHoId = (selectedHoFilter && selectedHoFilter !== 'all') ? selectedHoFilter : undefined;
       const params = {
         page,
         limit: 15,
@@ -151,35 +171,63 @@ export default function BranchesPage() {
     }
   };
 
-  const handleDownloadData = async () => {
-    try {
-      const effectiveHoId = isHoAdmin ? (user?.head_office_id || selectedHoFilter) : (selectedHoFilter || undefined);
-      const params = {
-        page: 1,
-        limit: 9999,
-        search: search.trim() || undefined,
-        head_office_id: effectiveHoId || undefined,
-      };
-      const res = await api.get('/api/branches', { params });
-      if (res.data?.success) {
-        const dataToExport = res.data.data.map(branch => ({
-          'Ward No': branch.ward_no,
-          'Ward Name': branch.name,
-          'Ward Code': branch.code,
-          'Area': branch.ward_area,
-          'Candidate/Contact': branch.contact_person,
-          Phone: branch.phone,
-          Address: branch.address,
-          'Head Office': branch.head_offices?.name,
-          'Total Stock': branch.total_stock || 0,
-          'Active Rentals': branch.active_rentals_count || 0
-        }));
-        exportToExcel(dataToExport, 'Branches_Wards_Data.xlsx');
-      }
-    } catch (err) {
-      console.error('Failed to download branches data:', err);
-      alert('Failed to download data.');
-    }
+  const [exporting, setExporting] = useState(false);
+
+  const BRANCH_EXPORT_COLUMNS = [
+    'Ward No',
+    'Ward Name',
+    'Ward Code',
+    'Ward Area / District',
+    'Candidate / In-Charge',
+    'Contact Phone',
+    'Branch Address',
+    'Governing Head Office',
+    'Head Office Code',
+    'Head Office City / State',
+    'Governing HO Admin',
+    'HO Admin Contact',
+    'Total Fleet Stock',
+    'Available Stock',
+    'Active Rentals / Deployed',
+    'Status'
+  ];
+
+  const fetchBranchesForExport = async () => {
+    const effectiveHoId = isHoAdmin ? (user?.head_office_id || selectedHoFilter) : (selectedHoFilter || undefined);
+    const params = {
+      search: search.trim() || undefined,
+      head_office_id: effectiveHoId || undefined,
+    };
+    return await fetchAllForExport(api, '/api/branches', params, 250);
+  };
+
+  const transformBranchRow = (branch) => {
+    const hoObj = branch.head_offices || branch.head_office || headOffices.find(h => h.id === branch.head_office_id);
+    const totalStock = branch.total_stock ?? 0;
+    const activeCount = branch.active_rentals_count ?? 0;
+    const availStock = branch.available_stock ?? Math.max(0, totalStock - activeCount);
+    return {
+      'Ward No': branch.ward_no ?? '—',
+      'Ward Name': branch.name || 'Unnamed Branch',
+      'Ward Code': branch.code || '—',
+      'Ward Area / District': branch.ward_area || 'Delhi',
+      'Candidate / In-Charge': branch.contact_person || 'Assigned Candidate',
+      'Contact Phone': branch.phone || 'N/A',
+      'Branch Address': branch.address || 'N/A',
+      'Governing Head Office': hoObj?.name || 'Moti Nagar Head Office',
+      'Head Office Code': hoObj?.code || 'DEL-HO',
+      'Head Office City / State': hoObj?.city || hoObj?.state || 'Delhi',
+      'Governing HO Admin': branch.ho_admin?.name || 'Zone Admin',
+      'HO Admin Contact': branch.ho_admin?.phone || 'N/A',
+      'Total Fleet Stock': totalStock,
+      'Available Stock': availStock,
+      'Active Rentals / Deployed': activeCount,
+      'Status': branch.is_active ? 'Active' : 'Inactive',
+    };
+  };
+
+  const handleDownloadData = () => {
+    setIsCustomExportOpen(true);
   };
 
   const handleOpenOverview = async (branch) => {
@@ -236,61 +284,148 @@ export default function BranchesPage() {
     }
   };
 
+  const getBranchHo = (row) => {
+    return (
+      row?.head_office ||
+      row?.head_offices ||
+      headOffices.find((h) => h.id === row?.head_office_id) ||
+      null
+    );
+  };
+
   const columns = [
     {
       header: 'Ward / Branch',
       key: 'name',
-      render: (row) => (
-        <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-xl bg-blue-50 dark:bg-blue-900/40 border border-blue-100 dark:border-blue-800/60 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs shrink-0 shadow-2xs">
-            {row.ward_no ? `#${row.ward_no}` : 'BR'}
+      className: 'min-w-[220px]',
+      render: (row) => {
+        const hoObj = getBranchHo(row);
+        const hoName = hoObj?.name || (row.head_office_id ? 'Head Office' : 'Central HQ');
+        const hoCode = hoObj?.code || '';
+
+        return (
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500/15 to-indigo-500/15 border border-blue-500/25 flex items-center justify-center text-blue-600 dark:text-blue-400 font-black text-xs shrink-0 shadow-2xs">
+              {row.ward_no ? `#${row.ward_no}` : 'BR'}
+            </div>
+            <div className="min-w-0 flex-1">
+              {/* Governing Head Office Pill Above Branch Name */}
+              <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60 shadow-2xs">
+                  <Building2 className="h-2.5 w-2.5 shrink-0 text-purple-600 dark:text-purple-400" />
+                  <span className="truncate max-w-[180px]">{hoName}</span>
+                </span>
+                {hoCode && (
+                  <span className="font-mono text-[9px] font-bold text-slate-500 dark:text-slate-400">
+                    ({hoCode})
+                  </span>
+                )}
+              </div>
+              <p className="font-bold text-slate-900 dark:text-white text-sm tracking-tight truncate">
+                {row.name}
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5 truncate">
+                <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
+                <span className="truncate">{row.ward_area || 'Standard Ward'}</span>
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="font-semibold text-slate-900 dark:text-white text-xs sm:text-sm">
-              {row.name}
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
-              <MapPin className="h-3 w-3 text-slate-400 shrink-0" />
-              {row.ward_area || 'Standard Ward'}
-            </p>
-          </div>
-        </div>
-      ),
+        );
+      },
     },
+    ...(isSuperAdmin ? [{
+      header: 'Governing Head Office',
+      key: 'ho_admin',
+      className: 'min-w-[230px]',
+      render: (row) => {
+        const hoObj = getBranchHo(row);
+        const hoName = hoObj?.name || 'Head Office';
+        const hoCode = hoObj?.code || 'DEL-HO';
+        const hoCity = hoObj?.city || '';
+        const hoAdmin = row.ho_admin;
+
+        return (
+          <div className="space-y-1.5 py-0.5">
+            {/* 1. Prominent Head Office Name & Code */}
+            <div className="flex items-center gap-2">
+              <span className="h-7 w-7 rounded-lg bg-gradient-to-br from-purple-500/15 to-indigo-500/20 text-purple-700 dark:text-purple-300 border border-purple-300/80 dark:border-purple-700/80 flex items-center justify-center shrink-0 shadow-2xs">
+                <Building2 className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+              </span>
+              <div className="min-w-0">
+                <p className="font-bold text-xs text-slate-900 dark:text-white leading-tight truncate" title={hoName}>
+                  {hoName}
+                </p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="font-mono text-[9px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-950/70 px-1.5 py-0.2 rounded border border-purple-200/80 dark:border-purple-800/80">
+                    {hoCode}
+                  </span>
+                  {hoCity && (
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[120px]">
+                      {hoCity}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Governing HO Admin Person & Contact */}
+            <div className="pl-9 text-xs space-y-0.5 border-l-2 border-purple-200 dark:border-purple-800/50 ml-3.5">
+              <p className="text-slate-600 dark:text-slate-300 font-medium flex items-center gap-1 text-[11px]">
+                <span className="text-slate-400">Admin:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                  {hoAdmin?.name || `${hoName} Admin`}
+                </span>
+              </p>
+              {hoAdmin?.phone && (
+                <a
+                  href={`tel:${hoAdmin.phone}`}
+                  className="inline-flex items-center gap-1 text-[11px] font-mono text-purple-600 dark:text-purple-400 hover:underline"
+                >
+                  <Phone className="h-2.5 w-2.5 shrink-0" />
+                  <span>{hoAdmin.phone}</span>
+                </a>
+              )}
+            </div>
+          </div>
+        );
+      },
+    }] : []),
     {
       header: 'In-Charge / Candidate',
       key: 'contact_person',
+      className: 'min-w-[230px]',
       render: (row) => {
         const initials = row.contact_person
           ? row.contact_person
-              .replace(/^(S\.|Sh\.|Dr\.|Mr\.)\s*/i, '')
-              .split(' ')
-              .slice(0, 2)
-              .map((n) => n[0])
-              .join('')
-              .toUpperCase()
+            .replace(/^(S\.|Sh\.|Dr\.|Mr\.)\s*/i, '')
+            .split(' ')
+            .slice(0, 2)
+            .map((n) => n[0])
+            .join('')
+            .toUpperCase()
           : 'IC';
 
         return (
-          <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500/20 to-purple-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 flex items-center justify-center text-[11px] font-black shrink-0 shadow-2xs">
               {initials}
             </div>
-            <div>
-              <p className="font-medium text-slate-900 dark:text-slate-100 text-xs">
-                {row.contact_person || 'Unassigned'}
-              </p>
-              {row.status_label && (
-                <span
-                  className={`inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium ${
-                    row.status_label === 'Won'
-                      ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
-                      : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
-                  }`}
-                >
-                  {row.status_label}
-                </span>
-              )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-semibold text-slate-900 dark:text-slate-100 text-xs sm:text-[13px] leading-tight">
+                  {row.contact_person || 'Unassigned'}
+                </p>
+                {row.status_label && (
+                  <span
+                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase ${row.status_label.toLowerCase() === 'won'
+                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                        : 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700'
+                      }`}
+                  >
+                    {row.status_label}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         );
@@ -299,18 +434,21 @@ export default function BranchesPage() {
     {
       header: 'Contact Phone',
       key: 'phone',
+      className: 'min-w-[145px] whitespace-nowrap',
+      cellClassName: 'whitespace-nowrap',
       render: (row) => (
         <div>
           {row.phone ? (
             <a
               href={`tel:${row.phone}`}
-              className="inline-flex items-center gap-1 text-xs font-mono text-blue-600 dark:text-blue-400 hover:underline"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-mono text-xs font-semibold border border-slate-200/80 dark:border-slate-700/80 transition-colors shadow-2xs"
+              title={`Call ${row.contact_person || row.name}`}
             >
               <Phone className="h-3 w-3 text-slate-400 shrink-0" />
-              {row.phone}
+              <span>{row.phone}</span>
             </a>
           ) : (
-            <span className="text-xs text-slate-400">N/A</span>
+            <span className="text-xs text-slate-400">—</span>
           )}
         </div>
       ),
@@ -318,10 +456,11 @@ export default function BranchesPage() {
     {
       header: 'Location / Address',
       key: 'address',
+      className: 'min-w-[260px]',
       render: (row) => (
-        <div className="group relative max-w-[240px] lg:max-w-[320px]">
+        <div className="group relative flex items-center justify-between gap-2 max-w-full">
           <p
-            className="text-xs text-slate-600 dark:text-slate-300 truncate cursor-help"
+            className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed truncate group-hover:text-slate-900 dark:group-hover:text-white transition-colors"
             title={row.address || 'Address not listed'}
           >
             {row.address || '—'}
@@ -330,7 +469,7 @@ export default function BranchesPage() {
             <button
               type="button"
               onClick={() => handleCopyAddress(row.id, row.address)}
-              className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 bg-white dark:bg-slate-800 rounded shadow-xs text-slate-500 hover:text-slate-900 dark:hover:text-white transition-opacity"
+              className="opacity-0 group-hover:opacity-100 p-1 bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700 shadow-2xs text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all shrink-0 cursor-pointer"
               title="Copy Address"
             >
               {copiedAddressId === row.id ? (
@@ -346,8 +485,10 @@ export default function BranchesPage() {
     {
       header: 'Code',
       key: 'code',
+      className: 'min-w-[105px] whitespace-nowrap text-center',
+      cellClassName: 'whitespace-nowrap text-center',
       render: (row) => (
-        <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold">
+        <span className="font-mono text-xs px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold tracking-wide shadow-2xs">
           {row.code}
         </span>
       ),
@@ -355,24 +496,41 @@ export default function BranchesPage() {
     {
       header: 'Status',
       key: 'is_active',
+      className: 'min-w-[115px] whitespace-nowrap text-center',
+      cellClassName: 'whitespace-nowrap text-center',
       render: (row) => (
-        <Badge
-          status={row.is_active ? 'Active' : 'Inactive'}
-          variant={row.is_active ? 'emerald' : 'rose'}
-          size="sm"
-        />
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${row.is_active
+            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
+            : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25'
+          }`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${row.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+          <span>{row.is_active ? 'ACTIVE' : 'INACTIVE'}</span>
+        </span>
       ),
     },
     {
       header: 'Actions',
       key: 'actions',
+      className: 'min-w-[140px] whitespace-nowrap text-right',
+      cellClassName: 'whitespace-nowrap text-right',
       render: (row) => (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedBranch(row);
+              router.push('/dashboard');
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 dark:hover:text-white border border-emerald-200 dark:border-emerald-500/30 transition-all shadow-2xs active:scale-95 cursor-pointer"
+            title={`Inspect ${row.name} Operations`}
+          >
+            <span>Inspect</span>
+          </button>
           <button
             type="button"
             onClick={() => handleOpenOverview(row)}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
-            title="View Ward Overview"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 dark:hover:text-white border border-blue-200 dark:border-blue-500/30 transition-all shadow-2xs active:scale-95 cursor-pointer"
+            title={`View ${row.name} Overview`}
           >
             <Eye className="h-3.5 w-3.5" />
             <span>View</span>
@@ -383,7 +541,7 @@ export default function BranchesPage() {
   ];
 
   return (
-    <div>
+    <div className="flex-1 flex flex-col min-w-0 w-full">
       <Header
         title={
           isHoAdmin
@@ -439,10 +597,10 @@ export default function BranchesPage() {
         }
       />
 
-      <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+      <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 min-w-0">
         {/* KPI / Insight Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
-          <Card className="p-3.5 sm:p-4.5 flex items-center gap-3 border-l-4 border-l-blue-500 overflow-hidden">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <Card className="p-3.5 sm:p-4.5 flex items-center gap-3 border-l-4 border-l-blue-500 overflow-hidden min-w-0">
             <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
               <Building2 className="h-5 w-5" />
             </div>
@@ -459,7 +617,7 @@ export default function BranchesPage() {
             </div>
           </Card>
 
-          <Card className="p-3.5 sm:p-4.5 flex items-center gap-3 border-l-4 border-l-emerald-500 overflow-hidden">
+          <Card className="p-3.5 sm:p-4.5 flex items-center gap-3 border-l-4 border-l-emerald-500 overflow-hidden min-w-0">
             <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
               <UserCheck className="h-5 w-5" />
             </div>
@@ -474,7 +632,7 @@ export default function BranchesPage() {
             </div>
           </Card>
 
-          <Card className="p-3.5 sm:p-4.5 flex items-center gap-3 border-l-4 border-l-purple-500 overflow-hidden">
+          <Card className="p-3.5 sm:p-4.5 flex items-center gap-3 border-l-4 border-l-purple-500 overflow-hidden min-w-0">
             <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-purple-50 dark:bg-purple-950/50 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
               <Award className="h-5 w-5" />
             </div>
@@ -495,7 +653,7 @@ export default function BranchesPage() {
             </div>
           </Card>
 
-          <Card className="p-3.5 sm:p-4.5 flex items-center gap-3 border-l-4 border-l-amber-500 overflow-hidden">
+          <Card className="p-3.5 sm:p-4.5 flex items-center gap-3 border-l-4 border-l-amber-500 overflow-hidden min-w-0">
             <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-amber-50 dark:bg-amber-950/50 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
               <MapPin className="h-5 w-5" />
             </div>
@@ -518,62 +676,70 @@ export default function BranchesPage() {
         </div>
 
         {/* Filters & Head Office Tabs */}
-        <div className="gsap-filter-bar flex flex-col lg:flex-row flex-wrap items-stretch lg:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-          {/* HO Tabs: Rendered exclusively for Super Admin */}
+        <div className="gsap-filter-bar flex flex-col lg:flex-row flex-wrap items-stretch lg:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs min-w-0">
+          {/* Head Office Filter: Dropdown selector for Super Admin */}
           {isSuperAdmin ? (
-            <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 lg:pb-0 scrollbar-thin">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedHoFilter('');
-                  setPage(1);
-                }}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
-                  selectedHoFilter === ''
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                }`}
-              >
-                All Regions (46 Delhi + NCR)
-              </button>
-              {headOffices.map((ho) => (
-                <button
-                  key={ho.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedHoFilter(ho.id);
+            <div className="flex items-center gap-2 w-full lg:w-auto min-w-0">
+              <div className="relative w-full sm:w-72 min-w-0">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-500">
+                  <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <select
+                  value={selectedHoFilter}
+                  onChange={(e) => {
+                    setSelectedHoFilter(e.target.value);
                     setPage(1);
                   }}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
-                    selectedHoFilter === ho.id
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                  }`}
+                  className="w-full pl-9 pr-8 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all shadow-2xs h-[38px] cursor-pointer appearance-none"
+                  aria-label="Filter branches by Head Office region"
                 >
-                  {ho.name}
+                  <option value="" className="dark:bg-slate-900 font-semibold">
+                    All Regions (46 Delhi + NCR)
+                  </option>
+                  {headOffices.map((ho) => (
+                    <option key={ho.id} value={ho.id} className="dark:bg-slate-900 font-semibold">
+                      {ho.name} ({ho.city || ho.code || 'Zone'})
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 pointer-events-none">
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </div>
+              </div>
+              {selectedHoFilter && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedHoFilter('');
+                    setPage(1);
+                  }}
+                  className="px-2.5 py-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 border border-rose-200/70 dark:border-rose-500/30 rounded-xl transition-all cursor-pointer shrink-0 active:scale-95 shadow-2xs"
+                  title="Clear Head Office filter"
+                >
+                  Clear
                 </button>
-              ))}
+              )}
             </div>
           ) : (
             /* HO Admin gets a dedicated badge indicating their assigned Head Office jurisdiction */
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 shrink-0">
                 <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 <span>{headOffices.find(h => h.id === user?.head_office_id)?.name || 'Assigned Head Office'}</span>
                 <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-blue-200/60 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200">
                   {headOffices.find(h => h.id === user?.head_office_id)?.code || 'HO'}
                 </span>
               </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:inline">
+              <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:inline whitespace-nowrap">
                 ({totalItems} {totalItems === 1 ? 'Branch' : 'Branches'} in Zone)
               </span>
             </div>
           )}
 
-          {/* Search Box */}
-          <div className="flex w-full lg:w-auto items-center gap-2 shrink-0">
-            <div className="relative w-full lg:w-80 shrink-0">
-              <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          {/* Search Box & Download Button */}
+          <div className="flex items-center gap-2 w-full lg:w-auto min-w-0">
+            <div className="relative flex-1 lg:w-80 min-w-0">
+              <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 value={search}
@@ -582,36 +748,37 @@ export default function BranchesPage() {
                   setPage(1);
                 }}
                 placeholder="Search ward, candidate (e.g. Virk, Ginni), phone..."
-                className="w-full pl-9 pr-3 py-1.5 text-[13px] h-[38px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full pl-9 pr-3 py-1.5 text-xs sm:text-[13px] h-[38px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
             <Button
               variant="outline"
               size="sm"
               icon={Download}
-              className="shrink-0 h-[38px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+              loading={exporting}
+              className="shrink-0 h-[38px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
               onClick={handleDownloadData}
-              title="Download Data as Excel"
+              title="Download Complete Branches Data as Excel"
             >
-              <span className="hidden sm:inline">Download Data</span>
+              <span className="hidden sm:inline">{exporting ? 'Exporting...' : 'Export Excel'}</span>
             </Button>
           </div>
         </div>
 
         {/* Branches: Dual View (Desktop Table + Mobile Touch Cards) */}
-        <div className="hidden md:block">
-          <Card className="overflow-hidden">
-            <Table
-              columns={columns}
-              data={branches}
-              loading={loading}
-              emptyText="No branches or wards found."
-            />
-          </Card>
+        <div className="hidden md:block w-full min-w-0">
+          <Table
+            columns={columns}
+            data={branches}
+            loading={loading}
+            emptyText="No branches or wards found."
+            minWidth="min-w-[1100px]"
+            tableLayout="table-auto"
+          />
         </div>
 
         {/* Mobile Touch Cards View */}
-        <div className="block md:hidden space-y-3">
+        <div className="block md:hidden space-y-3 min-w-0">
           {loading ? (
             <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800">
               <Spinner size="md" className="mx-auto text-blue-600 dark:text-blue-400" />
@@ -637,6 +804,12 @@ export default function BranchesPage() {
                         #{b.ward_no || '•'}
                       </div>
                       <div>
+                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60">
+                            <Building2 className="w-2.5 h-2.5 shrink-0 text-purple-600 dark:text-purple-400" />
+                            <span className="truncate max-w-[170px]">{getBranchHo(b)?.name || 'Head Office'}</span>
+                          </span>
+                        </div>
                         <h4 className="font-extrabold text-sm text-slate-900 dark:text-white leading-tight">
                           {b.name}
                         </h4>
@@ -648,13 +821,12 @@ export default function BranchesPage() {
                     </div>
 
                     {b.status_label && (
-                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 ${
-                        isWon
+                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 ${isWon
                           ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
                           : isLost
-                          ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25'
-                          : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25'
-                      }`}>
+                            ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25'
+                            : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25'
+                        }`}>
                         {b.status_label}
                       </span>
                     )}
@@ -680,15 +852,13 @@ export default function BranchesPage() {
                   </div>
 
                   <div className="flex items-center justify-between pt-1">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[200px]">
-                      {b.head_offices?.name || 'Moti Nagar Head Office'}
+                    <span className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 truncate max-w-[200px] flex items-center gap-1">
+                      <Building2 className="w-3 h-3 shrink-0" />
+                      <span>{getBranchHo(b)?.name || 'Head Office'} • {b.ho_admin?.name || 'Admin'}</span>
                     </span>
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedBranch(b);
-                        setIsDetailOpen(true);
-                      }}
+                      onClick={() => handleOpenOverview(b)}
                       className="px-3 py-1 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors cursor-pointer"
                     >
                       View Details
@@ -919,14 +1089,33 @@ export default function BranchesPage() {
             </div>
 
             {/* Region / HO summary */}
-            <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs">
-              <div className="flex justify-between">
+            <div className="space-y-2 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-xs border border-slate-200/60 dark:border-slate-700/60">
+              <div className="flex justify-between items-center">
                 <span className="text-slate-500">Parent Head Office:</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">
-                  {overviewData.branch.head_office?.name || 'Delhi Head Office'}
+                <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                  {overviewData.branch.head_office?.name || getBranchHo(overviewData.branch)?.name || 'Head Office'}
                 </span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Governing HO Admin:</span>
+                <span className="font-bold text-purple-700 dark:text-purple-300">
+                  {overviewData.branch.ho_admin?.name || 'Assigned Zone Admin'}
+                </span>
+              </div>
+              {overviewData.branch.ho_admin?.phone && (
+                <div className="flex justify-between items-center pt-1 border-t border-slate-200/50 dark:border-slate-700/50">
+                  <span className="text-slate-500">HO Admin Contact:</span>
+                  <a
+                    href={`tel:${overviewData.branch.ho_admin.phone}`}
+                    className="font-mono font-semibold text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-1"
+                  >
+                    <Phone className="w-3 h-3" />
+                    +91 {overviewData.branch.ho_admin.phone}
+                  </a>
+                </div>
+              )}
+              <div className="flex justify-between items-center">
                 <span className="text-slate-500">Official Ward Code:</span>
                 <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
                   {overviewData.branch.code}
@@ -993,6 +1182,19 @@ export default function BranchesPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Universal Custom Export Modal */}
+      <CustomExportModal
+        isOpen={isCustomExportOpen}
+        onClose={() => setIsCustomExportOpen(false)}
+        title="Export Branches & Wards Stock"
+        subtitle="Download municipal ward allocations, governing head offices, and live fleet stock (Excel / CSV)"
+        defaultFilename="GoSpeedy_Branches_Wards_Stock"
+        columns={BRANCH_EXPORT_COLUMNS}
+        dateAccessor="created_at"
+        onFetchData={fetchBranchesForExport}
+        transformRow={transformBranchRow}
+      />
     </div>
   );
 }
