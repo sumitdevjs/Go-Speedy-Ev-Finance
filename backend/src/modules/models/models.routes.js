@@ -2,6 +2,7 @@ const express = require('express');
 const { z } = require('zod');
 const modelsController = require('./models.controller');
 const requireAuth = require('../../middleware/auth');
+const { requireRole } = require('../../middleware/roleGuard');
 const requestLogger = require('../../middleware/requestLogger');
 
 const router = express.Router();
@@ -173,6 +174,7 @@ router.get('/:id', modelsController.getById.bind(modelsController));
  */
 router.post(
   '/', 
+  requireRole('super_admin', 'ho_admin', 'admin'),
   validateBody(createModelSchema), 
   requestLogger('ev_models', 'CREATE_MODEL'), 
   modelsController.create.bind(modelsController)
@@ -231,6 +233,7 @@ router.post(
  */
 router.patch(
   '/:id', 
+  requireRole('super_admin', 'ho_admin', 'admin'),
   validateBody(updateModelSchema), 
   requestLogger('ev_models', 'UPDATE_MODEL'), 
   modelsController.update.bind(modelsController)
@@ -267,6 +270,7 @@ router.patch(
  */
 router.post(
   '/:id/stock',
+  requireRole('super_admin', 'ho_admin', 'admin'),
   validateBody(addStockSchema),
   requestLogger('ev_models', 'ADD_STOCK'),
   modelsController.addStock.bind(modelsController)

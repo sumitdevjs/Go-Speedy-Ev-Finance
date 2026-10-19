@@ -30,8 +30,10 @@ const ROLE_OPTIONS = [
 ];
 
 export default function StaffPage() {
-  const { user: currentUser, selectedBranch } = useAuthStore();
-  const isHoAdmin = currentUser?.role === 'ho_admin';
+  const { user: currentUser, role: currentRole, selectedBranch } = useAuthStore();
+  const isSuperAdmin = currentRole === 'super_admin' || currentRole === 'admin' || currentUser?.role === 'super_admin' || currentUser?.role === 'admin';
+  const isHoAdmin = currentRole === 'ho_admin' || currentUser?.role === 'ho_admin';
+  const isBranchAdmin = currentRole === 'branch_admin' || currentUser?.role === 'branch_admin';
   const roleOptions = isHoAdmin
     ? ROLE_OPTIONS.filter((o) => o.value === 'staff' || o.value === 'branch_admin')
     : ROLE_OPTIONS;
@@ -338,6 +340,28 @@ export default function StaffPage() {
     e.preventDefault();
     setEditError('');
 
+    const isSelfWardAdmin = isEditingSelf && isBranchAdmin;
+
+    // If Ward Admin editing self, only verification doc is updated
+    if (isSelfWardAdmin) {
+      try {
+        setEditSubmitting(true);
+        const res = await api.patch(`/api/staff/${editingStaff.id}`, {
+          verification_doc: editVerificationDoc.trim() || null,
+        });
+        if (res.data?.success) {
+          setEditingStaff(null);
+          toast.success('Your verification document has been updated.');
+          fetchStaff();
+        }
+      } catch (err) {
+        setEditError(err.response?.data?.message || 'Failed to update document');
+      } finally {
+        setEditSubmitting(false);
+      }
+      return;
+    }
+
     if (!editName.trim() || !editPhone.trim() || !editEmail.trim()) {
       setEditError('Name, phone, and email are required');
       return;
@@ -360,8 +384,6 @@ export default function StaffPage() {
         branch_id: editBranchId || null,
         verification_doc: editVerificationDoc.trim() || null,
       };
-      // Omit role entirely when self-editing — the field is locked in the UI too,
-      // and the backend also rejects a self role-change as a second line of defense.
       if (!isEditingSelf) {
         payload.role = editRole;
       }
@@ -553,41 +575,75 @@ export default function StaffPage() {
       key: 'actions',
       className: 'whitespace-nowrap text-right',
       cellClassName: 'whitespace-nowrap text-right',
-      render: (row) => (
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            icon={Pencil}
-            onClick={() => openEditModal(row)}
-          >
-            Edit
-          </Button>
+      render: (row) => {
+        const isRowSelf = row.id === currentUser?.id;
 
-          <Button
-            variant="outline"
-            size="sm"
-            icon={Key}
-            onClick={() => {
-              setPasswordModalUser(row);
-              setNewPassword('');
-              setResetError('');
-            }}
-          >
-            Password
-          </Button>
+        // Can edit logic:
+        // - Super Admin can edit everyone
+        // - HO Admin can edit branch_admin and staff in their HO, but NOT self, NOT other ho_admin, NOT super_admin
+        // - Ward Admin can edit staff in their branch, and on self can ONLY upload verification doc
+        let showEdit = false;
+        if (isSuperAdmin) {
+          showEdit = true;
+        } else if (isHoAdmin) {
+          showEdit = !isRowSelf && (row.role === 'branch_admin' || row.role === 'staff');
+        } else if (isBranchAdmin) {
+          showEdit = isRowSelf || row.role === 'staff';
+        }
 
-          {row.id !== currentUser?.id && (
-            <Button
-              variant={row.is_active ? 'danger' : 'success'}
-              size="sm"
-              onClick={() => handleToggleDeactivate(row)}
-            >
-              {row.is_active ? 'Deactivate' : 'Activate'}
-            </Button>
-          )}
-        </div>
-      ),
+        // Can change password logic:
+        // - Super Admin can change everyone's password
+        // - HO Admin can change branch_admin and staff passwords, but NEVER own password or super_admin
+        // - Ward Admin can change staff passwords in their branch, but NEVER own password or other admins
+        let showPasswordReset = false;
+        if (isSuperAdmin) {
+          showPasswordReset = true;
+        } else if (isHoAdmin) {
+          showPasswordReset = !isRowSelf && (row.role === 'branch_admin' || row.role === 'staff');
+        } else if (isBranchAdmin) {
+          showPasswordReset = !isRowSelf && row.role === 'staff';
+        }
+
+        return (
+          <div className="flex items-center justify-end gap-2">
+            {showEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                icon={Pencil}
+                onClick={() => openEditModal(row)}
+              >
+                {isRowSelf && isBranchAdmin ? 'My Document' : 'Edit'}
+              </Button>
+            )}
+
+            {showPasswordReset && (
+              <Button
+                variant="outline"
+                size="sm"
+                icon={Key}
+                onClick={() => {
+                  setPasswordModalUser(row);
+                  setNewPassword('');
+                  setResetError('');
+                }}
+              >
+                Password
+              </Button>
+            )}
+
+            {!isRowSelf && isSuperAdmin && (
+              <Button
+                variant={row.is_active ? 'danger' : 'success'}
+                size="sm"
+                onClick={() => handleToggleDeactivate(row)}
+              >
+                {row.is_active ? 'Deactivate' : 'Activate'}
+              </Button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -931,12 +987,25 @@ export default function StaffPage() {
             </div>
           )}
 
+          {isEditingSelf && isBranchAdmin && (
+            <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-xs text-amber-700 dark:text-amber-300 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Ward Admin Notice</p>
+                <p className="text-[11px] mt-0.5">
+                  You can only upload/update your personal Verification Document. Name, phone number, login email, and assigned ward can only be modified by Head Office or Super Admin.
+                </p>
+              </div>
+            </div>
+          )}
+
           <Input
             label="Full Name"
             placeholder="e.g. Gurpreet Singh"
             value={editName}
             onChange={(e) => setEditName(e.target.value)}
-            required
+            disabled={isEditingSelf && isBranchAdmin}
+            required={!(isEditingSelf && isBranchAdmin)}
           />
 
           <Input
@@ -946,7 +1015,8 @@ export default function StaffPage() {
             onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
             maxLength={10}
             inputMode="numeric"
-            required
+            disabled={isEditingSelf && isBranchAdmin}
+            required={!(isEditingSelf && isBranchAdmin)}
           />
 
           <Input
@@ -955,7 +1025,8 @@ export default function StaffPage() {
             placeholder="e.g. staff@gmail.com"
             value={editEmail}
             onChange={(e) => setEditEmail(e.target.value)}
-            required
+            disabled={isEditingSelf && isBranchAdmin}
+            required={!(isEditingSelf && isBranchAdmin)}
           />
 
           <div>
@@ -978,6 +1049,7 @@ export default function StaffPage() {
               <Select
                 label="Head Office"
                 value={editHeadOfficeId}
+                disabled={isEditingSelf && isBranchAdmin}
                 onChange={(e) => {
                   setEditHeadOfficeId(e.target.value);
                   if (e.target.value && editBranchId) {
@@ -1002,6 +1074,7 @@ export default function StaffPage() {
             <Select
               label="Assigned Ward / Branch"
               value={editBranchId}
+              disabled={isEditingSelf && isBranchAdmin}
               onChange={(e) => {
                 const bId = e.target.value;
                 setEditBranchId(bId);
@@ -1028,6 +1101,7 @@ export default function StaffPage() {
             label="Ward / Area Notes"
             placeholder="e.g. Rohini Sector 7 Hub"
             value={editWardArea}
+            disabled={isEditingSelf && isBranchAdmin}
             onChange={(e) => setEditWardArea(e.target.value)}
           />
 

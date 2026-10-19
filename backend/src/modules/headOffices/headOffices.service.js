@@ -183,11 +183,11 @@ class HeadOfficesService {
 
     if (!headOffice) {
       headOffice = {
-        id: '9bab7b7d-e935-4401-ba93-8eddc8b2b90e',
-        name: 'Delhi Head Office',
-        code: 'DEL-HO',
-        city: 'New Delhi',
-        state: 'Delhi',
+        id: null,
+        name: 'Head Office Command',
+        code: 'HO',
+        city: '',
+        state: '',
       };
     }
 

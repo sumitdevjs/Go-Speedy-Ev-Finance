@@ -22,6 +22,32 @@ const resetPasswordSchema = z.object({
   newPassword: z.string().min(6, 'Password must be at least 6 characters long'),
 });
 
+const rateLimit = require('express-rate-limit');
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 15,
+  message: { success: false, message: 'Too many login attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  message: { success: false, message: 'Too many OTP requests. Please try again in 1 hour.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const resetPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: { success: false, message: 'Too many attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Middleware for validation
 const validateLogin = (req, res, next) => {
   loginSchema.parse(req.body);
@@ -77,7 +103,7 @@ const validateResetPassword = (req, res, next) => {
  *       401:
  *         description: Invalid credentials
  */
-router.post('/login', validateLogin, authController.login.bind(authController));
+router.post('/login', loginLimiter, validateLogin, authController.login.bind(authController));
 
 /**
  * @openapi
@@ -98,10 +124,11 @@ router.post('/login', validateLogin, authController.login.bind(authController));
  *     responses:
  *       200:
  *         description: OTP sent successfully
+ *         tools: [SMTP]
  *       400:
  *         description: User not found or invalid request
  */
-router.post('/forgot-password', validateForgotPassword, authController.forgotPassword.bind(authController));
+router.post('/forgot-password', forgotPasswordLimiter, validateForgotPassword, authController.forgotPassword.bind(authController));
 
 /**
  * @openapi
@@ -129,7 +156,7 @@ router.post('/forgot-password', validateForgotPassword, authController.forgotPas
  *       400:
  *         description: Invalid or expired OTP
  */
-router.post('/reset-password', validateResetPassword, authController.resetPassword.bind(authController));
+router.post('/reset-password', resetPasswordLimiter, validateResetPassword, authController.resetPassword.bind(authController));
 
 /**
  * @openapi
@@ -176,6 +203,28 @@ router.post('/logout', requireAuth, authController.logout.bind(authController));
  *         description: Unauthorized
  */
 router.get('/me', requireAuth, authController.me.bind(authController));
+
+/**
+ * @openapi
+ * /api/auth/profile:
+ *   patch:
+ *     summary: Update current user profile (name, email, phone)
+ *     tags: [Auth]
+ *     security:
+ *       - cookieAuth: []
+ */
+router.patch('/profile', requireAuth, authController.updateProfile.bind(authController));
+
+/**
+ * @openapi
+ * /api/auth/change-password:
+ *   patch:
+ *     summary: Change current user password
+ *     tags: [Auth]
+ *     security:
+ *       - cookieAuth: []
+ */
+router.patch('/change-password', requireAuth, resetPasswordLimiter, authController.changePassword.bind(authController));
 
 const passport = require('../../config/passport');
 const authService = require('./auth.service');

@@ -171,6 +171,12 @@ export const useAuthStore = create((set, get) => ({
 
         const effectiveRole = isSuperAdmin ? 'super_admin' : (user.role === 'admin' ? 'branch_admin' : user.role);
 
+        if (typeof window !== 'undefined' && res.data?.data?.token) {
+          try {
+            localStorage.setItem('gospeedy_token', res.data.data.token);
+          } catch (e) {}
+        }
+
         set({
           user: { ...user, role: effectiveRole },
           role: effectiveRole,
@@ -178,6 +184,7 @@ export const useAuthStore = create((set, get) => ({
           selectedHeadOffice: isSuperAdmin ? storedHo : null,
           isLoggedIn: true,
           isLoading: false,
+          hasCheckedAuth: true,
         });
         return { success: true, user };
       }
@@ -202,6 +209,7 @@ export const useAuthStore = create((set, get) => ({
       console.error('Logout error:', err);
     } finally {
       if (typeof window !== 'undefined') {
+        localStorage.removeItem('gospeedy_token');
         localStorage.removeItem('gospeedy_selected_branch');
         localStorage.removeItem('gospeedy_selected_ho');
       }

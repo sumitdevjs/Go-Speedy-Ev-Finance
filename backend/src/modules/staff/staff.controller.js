@@ -67,7 +67,7 @@ class StaffController {
     try {
       const { id } = req.params;
       const { password } = req.body;
-      await staffService.changePassword(id, password);
+      await staffService.changePassword(id, password, req.user);
       // Never log the password itself (hashed or not) — just record that a reset happened.
       await logAudit({
         userId: req.user.id,
@@ -81,7 +81,8 @@ class StaffController {
       return successResponse(res, 200, null, 'Password updated successfully');
     } catch (error) {
       console.error(error);
-      return errorResponse(res, 500, 'Internal Server Error');
+      const status = error.message?.includes('Access denied') ? 403 : 400;
+      return errorResponse(res, status, error.message || 'Internal Server Error');
     }
   }
 

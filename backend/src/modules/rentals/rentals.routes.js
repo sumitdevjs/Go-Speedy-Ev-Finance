@@ -68,9 +68,40 @@ const createRentalSchema = z.object({
   notes: z.string().optional(),
 }).passthrough();
 
-// status must go through /:id/complete or /:id/cancel, which enforce the
-// real business rules (e.g. balance must be zero before completing).
-const updateRentalSchema = z.object({}).passthrough().refine(
+const updateRentalSchema = z.object({
+  name: z.string().min(1).optional(),
+  phone: z.string().regex(/^\d{10}$/).optional(),
+  gender: z.enum(['male', 'female']).optional(),
+  address: z.string().optional().nullable(),
+  vehicle_number: z.string().optional().nullable(),
+  chassis_no: z.string().optional().nullable(),
+  battery_number: z.string().optional().nullable(),
+  charger_number: z.string().optional().nullable(),
+  key_number: z.string().optional().nullable(),
+  start_date: z.string().optional(),
+  total_months: z.number().optional(),
+  amc_start_date: z.string().optional().nullable(),
+  amc_expire_date: z.string().optional().nullable(),
+  scooty_insurance_start: z.string().optional().nullable(),
+  scooty_policy_expiry: z.string().optional().nullable(),
+  rider_insurance_start: z.string().optional().nullable(),
+  rider_policy_expiry: z.string().optional().nullable(),
+  has_pending_docs: z.boolean().optional(),
+  notes: z.string().optional().nullable(),
+  invoice_generated: z.boolean().optional(),
+  invoice_doc_path: z.string().optional().nullable(),
+  aadhar_path: z.string().optional().nullable(),
+  pan_path: z.string().optional().nullable(),
+  cheque_path: z.string().optional().nullable(),
+  electricity_bill_path: z.string().optional().nullable(),
+  tenant_photo_path: z.string().optional().nullable(),
+  scooty_photo_path: z.string().optional().nullable(),
+  rent_agreement_path: z.string().optional().nullable(),
+  scooty_insurance_path: z.string().optional().nullable(),
+  rider_insurance_path: z.string().optional().nullable(),
+  rider_license_path: z.string().optional().nullable(),
+  verification_doc: z.string().optional().nullable(),
+}).refine(
   (data) => !('status' in data),
   { message: 'status cannot be changed via a generic update — use the /complete or /cancel endpoints.' }
 );

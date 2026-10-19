@@ -21,6 +21,7 @@ import {
   BarChart3,
   ArrowRightLeft,
   Receipt,
+  UserCog,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Badge from '../ui/Badge';
@@ -157,6 +158,7 @@ function SidebarInner({ isOpen, onClose }) {
         : []),
     { name: isHoAdmin ? 'Branch Admins & Staff' : 'Staff Management', href: '/staff', icon: UserCheck },
     ...(isSuperAdmin || isHoAdmin ? [{ name: 'Audit Logs', href: '/audit', icon: ShieldCheck }] : []),
+    ...(isSuperAdmin ? [{ name: 'Super Admin Profile', href: '/profile', icon: UserCog }] : []),
   ];
 
   // Derive role label & badge variant
@@ -231,21 +233,43 @@ function SidebarInner({ isOpen, onClose }) {
 
       {/* User Card & Logout */}
       <div className="shrink-0 p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80">
-        <div className="flex items-center justify-between gap-2.5 mb-2">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
-              {user?.name || (role === 'staff' ? 'Staff Operator' : 'Administrator')}
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-              {user?.phone || user?.email || (role === 'staff' ? 'Staff Console' : 'Admin Console')}
-            </p>
+        {isSuperAdmin ? (
+          <Link
+            href="/profile"
+            className="flex items-center justify-between gap-2.5 mb-2 group cursor-pointer"
+            title="Click to view and edit Super Admin credentials"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                {user?.name || 'Administrator'}
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                {user?.phone || user?.email || 'Admin Console'}
+              </p>
+            </div>
+            <Badge
+              status={roleLabel}
+              variant={badgeVariant}
+              size="sm"
+            />
+          </Link>
+        ) : (
+          <div className="flex items-center justify-between gap-2.5 mb-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                {user?.name || (role === 'staff' ? 'Staff Operator' : 'Administrator')}
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                {user?.phone || user?.email || (role === 'staff' ? 'Staff Console' : 'Admin Console')}
+              </p>
+            </div>
+            <Badge
+              status={roleLabel}
+              variant={badgeVariant}
+              size="sm"
+            />
           </div>
-          <Badge
-            status={roleLabel}
-            variant={badgeVariant}
-            size="sm"
-          />
-        </div>
+        )}
 
         {/* Current Active Branch / Ward Tag */}
         <div className="flex items-center gap-1.5 mb-3 px-2 py-1 rounded-md bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 text-[11px] text-slate-600 dark:text-slate-300">

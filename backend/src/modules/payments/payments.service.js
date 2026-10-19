@@ -92,7 +92,7 @@ class PaymentsService {
     return data;
   }
 
-  async recordPayment(paymentData, collectedBy) {
+  async recordPayment(paymentData, collectedBy, req = null) {
     const { tenant_id, amount, payment_date, mode, notes, gst_amount, late_fee_paid, is_penalty_waiver } = paymentData;
 
     // 1. Check if tenant exists and is active
@@ -104,6 +104,19 @@ class PaymentsService {
 
     if (tenantError || !tenant) throw new Error('Tenant not found');
     if (tenant.status !== 'rented') throw new Error(`Cannot record payment: rental status is ${tenant.status}`);
+
+    if (req?.user) {
+      const user = req.user;
+      if (user.role === 'branch_admin' || user.role === 'staff') {
+        if (tenant.branch_id && user.branch_id && tenant.branch_id !== user.branch_id) {
+          throw new Error('Access denied: Cannot record payment for tenant in another branch');
+        }
+      } else if (user.role === 'ho_admin') {
+        if (tenant.head_office_id && user.head_office_id && tenant.head_office_id !== user.head_office_id) {
+          throw new Error('Access denied: Cannot record payment for tenant in another Head Office');
+        }
+      }
+    }
 
     // 2. Insert Payment with branch attribution if columns exist
     const insertPayload = {

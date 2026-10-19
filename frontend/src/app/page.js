@@ -82,11 +82,11 @@ export default function RootPage() {
 
     // Specific validation messages for required fields
     if (!identifier?.trim() && !password?.trim()) {
-      setError('Phone number/email and password are both required.');
+      setError('Email / User ID and password are both required.');
       return;
     }
     if (!identifier?.trim()) {
-      setError('Phone number or email is required.');
+      setError('Email or User ID is required.');
       return;
     }
     if (!password?.trim()) {
@@ -265,10 +265,10 @@ export default function RootPage() {
               <form onSubmit={handleSubmit} className="space-y-4 font-sans" autoComplete="off">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2 font-sans" htmlFor="identifier">
-                    Phone Number or Email
+                    Email / User ID
                   </label>
                   <div className="relative group">
-                    <span className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${error && (error.toLowerCase().includes('phone') || error.toLowerCase().includes('email') || error.toLowerCase().includes('account') || (!identifier && error))
+                    <span className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${error && (error.toLowerCase().includes('email') || error.toLowerCase().includes('user') || error.toLowerCase().includes('account') || (!identifier && error))
                       ? 'text-rose-500'
                       : 'text-slate-400 group-focus-within:text-emerald-500'
                       }`}>
@@ -277,7 +277,7 @@ export default function RootPage() {
                     <input
                       id="identifier"
                       type="text"
-                      className={`w-full bg-slate-50/90 hover:bg-slate-100/80 dark:bg-[#0d1629]/95 dark:hover:bg-[#101b33] border ${error && (error.toLowerCase().includes('phone') || error.toLowerCase().includes('email') || error.toLowerCase().includes('account') || (!identifier && error))
+                      className={`w-full bg-slate-50/90 hover:bg-slate-100/80 dark:bg-[#0d1629]/95 dark:hover:bg-[#101b33] border ${error && (error.toLowerCase().includes('email') || error.toLowerCase().includes('user') || error.toLowerCase().includes('account') || (!identifier && error))
                         ? 'border-rose-500 ring-1 ring-rose-500/40 text-rose-600 dark:text-rose-300'
                         : 'border-slate-300/90 dark:border-slate-700/80 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-slate-900 dark:text-white'
                         } rounded-xl pl-11 pr-4 py-3 sm:py-3.5 text-base sm:text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none transition-all font-sans`}
@@ -286,7 +286,7 @@ export default function RootPage() {
                         setIdentifier(e.target.value);
                         if (error) setError('');
                       }}
-                      placeholder="e.g. admin@gmail.com or wardadminrohini"
+                      placeholder="Enter your email ID"
                       autoComplete="username"
                     />
                   </div>

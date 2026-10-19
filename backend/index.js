@@ -36,7 +36,7 @@ app.use(cookieParser());
 
 // Session — used briefly during OAuth redirect (not for general auth)
 app.use(session({
-  secret: env.SESSION_SECRET,
+  secret: env.SESSION_SECRET || env.JWT_SECRET || 'gospeedy-session-secret-fallback',
   resave: false,
   saveUninitialized: false,
   cookie: { secure: env.NODE_ENV === 'production', maxAge: 5 * 60 * 1000 }, // 5 min

@@ -99,7 +99,7 @@ class RentalsService {
     return { data: finalData, meta };
   }
 
-  async getRentalById(id) {
+  async getRentalById(id, req = null) {
     const { data: tenant, error } = await supabase
       .from('tenants')
       .select('*, ev_models(name, company, kilometres)')
@@ -108,6 +108,19 @@ class RentalsService {
 
     if (error) throw error;
     if (!tenant) throw new Error('Rental not found');
+
+    if (req?.user) {
+      const user = req.user;
+      if (user.role === 'branch_admin' || user.role === 'staff') {
+        if (tenant.branch_id && user.branch_id && tenant.branch_id !== user.branch_id) {
+          throw new Error('Access denied: Rental belongs to another branch');
+        }
+      } else if (user.role === 'ho_admin') {
+        if (tenant.head_office_id && user.head_office_id && tenant.head_office_id !== user.head_office_id) {
+          throw new Error('Access denied: Rental belongs to another Head Office');
+        }
+      }
+    }
 
     const { data: payments, error: paymentsError } = await supabase
       .from('payments')
@@ -298,7 +311,28 @@ class RentalsService {
     }
   }
 
-  async updateRental(id, updates) {
+  async updateRental(id, updates, req = null) {
+    if (req?.user) {
+      const user = req.user;
+      const { data: existing } = await supabase
+        .from('tenants')
+        .select('branch_id, head_office_id')
+        .eq('id', id)
+        .single();
+
+      if (existing) {
+        if (user.role === 'branch_admin' || user.role === 'staff') {
+          if (existing.branch_id && user.branch_id && existing.branch_id !== user.branch_id) {
+            throw new Error('Access denied: Rental belongs to another branch');
+          }
+        } else if (user.role === 'ho_admin') {
+          if (existing.head_office_id && user.head_office_id && existing.head_office_id !== user.head_office_id) {
+            throw new Error('Access denied: Rental belongs to another Head Office');
+          }
+        }
+      }
+    }
+
     // Sanitize empty strings to undefined so they are updated as NULL in DB
     Object.keys(updates).forEach(key => {
       if (updates[key] === '') {
@@ -384,14 +418,28 @@ class RentalsService {
     return data;
   }
 
-  async cancelRental(id) {
+  async cancelRental(id, req = null) {
     const { data: tenant, error: fetchError } = await supabase
       .from('tenants')
-      .select('status, ev_model_id')
+      .select('status, ev_model_id, branch_id, head_office_id')
       .eq('id', id)
       .single();
 
     if (fetchError) throw fetchError;
+
+    if (req?.user) {
+      const user = req.user;
+      if (user.role === 'branch_admin' || user.role === 'staff') {
+        if (tenant.branch_id && user.branch_id && tenant.branch_id !== user.branch_id) {
+          throw new Error('Access denied: Rental belongs to another branch');
+        }
+      } else if (user.role === 'ho_admin') {
+        if (tenant.head_office_id && user.head_office_id && tenant.head_office_id !== user.head_office_id) {
+          throw new Error('Access denied: Rental belongs to another Head Office');
+        }
+      }
+    }
+
     if (tenant.status === 'cancelled') throw new Error('This contract is already cancelled');
     if (tenant.status !== 'rented' && tenant.status !== 'direct_purchase' && tenant.status !== 'completed') {
       throw new Error('Only active rentals, direct purchases, or completed purchases can be cancelled');
@@ -433,9 +481,9 @@ class RentalsService {
     return { success: true };
   }
 
-  async completeRental(id) {
+  async completeRental(id, req = null) {
     // Verify it can be completed (outstanding = 0, dp cleared)
-    const rental = await this.getRentalById(id);
+    const rental = await this.getRentalById(id, req);
 
     if (rental.status !== 'rented') throw new Error('Rental is not currently active');
 

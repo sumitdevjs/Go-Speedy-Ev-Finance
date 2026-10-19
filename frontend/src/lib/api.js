@@ -34,6 +34,16 @@ api.interceptors.request.use((config) => {
     } catch (e) {
       // ignore parsing errors
     }
+
+    // Attach auth token header as reliable fallback to cookies
+    try {
+      const token = localStorage.getItem('gospeedy_token');
+      if (token && !config.headers['Authorization']) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
+    } catch (e) {
+      // ignore localStorage errors
+    }
   }
 
   return config;

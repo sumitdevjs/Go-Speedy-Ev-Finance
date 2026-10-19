@@ -1,9 +1,11 @@
 const express = require('express');
 const requireAuth = require('../../middleware/auth');
+const { requireBranchAdmin } = require('../../middleware/roleGuard');
 const transfersController = require('./transfers.controller');
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireBranchAdmin);
 
 router.get('/', transfersController.getAll.bind(transfersController));
 router.post('/', transfersController.initiate.bind(transfersController));

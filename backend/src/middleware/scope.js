@@ -86,8 +86,12 @@ const applyScope = (queryBuilder, req, options = {}) => {
   }
 
   // 3. Branch Admin & Staff: strictly scoped to their assigned branch/ward
-  if (scope.isBranchScoped && scope.userBranchId) {
-    return queryBuilder.eq(branchCol, scope.userBranchId);
+  if (scope.isBranchScoped) {
+    if (scope.userBranchId) {
+      return queryBuilder.eq(branchCol, scope.userBranchId);
+    }
+    // Fail-closed: Prevent unscoped global data exposure if user has no assigned branch
+    return queryBuilder.eq(branchCol, '00000000-0000-0000-0000-000000000000');
   }
 
   return queryBuilder;

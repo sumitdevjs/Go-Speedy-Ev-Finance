@@ -173,7 +173,7 @@ class CustomersService {
     };
   }
 
-  async getCustomerDetails(idOrPhone) {
+  async getCustomerDetails(idOrPhone, req = null) {
     // Look up by ID or Phone
     let tenantQuery = supabase
       .from('tenants')
@@ -183,6 +183,21 @@ class CustomersService {
     const { data: tenants, error } = await tenantQuery;
     if (error || !tenants || tenants.length === 0) {
       throw new Error('Customer not found');
+    }
+
+    if (req?.user) {
+      const user = req.user;
+      if (user.role === 'branch_admin' || user.role === 'staff') {
+        const hasBranchContract = tenants.some(t => t.branch_id === user.branch_id || t.ward_area === user.ward_area);
+        if (!hasBranchContract && user.branch_id) {
+          throw new Error('Access denied: Customer does not belong to your assigned branch');
+        }
+      } else if (user.role === 'ho_admin') {
+        const hasHoContract = tenants.some(t => t.head_office_id === user.head_office_id);
+        if (!hasHoContract && user.head_office_id) {
+          throw new Error('Access denied: Customer does not belong to your assigned Head Office');
+        }
+      }
     }
 
     const primaryTenant = tenants[0];

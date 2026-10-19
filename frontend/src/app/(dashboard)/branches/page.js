@@ -214,9 +214,9 @@ export default function BranchesPage() {
       'Candidate / In-Charge': branch.contact_person || 'Assigned Candidate',
       'Contact Phone': branch.phone || 'N/A',
       'Branch Address': branch.address || 'N/A',
-      'Governing Head Office': hoObj?.name || 'Moti Nagar Head Office',
-      'Head Office Code': hoObj?.code || 'DEL-HO',
-      'Head Office City / State': hoObj?.city || hoObj?.state || 'Delhi',
+      'Governing Head Office': hoObj?.name || 'Head Office',
+      'Head Office Code': hoObj?.code || '—',
+      'Head Office City / State': hoObj?.city || hoObj?.state || '—',
       'Governing HO Admin': branch.ho_admin?.name || 'Zone Admin',
       'HO Admin Contact': branch.ho_admin?.phone || 'N/A',
       'Total Fleet Stock': totalStock,
@@ -340,7 +340,7 @@ export default function BranchesPage() {
       render: (row) => {
         const hoObj = getBranchHo(row);
         const hoName = hoObj?.name || 'Head Office';
-        const hoCode = hoObj?.code || 'DEL-HO';
+        const hoCode = hoObj?.code || 'HO';
         const hoCity = hoObj?.city || '';
         const hoAdmin = row.ho_admin;
 
@@ -747,7 +747,7 @@ export default function BranchesPage() {
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                placeholder="Search ward, candidate (e.g. Virk, Ginni), phone..."
+                placeholder="Search ward, code, contact person, phone..."
                 className="w-full pl-9 pr-3 py-1.5 text-xs sm:text-[13px] h-[38px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>

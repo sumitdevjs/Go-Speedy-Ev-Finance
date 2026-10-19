@@ -5,8 +5,6 @@ const { getPaginationOptions, getPaginationMeta } = require('../../utils/paginat
 const { buildSearchFilter } = require('../../utils/searchFilter');
 const { applyScope, resolveCreateScope } = require('../../middleware/scope');
 
-const { ALL_WARDS } = require('../branches/delhiWardsData');
-
 class StaffService {
   async getAllStaff(query = {}, req = null) {
     const { page, limit, offset } = getPaginationOptions(query);
@@ -90,23 +88,6 @@ class StaffService {
         // Attach resolved branch
         if (u.branch_id && branchMap.has(u.branch_id)) {
           u.branches = branchMap.get(u.branch_id);
-        } else if (u.ward_area) {
-          const s = String(u.ward_area).trim().toLowerCase();
-          const sNorm = s.replace(/[^a-z0-9]/g, '');
-          const matched = ALL_WARDS.find(w =>
-            w.name.toLowerCase() === s ||
-            w.name.toLowerCase().replace(/[^a-z0-9]/g, '') === sNorm ||
-            (w.ward_area && w.ward_area.toLowerCase().includes(s))
-          );
-          if (matched) {
-            u.branches = {
-              id: matched.id,
-              name: matched.name,
-              code: matched.code,
-              ward_no: matched.ward_no,
-              ward_area: matched.ward_area,
-            };
-          }
         }
 
         // Attach resolved head office
@@ -123,7 +104,13 @@ class StaffService {
   }
 
   async createStaff({ name, phone, email, password, role, ward_area, branch_id, head_office_id, verification_doc }, createdBy, req = null) {
-    if (req?.user?.role === 'ho_admin') {
+    const requesterRole = req?.user?.role;
+    if (requesterRole === 'branch_admin') {
+      if (role && role !== 'staff') {
+        throw new Error('Access denied: Branch Admins can only create Staff members');
+      }
+      role = 'staff';
+    } else if (requesterRole === 'ho_admin') {
       if (role === 'super_admin' || role === 'ho_admin') {
         throw new Error('Access denied: Head Office Admins can only create Branch Admins and Staff');
       }
@@ -188,25 +175,71 @@ class StaffService {
   }
 
   async updateStaff(id, updates, requestingUserId, req = null) {
-    if (requestingUserId && id === requestingUserId && 'role' in updates) {
+    const requesterRole = req?.user?.role;
+    const isSelf = requestingUserId && id === requestingUserId;
+
+    if (isSelf && 'role' in updates) {
       throw new Error('Cannot change your own role');
     }
 
-    if (req?.user?.role === 'ho_admin') {
-      if (updates.role === 'super_admin' || updates.role === 'ho_admin') {
-        throw new Error('Access denied: Head Office Admins can only assign Branch Admin or Staff roles');
-      }
-      updates.head_office_id = req.user.head_office_id;
-    }
-
-    const { data: before } = await supabase
+    const { data: before, error: fetchErr } = await supabase
       .from('users')
       .select('*')
       .eq('id', id)
       .single();
 
-    if (req?.user?.role === 'ho_admin' && before && before.head_office_id !== req.user.head_office_id) {
-      throw new Error('Access denied: Cannot edit users belonging to another Head Office');
+    if (fetchErr || !before) {
+      throw new Error('User not found');
+    }
+
+    // Role-based editing rules:
+    if (isSelf) {
+      if (requesterRole === 'super_admin' || requesterRole === 'admin') {
+        // Super admin can edit own details
+      } else if (requesterRole === 'branch_admin') {
+        // Ward Admin self-edit: ONLY verification_doc is allowed!
+        // All other fields (name, phone, email, ward, role) cannot be changed by Ward Admin on their own account.
+        const allowedKeys = ['verification_doc'];
+        const disallowed = Object.keys(updates).filter(
+          k => !allowedKeys.includes(k) && updates[k] !== undefined && updates[k] !== null && updates[k] !== before[k]
+        );
+        if (disallowed.length > 0) {
+          throw new Error('Access denied: Ward Admin can only upload verification documents for their own profile. Other details can only be changed by Head Office or Super Admin.');
+        }
+        // Restrict updates to only verification_doc
+        updates = { verification_doc: updates.verification_doc };
+      } else {
+        // HO Admin or Staff cannot edit themselves
+        throw new Error('Access denied: You cannot edit your own profile details. Contact Super Admin.');
+      }
+    } else {
+      // Editing someone else
+      if (requesterRole === 'super_admin' || requesterRole === 'admin') {
+        // Allowed to edit anyone
+      } else if (requesterRole === 'ho_admin') {
+        if (before.role !== 'branch_admin' && before.role !== 'staff') {
+          throw new Error('Access denied: Head Office Admins can only edit Branch/Ward Admins and Staff.');
+        }
+        if (before.head_office_id && before.head_office_id !== req?.user?.head_office_id) {
+          throw new Error('Access denied: Cannot edit users belonging to another Head Office');
+        }
+        if (updates.role && updates.role !== 'branch_admin' && updates.role !== 'staff') {
+          throw new Error('Access denied: Head Office Admins can only assign Branch Admin or Staff roles');
+        }
+        updates.head_office_id = req.user.head_office_id;
+      } else if (requesterRole === 'branch_admin') {
+        if (before.role !== 'staff') {
+          throw new Error('Access denied: Ward Admins can only edit Staff members.');
+        }
+        if (before.branch_id && before.branch_id !== req?.user?.branch_id) {
+          throw new Error('Access denied: Cannot edit staff belonging to another Branch');
+        }
+        if (updates.role && updates.role !== 'staff') {
+          throw new Error('Access denied: Branch Admins cannot alter user roles');
+        }
+      } else {
+        throw new Error('Access denied: Unauthorized to edit users');
+      }
     }
 
     let cleanUpdates = { ...updates };
@@ -244,7 +277,51 @@ class StaffService {
     return { data, diff };
   }
 
-  async changePassword(id, newPassword) {
+  async changePassword(id, newPassword, requestingUser = null) {
+    if (requestingUser) {
+      const requesterRole = requestingUser.role;
+      const isSelf = id === requestingUser.id;
+
+      if (requesterRole !== 'super_admin' && requesterRole !== 'admin') {
+        const { data: targetUser, error: fetchErr } = await supabase
+          .from('users')
+          .select('id, role, branch_id, head_office_id')
+          .eq('id', id)
+          .single();
+
+        if (fetchErr || !targetUser) {
+          throw new Error('User not found');
+        }
+
+        // Rule 1: Neither HO, Ward, nor Staff can change their own password
+        if (isSelf) {
+          throw new Error('Access denied: You cannot change your own password. Only Super Admin can change your password.');
+        }
+
+        // Rule 2: HO Admin can change password of Ward Admins and Staff in their HO
+        if (requesterRole === 'ho_admin') {
+          if (targetUser.role !== 'branch_admin' && targetUser.role !== 'staff') {
+            throw new Error('Access denied: Head Office Admin can only change passwords for Branch/Ward Admins and Staff.');
+          }
+          if (targetUser.head_office_id && targetUser.head_office_id !== requestingUser.head_office_id) {
+            throw new Error('Access denied: User does not belong to your Head Office.');
+          }
+        }
+
+        // Rule 3: Ward Admin can ONLY change Staff passwords in their branch
+        else if (requesterRole === 'branch_admin') {
+          if (targetUser.role !== 'staff') {
+            throw new Error('Access denied: Ward Admin can only change passwords for Ward Staff.');
+          }
+          if (targetUser.branch_id && targetUser.branch_id !== requestingUser.branch_id) {
+            throw new Error('Access denied: Staff does not belong to your Ward/Branch.');
+          }
+        } else {
+          throw new Error('Access denied: Unauthorized to change passwords.');
+        }
+      }
+    }
+
     const password_hash = await bcrypt.hash(newPassword, 10);
 
     const { error } = await supabase

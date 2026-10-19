@@ -1,5 +1,6 @@
 const supabase = require('../../config/db');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
+const { buildSearchFilter } = require('../../utils/searchFilter');
 const { ALL_WARDS, ALL_HEAD_OFFICES, DELHI_HEAD_OFFICE } = require('./delhiWardsData');
 
 // In-memory wards state initialized with all 46 Delhi Wards (plus regional hubs)
@@ -35,7 +36,7 @@ class BranchesService {
 
       // Filter by Search
       if (query.search) {
-        queryBuilder = queryBuilder.or(`name.ilike.%${query.search}%,code.ilike.%${query.search}%,ward_area.ilike.%${query.search}%,contact_person.ilike.%${query.search}%,address.ilike.%${query.search}%`);
+        queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'code', 'ward_area', 'contact_person', 'address'], query.search));
       }
 
       // Filter by Active
@@ -255,8 +256,8 @@ class BranchesService {
       status_label: w.status_label,
       head_office_id: w.head_office_id,
       head_offices: {
-        name: w.head_office?.name || 'Delhi Head Office',
-        code: w.head_office?.code || 'DEL-HO',
+        name: w.head_office?.name || 'Head Office',
+        code: w.head_office?.code || 'HO',
       },
       head_office: w.head_office,
     }));
@@ -291,12 +292,30 @@ class BranchesService {
   }
 
   async create({ head_office_id, ward_no, name, code, ward_area, address, phone, contact_person, status_label }, user = {}) {
-    const finalHoId = (user && user.role === 'ho_admin' && user.head_office_id)
+    let finalHoId = (user && user.role === 'ho_admin' && user.head_office_id)
       ? user.head_office_id
-      : (head_office_id || '9bab7b7d-e935-4401-ba93-8eddc8b2b90e');
-    const ho = ALL_HEAD_OFFICES.find(h => h.id === finalHoId) || DELHI_HEAD_OFFICE;
+      : head_office_id;
+
+    if (!finalHoId) {
+      try {
+        const { data: firstHo } = await supabase.from('head_offices').select('id').eq('is_active', true).limit(1);
+        finalHoId = firstHo?.[0]?.id || null;
+      } catch (e) {}
+    }
+
+    let ho = null;
+    if (finalHoId) {
+      try {
+        const { data: hoData } = await supabase
+          .from('head_offices')
+          .select('id, name, code, city, state')
+          .eq('id', finalHoId)
+          .single();
+        ho = hoData || null;
+      } catch (e) {}
+    }
+
     const newBranch = {
-      id: `ward-custom-${Date.now()}`,
       head_office_id: finalHoId,
       ward_no: ward_no ? parseInt(ward_no) : null,
       name,
@@ -323,21 +342,38 @@ class BranchesService {
           address: newBranch.address,
           phone: newBranch.phone,
           contact_person: newBranch.contact_person,
+          status_label: newBranch.status_label,
           is_active: true,
         }])
         .select('*')
         .single();
 
-      if (!error && data) {
-        inMemoryWards.unshift({ ...newBranch, ...data });
-        return data;
+      if (error) {
+        console.error('[Create Branch DB Error]:', error);
+        throw new Error(error.message || 'Database error creating branch');
+      }
+
+      if (data) {
+        const createdBranch = { ...data, head_office: ho };
+        inMemoryWards.unshift(createdBranch);
+        return createdBranch;
       }
     } catch (e) {
-      // fallback
+      if (e.message && e.message.includes('duplicate key') && e.message.includes('code')) {
+        throw new Error(`Branch with code "${newBranch.code}" already exists`);
+      }
+      if (e.message && !e.message.includes('Database error')) {
+        throw e;
+      }
+      // fallback for offline/in-memory mode if DB is unreachable
     }
 
-    inMemoryWards.unshift(newBranch);
-    return newBranch;
+    const fallbackBranch = {
+      id: `ward-custom-${Date.now()}`,
+      ...newBranch,
+    };
+    inMemoryWards.unshift(fallbackBranch);
+    return fallbackBranch;
   }
 
   async update(id, updates) {

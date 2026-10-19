@@ -17,7 +17,7 @@ class CustomersController {
   async getDetails(req, res, next) {
     try {
       const { id } = req.params;
-      const result = await customersService.getCustomerDetails(id);
+      const result = await customersService.getCustomerDetails(id, req);
       res.status(200).json({
         success: true,
         data: result

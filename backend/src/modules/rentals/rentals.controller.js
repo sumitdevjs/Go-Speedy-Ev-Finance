@@ -15,10 +15,11 @@ class RentalsController {
   async getById(req, res) {
     try {
       const { id } = req.params;
-      const data = await rentalsService.getRentalById(id);
+      const data = await rentalsService.getRentalById(id, req);
       return successResponse(res, 200, data, 'Rental details retrieved');
     } catch (error) {
       if (error.message === 'Rental not found') return errorResponse(res, 404, error.message);
+      if (error.message.startsWith('Access denied')) return errorResponse(res, 403, error.message);
       console.error(error);
       return errorResponse(res, 500, 'Internal Server Error');
     }
@@ -39,12 +40,13 @@ class RentalsController {
   async update(req, res) {
     try {
       const { id } = req.params;
-      const data = await rentalsService.updateRental(id, req.body);
+      const data = await rentalsService.updateRental(id, req.body, req);
       return successResponse(res, 200, data, 'Rental updated successfully');
     } catch (error) {
       if (error.message.includes('Unique constraint violation')) {
         return errorResponse(res, 409, error.message);
       }
+      if (error.message.startsWith('Access denied')) return errorResponse(res, 403, error.message);
       console.error(error);
       return errorResponse(res, 500, 'Internal Server Error');
     }
@@ -53,12 +55,13 @@ class RentalsController {
   async cancel(req, res) {
     try {
       const { id } = req.params;
-      await rentalsService.cancelRental(id);
+      await rentalsService.cancelRental(id, req);
       return successResponse(res, 200, null, 'Rental cancelled successfully');
     } catch (error) {
       if (error.message.includes('already cancelled') || error.message.includes('Only active')) {
         return errorResponse(res, 400, error.message);
       }
+      if (error.message.startsWith('Access denied')) return errorResponse(res, 403, error.message);
       console.error(error);
       return errorResponse(res, 500, 'Internal Server Error');
     }
@@ -67,12 +70,13 @@ class RentalsController {
   async complete(req, res) {
     try {
       const { id } = req.params;
-      const data = await rentalsService.completeRental(id);
+      const data = await rentalsService.completeRental(id, req);
       return successResponse(res, 200, data, 'Rental completed successfully');
     } catch (error) {
       if (error.message.startsWith('Cannot complete') || error.message.includes('not currently active')) {
         return errorResponse(res, 400, error.message);
       }
+      if (error.message.startsWith('Access denied')) return errorResponse(res, 403, error.message);
       console.error(error);
       return errorResponse(res, 500, 'Internal Server Error');
     }

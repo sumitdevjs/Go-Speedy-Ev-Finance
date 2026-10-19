@@ -142,7 +142,7 @@ export default function HoDashboard() {
             <div className="space-y-1.5">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-bold uppercase tracking-wider">
                 <Building2 className="w-3.5 h-3.5 text-blue-400" />
-                <span>Head Office Jurisdiction: {headOffice?.code || 'DEL-HO'}</span>
+                <span>Head Office Jurisdiction: {headOffice?.code || 'HEAD OFFICE'}</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                 {headOffice?.name || 'Head Office Command'}

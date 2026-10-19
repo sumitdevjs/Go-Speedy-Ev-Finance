@@ -180,8 +180,8 @@ export default function CustomersPage() {
     return {
       'Customer Name': c.name || '—',
       'Phone Number': c.phone || '—',
-      'Assigned Branch / Ward': c.branch?.name || 'Head Office Central',
-      'Branch Code': c.branch?.code || 'DEL-HO',
+      'Assigned Branch / Ward': c.branch?.name || '—',
+      'Branch Code': c.branch?.code || '—',
       'Customer Address': c.address || 'N/A',
       'Active Contracts': c.active_contract_count || 0,
       'Total Contracts': c.total_contracts || contractsList.length,
