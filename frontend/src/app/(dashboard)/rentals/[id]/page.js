@@ -152,7 +152,7 @@ export default function TenantDetailPage() {
         setSignedDocs(docsRes.data.data || {});
       }
     } catch (err) {
-      console.error('Error loading tenant details:', err);
+      // silenced error
     } finally {
       setLoading(false);
     }

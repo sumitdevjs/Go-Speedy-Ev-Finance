@@ -73,7 +73,6 @@ export default function AddPenaltyModal({ isOpen, onClose, target, onSuccess }) 
         onClose();
       }
     } catch (err) {
-      console.error('Error adding penalty:', err);
       toast.error(err.response?.data?.message || 'Failed to add penalty');
     } finally {
       setIsSubmitting(false);

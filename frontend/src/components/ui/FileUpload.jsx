@@ -56,7 +56,6 @@ export default function FileUpload({
         throw new Error(res.data?.message || 'Upload failed');
       }
     } catch (err) {
-      console.error('Document upload error:', err);
       setUploadError(err.response?.data?.message || err.message || 'Upload failed');
     } finally {
       setUploading(false);

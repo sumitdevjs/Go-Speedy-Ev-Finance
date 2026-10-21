@@ -46,7 +46,7 @@ export default function ReturnEvModal({
         const res = await api.get(`/api/rentals?search=${encodeURIComponent(search)}&status=rented&limit=6`);
         setTenants(res.data?.data || []);
       } catch (err) {
-        console.error('Tenant search error:', err);
+        // silenced search error
       } finally {
         setSearching(false);
       }
@@ -91,7 +91,6 @@ export default function ReturnEvModal({
         setSelectedTenant(null);
       }, 1400);
     } catch (err) {
-      console.error('Process EV return error:', err);
       setError(
         err.response?.data?.message || err.message || 'Failed to process vehicle return'
       );

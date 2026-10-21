@@ -85,7 +85,7 @@ export default function RentalsListPage() {
         setTotalRecords(res.data.pagination?.totalItems || 0);
       }
     } catch (err) {
-      console.error('Failed to load rentals:', err);
+      // silent
     } finally {
       setLoading(false);
     }

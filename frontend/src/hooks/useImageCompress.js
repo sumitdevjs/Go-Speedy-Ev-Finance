@@ -36,7 +36,6 @@ export function useImageCompress() {
         previewUrl,
       };
     } catch (err) {
-      console.warn('Image compression fallback:', err);
       // Fallback to original file
       setCompressing(false);
       return {

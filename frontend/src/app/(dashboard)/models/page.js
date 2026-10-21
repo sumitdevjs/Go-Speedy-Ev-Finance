@@ -143,7 +143,7 @@ export default function ModelsPage() {
           setBranches(res.data.data || []);
         }
       })
-      .catch((err) => console.error('Failed to load branches for stock modal:', err));
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -163,7 +163,7 @@ export default function ModelsPage() {
         setOldEvs(res.data.data || []);
       }
     } catch (err) {
-      console.error('Failed to load old EVs:', err);
+      // silent
     } finally {
       setLoadingOldEvs(false);
     }
@@ -178,7 +178,7 @@ export default function ModelsPage() {
         setWardBreakdown(res.data.data || []);
       }
     } catch (err) {
-      console.error('Failed to load ward stock breakdown:', err);
+      // silent
     } finally {
       setLoadingWardBreakdown(false);
     }
@@ -202,7 +202,7 @@ export default function ModelsPage() {
         setTotalRecords(res.data.pagination?.totalItems || 0);
       }
     } catch (err) {
-      console.error('Failed to load models:', err);
+      // silent
     } finally {
       setLoading(false);
     }

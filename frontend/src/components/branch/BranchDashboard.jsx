@@ -78,7 +78,6 @@ export default function BranchDashboard() {
         setData(res.data.data);
       }
     } catch (err) {
-      console.error('Failed to load branch dashboard:', err);
       // On API error, try to compose from individual endpoints
       await fetchFallbackData();
     } finally {
@@ -125,7 +124,7 @@ export default function BranchDashboard() {
         recentPayments: payments.slice(0, 6),
       }));
     } catch (err) {
-      console.error('Fallback data fetch failed:', err);
+      // silenced fallback error
     }
   };
 

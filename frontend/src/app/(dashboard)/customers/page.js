@@ -107,7 +107,6 @@ export default function CustomersPage() {
         if (res.data.summary) setSummary(res.data.summary);
       }
     } catch (err) {
-      console.error('Error fetching customers:', err);
       toast.error('Failed to load customers');
     } finally {
       setLoading(false);
@@ -124,7 +123,6 @@ export default function CustomersPage() {
         setCustomerDetails(res.data.data);
       }
     } catch (err) {
-      console.error('Error fetching customer details:', err);
       toast.error('Failed to load 360 profile');
     } finally {
       setLoadingDetails(false);

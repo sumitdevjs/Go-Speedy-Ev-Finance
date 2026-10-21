@@ -98,7 +98,7 @@ export default function StaffPage() {
         if (hoRes.data?.success) setHeadOffices(hoRes.data.data || []);
         if (brRes.data?.success) setBranches(brRes.data.data || []);
       } catch (err) {
-        console.error('Failed to load branches dropdown:', err);
+        // silent
       }
     };
     fetchDropdowns();
@@ -154,7 +154,7 @@ export default function StaffPage() {
         setTotalRecords(res.data.pagination?.totalItems || 0);
       }
     } catch (err) {
-      console.error('Failed to load staff:', err);
+      // silent
     } finally {
       setLoading(false);
     }

@@ -206,7 +206,7 @@ export const useAuthStore = create((set, get) => ({
     try {
       await api.post('/api/auth/logout');
     } catch (err) {
-      console.error('Logout error:', err);
+      // Clean up session in finally
     } finally {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('gospeedy_token');

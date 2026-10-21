@@ -47,7 +47,7 @@ export default function BranchSwitcher({ isMobileBar = false }) {
           setHeadOffices(hoRes.data.data || []);
         }
       } catch (err) {
-        console.error('Failed to load branches dropdown:', err);
+        // silent fail
       } finally {
         setLoading(false);
       }

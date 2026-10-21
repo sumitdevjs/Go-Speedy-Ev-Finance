@@ -185,7 +185,7 @@ export default function NewRentalWizardPage() {
         const { isDirectPurchase: _, ...validData } = parsed;
         setFormData((prev) => ({ ...prev, ...validData }));
       } catch (err) {
-        console.warn('Could not parse saved draft:', err);
+        // ignore invalid draft
       }
     }
   }, []);
@@ -473,7 +473,6 @@ export default function NewRentalWizardPage() {
         throw new Error(res.data?.message || 'Submission failed');
       }
     } catch (err) {
-      console.error('Rental registration error:', err);
       setErrorMessage(
         err.response?.data?.message || err.message || 'Failed to issue rental'
       );

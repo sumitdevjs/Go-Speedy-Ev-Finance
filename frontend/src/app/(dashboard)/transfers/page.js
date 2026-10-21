@@ -78,7 +78,6 @@ export default function TransfersPage() {
         setTransfers(res.data.data || []);
       }
     } catch (err) {
-      console.error('Error fetching transfers:', err);
       toast.error('Failed to load transfers');
     } finally {
       setLoading(false);
@@ -94,7 +93,7 @@ export default function TransfersPage() {
       if (modelsRes.data?.success) setModels(modelsRes.data.data || []);
       if (branchesRes.data?.success) setBranches(branchesRes.data.data || []);
     } catch (err) {
-      console.error('Error fetching dropdown data:', err);
+      // silenced error
     }
   };
 

@@ -144,7 +144,7 @@ export default function BranchesPage() {
         setHeadOffices(res.data.data || []);
       }
     } catch (err) {
-      console.error('Failed to load head offices:', err);
+      // silent
     }
   };
 
@@ -165,7 +165,7 @@ export default function BranchesPage() {
         setTotalPages(res.data.meta?.totalPages || 1);
       }
     } catch (err) {
-      console.error('Failed to load branches:', err);
+      // silent
     } finally {
       setLoading(false);
     }

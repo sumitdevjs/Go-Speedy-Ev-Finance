@@ -144,7 +144,7 @@ function AdminDashboard() {
         }
       } catch (_) {}
     } catch (err) {
-      console.error('Error loading dashboard data:', err);
+      // Handled silently
     } finally {
       setLoading(false);
     }

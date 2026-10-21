@@ -104,7 +104,6 @@ export default function RootPage() {
         setError(res?.error || 'Wrong password! Please check your password and try again.');
       }
     } catch (err) {
-      console.error(err);
       setError(err.response?.data?.message || err.message || 'Wrong password! Please check your password and try again.');
     } finally {
       setSubmitting(false);

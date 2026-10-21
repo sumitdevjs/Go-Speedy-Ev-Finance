@@ -91,7 +91,7 @@ export default function PaymentsPage() {
       const bRes = await api.get('/api/branches?limit=100');
       if (bRes.data?.success) setBranches(bRes.data.data || []);
     } catch (e) {
-      console.error('Error fetching filter options:', e);
+      // silent
     }
   };
 
@@ -119,7 +119,7 @@ export default function PaymentsPage() {
         setPayments(res.data.data || []);
       }
     } catch (err) {
-      console.error('Failed to load payments:', err);
+      // silent
     } finally {
       setLoading(false);
     }

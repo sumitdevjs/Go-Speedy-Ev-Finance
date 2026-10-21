@@ -4,7 +4,7 @@ const nextConfig = {
     buildActivity: false,
   },
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
+    removeConsole: true,
   },
   // Proxy all /api/* requests to the backend at local port 5000.
   // This makes cookies work properly (same-origin from the browser's perspective)

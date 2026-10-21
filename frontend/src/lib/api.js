@@ -1,5 +1,21 @@
 import axios from 'axios';
 
+// Silence all browser console output on production/remote domains so clients cannot inspect internal requests or data
+if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+  const noop = () => {};
+  const methods = ['log', 'debug', 'info', 'warn', 'error', 'table', 'trace', 'dir', 'dirxml', 'group', 'groupCollapsed', 'groupEnd', 'time', 'timeEnd', 'timeLog', 'count', 'countReset', 'assert'];
+  methods.forEach((m) => {
+    try {
+      window.console[m] = noop;
+      Object.defineProperty(window.console, m, {
+        value: noop,
+        writable: false,
+        configurable: false,
+      });
+    } catch (e) {}
+  });
+}
+
 const api = axios.create({
   baseURL: '', // Always hit the Next.js proxy (/api/...) to avoid CORS and cross-site cookie issues
   withCredentials: true,

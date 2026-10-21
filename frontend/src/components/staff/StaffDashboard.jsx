@@ -105,7 +105,7 @@ export default function StaffDashboard() {
         overdueCount: overdue.length,
       });
     } catch (err) {
-      console.error('Error loading staff dashboard:', err);
+      // silenced error in UI
     } finally {
       setLoading(false);
     }

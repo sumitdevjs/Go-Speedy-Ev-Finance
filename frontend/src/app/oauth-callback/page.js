@@ -75,7 +75,6 @@ export default function OAuthCallbackPage() {
           throw new Error('No user session found after exchange');
         }
       } catch (err) {
-        console.error('OAuth exchange failed:', err);
         setStatus('');
         const msg = err?.response?.data?.message || '';
         if (msg.includes('expired') || msg.includes('Invalid')) {

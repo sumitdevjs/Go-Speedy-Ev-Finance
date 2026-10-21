@@ -164,7 +164,6 @@ export default function CustomExportModal({
       toast.success(`Successfully exported ${dataToExport.length} records!`);
       onClose();
     } catch (err) {
-      console.error('Export error:', err);
       toast.error('Failed to generate export file. Please try again.');
     } finally {
       setIsExporting(false);

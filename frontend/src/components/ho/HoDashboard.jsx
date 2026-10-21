@@ -83,7 +83,7 @@ export default function HoDashboard() {
         setData(res.data.data);
       }
     } catch (err) {
-      console.error('Failed to load HO dashboard:', err);
+      // silenced error
     } finally {
       setLoading(false);
     }

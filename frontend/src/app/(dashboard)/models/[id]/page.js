@@ -56,7 +56,7 @@ export default function ModelViewPage({ params }) {
       .then((res) => {
         if (res.data?.success) setBranches(res.data.data || []);
       })
-      .catch((err) => console.error('Failed to load branches:', err));
+      .catch(() => {});
   }, []);
 
   useEffect(() => {

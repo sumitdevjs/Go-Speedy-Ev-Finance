@@ -8,7 +8,6 @@ import * as XLSX from 'xlsx';
  */
 export const exportToSpreadsheet = (data, filename = 'export', format = 'xlsx') => {
   if (!data || data.length === 0) {
-    console.warn('No data provided for export');
     return;
   }
 

@@ -260,7 +260,7 @@ export default function AuditPage() {
         setTotalRecords(res.data.pagination?.totalItems || 0);
       }
     } catch (err) {
-      console.error('Failed to load audit logs:', err);
+      // silenced error
     } finally {
       setLoading(false);
     }

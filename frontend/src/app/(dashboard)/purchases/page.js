@@ -73,7 +73,7 @@ export default function PurchasesPage() {
         setTotalRecords(res.data.pagination?.totalItems || 0);
       }
     } catch (err) {
-      console.error('Failed to load purchases:', err);
+      // silenced error
     } finally {
       setLoading(false);
     }

@@ -131,7 +131,7 @@ export default function BookingsPage() {
         setModels(modelsRes.data.data || []);
       }
     } catch (err) {
-      console.error('Error fetching bookings:', err);
+      // silenced error
     } finally {
       setLoading(false);
     }
