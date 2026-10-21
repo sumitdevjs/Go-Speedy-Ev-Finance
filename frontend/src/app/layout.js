@@ -38,16 +38,18 @@ export default function RootLayout({ children }) {
               if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
                 (function() {
                   var noop = function() {};
-                  var methods = ['log', 'debug', 'info', 'warn', 'error', 'table', 'trace', 'dir', 'dirxml', 'group', 'groupCollapsed', 'groupEnd', 'time', 'timeEnd', 'timeLog', 'count', 'countReset', 'assert'];
+                  var methods = ['log', 'debug', 'info', 'warn', 'error', 'table', 'trace', 'dir', 'dirxml', 'group', 'groupCollapsed', 'groupEnd', 'time', 'timeEnd', 'timeLog', 'count', 'countReset', 'assert', 'clear'];
                   for (var i = 0; i < methods.length; i++) {
                     try {
-                      window.console[methods[i]] = noop;
                       Object.defineProperty(window.console, methods[i], {
-                        value: noop,
-                        writable: false,
-                        configurable: false,
+                        get: function() { return noop; },
+                        set: function() {},
+                        configurable: true,
+                        enumerable: true,
                       });
-                    } catch (e) {}
+                    } catch (e) {
+                      try { window.console[methods[i]] = noop; } catch (e2) {}
+                    }
                   }
                 })();
               }

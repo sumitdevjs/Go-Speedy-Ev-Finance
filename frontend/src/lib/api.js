@@ -3,16 +3,18 @@ import axios from 'axios';
 // Silence all browser console output on production/remote domains so clients cannot inspect internal requests or data
 if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
   const noop = () => {};
-  const methods = ['log', 'debug', 'info', 'warn', 'error', 'table', 'trace', 'dir', 'dirxml', 'group', 'groupCollapsed', 'groupEnd', 'time', 'timeEnd', 'timeLog', 'count', 'countReset', 'assert'];
+  const methods = ['log', 'debug', 'info', 'warn', 'error', 'table', 'trace', 'dir', 'dirxml', 'group', 'groupCollapsed', 'groupEnd', 'time', 'timeEnd', 'timeLog', 'count', 'countReset', 'assert', 'clear'];
   methods.forEach((m) => {
     try {
-      window.console[m] = noop;
       Object.defineProperty(window.console, m, {
-        value: noop,
-        writable: false,
-        configurable: false,
+        get: () => noop,
+        set: () => {},
+        configurable: true,
+        enumerable: true,
       });
-    } catch (e) {}
+    } catch (e) {
+      try { window.console[m] = noop; } catch (e2) {}
+    }
   });
 }
 
