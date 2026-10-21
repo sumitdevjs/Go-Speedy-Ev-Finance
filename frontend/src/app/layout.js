@@ -31,6 +31,25 @@ export default function RootLayout({ children }) {
           href="https://fonts.googleapis.com/css2?family=Charis+SIL:ital,wght@0,400;0,700;1,400;1,700&display=swap"
           rel="stylesheet"
         />
+        {/* Silence all browser console output on production/remote domains so clients cannot inspect internal requests or data */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                (function() {
+                  var noop = function() {};
+                  window.console.log = noop;
+                  window.console.info = noop;
+                  window.console.warn = noop;
+                  window.console.debug = noop;
+                  window.console.error = noop;
+                  window.console.trace = noop;
+                  window.console.table = noop;
+                })();
+              }
+            `,
+          }}
+        />
       </head>
       <body
         className="min-h-full antialiased text-slate-900 dark:text-slate-100 bg-slate-50 dark:bg-slate-950 transition-colors"

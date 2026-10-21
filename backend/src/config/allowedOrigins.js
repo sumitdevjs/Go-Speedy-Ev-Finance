@@ -20,8 +20,9 @@ function isAllowedOrigin(origin) {
   if (/^https?:\/\/3\.7\.65\.179(:\d+)?$/.test(cleanOrigin)) return true;
   // Automatically allow localhost and 127.0.0.1
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin)) return true;
-  // Automatically allow company domain (both HTTP and HTTPS)
+  // Automatically allow company domains (both HTTP and HTTPS)
   if (/^https?:\/\/([a-z0-9-]+\.)?gospeedy\.in(:\d+)?$/.test(cleanOrigin)) return true;
+  if (/^https?:\/\/([a-z0-9-]+\.)?gospeedyev\.in(:\d+)?$/.test(cleanOrigin)) return true;
   return false;
 }
 
