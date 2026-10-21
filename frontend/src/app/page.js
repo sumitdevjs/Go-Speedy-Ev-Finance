@@ -20,8 +20,6 @@ import { useAuthStore } from '../store/authStore';
 import { gsap } from '../lib/gsap';
 import api from '../lib/api';
 
-
-/* Brand lock-up using BrandLogo */
 function Brand({ size = 'nav' }) {
   return (
     <BrandLogo
@@ -55,7 +53,6 @@ export default function RootPage() {
     setMounted(true);
   }, [checkAuth, router]);
 
-  // Subtle GSAP entrance animation
   useEffect(() => {
     if (!showVideo && mounted) {
       gsap.fromTo(
@@ -80,7 +77,6 @@ export default function RootPage() {
     e.preventDefault();
     setError('');
 
-    // Specific validation messages for required fields
     if (!identifier?.trim() && !password?.trim()) {
       setError('Email / User ID and password are both required.');
       return;
@@ -115,7 +111,6 @@ export default function RootPage() {
 
   return (
     <div className="relative min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-900 dark:text-white flex flex-col overflow-x-hidden select-none transition-colors duration-300">
-      {/* ── MOBILE AMBIENT BACKGROUND ── */}
       <div className="desk:hidden fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <img
           src="/ev-hero-bg.jpg"
@@ -126,7 +121,6 @@ export default function RootPage() {
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] bg-emerald-500/10 rounded-full blur-[90px]" />
       </div>
 
-      {/* ── DESKTOP HERO PHOTO (Cinematic EV fleet background) ── */}
       <div className="hero-bg-layer hidden desk:block fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-y-0 left-0 w-[64%] xl:w-[66%] 2xl:w-[68%] max-w-[calc(50vw_+_320px)] flex items-center">
           <div className="relative w-full h-[92%] max-h-[920px] overflow-hidden">
@@ -135,30 +129,23 @@ export default function RootPage() {
               alt="Go Speedy EV Fleet"
               className="w-full h-full object-cover object-right opacity-85 dark:opacity-100 transition-opacity"
             />
-            {/* Left: typography readability gradient (only behind the text, leaving the scooter clear) */}
             <div className="absolute inset-y-0 left-0 w-[48%] xl:w-[42%] bg-gradient-to-r from-slate-50 via-slate-50/90 to-transparent dark:from-[#070c18] dark:via-[#070c18]/80 dark:to-transparent" />
-            {/* Right: soft fade towards the login card */}
             <div className="absolute inset-y-0 right-0 w-[8%] bg-gradient-to-r from-transparent to-slate-50 dark:to-[#070c18]" />
-            {/* Top & bottom melts */}
             <div className="absolute inset-x-0 top-0 h-[14%] bg-gradient-to-b from-slate-50 via-slate-50/60 to-transparent dark:from-[#070c18] dark:via-[#070c18]/50 dark:to-transparent" />
             <div className="absolute inset-x-0 bottom-0 h-[14%] bg-gradient-to-t from-slate-50 via-slate-50/60 to-transparent dark:from-[#070c18] dark:via-[#070c18]/50 dark:to-transparent" />
           </div>
         </div>
       </div>
 
-      {/* ── NAVBAR ── */}
       <nav className="relative z-20 flex items-center justify-between px-4 xs:px-6 sm:px-8 desk:px-16 py-3 desk:py-5 [@media(max-height:720px)]:desk:!py-3 w-full max-w-[1720px] mx-auto">
         <Brand size="nav" />
         <ThemeToggle variant="glass" />
       </nav>
 
-      {/* ── MAIN CONTENT (Split on desktop, streamlined single-column on mobile) ── */}
       <main className="relative z-10 flex-1 flex flex-col justify-center px-4 xs:px-5 sm:px-8 desk:px-16 py-2 xs:py-4 desk:py-8 [@media(max-height:720px)]:desk:!py-3 w-full max-w-[1720px] mx-auto">
         <div className="w-full grid grid-cols-1 desk:grid-cols-12 desk:gap-10 xl:gap-14 items-center">
 
-          {/* DESKTOP LEFT SIDE: Enterprise Fleet Narrative & Metric Cards (constrained width so scooter stays 100% open) */}
           <div className="gsap-left-content hidden desk:flex desk:col-span-7 flex-col justify-center text-left max-w-[430px] xl:max-w-[460px]">
-            {/* Live Ward Status Pill */}
             <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold tracking-wide self-start mb-5 backdrop-blur-md shadow-xs">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -167,7 +154,6 @@ export default function RootPage() {
               <span>Delhi-NCR Smart EV Mobility Network • Live Operations</span>
             </div>
 
-            {/* Authoritative Headline */}
             <h1 className="text-4xl xl:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-[1.12]">
               Enterprise EV Fleet &amp; <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 dark:from-emerald-400 dark:via-teal-300 dark:to-cyan-400">
@@ -175,12 +161,10 @@ export default function RootPage() {
               </span>
             </h1>
 
-            {/* Subtitle */}
             <p className="text-sm xl:text-base text-slate-600 dark:text-slate-300/85 mt-3.5 leading-relaxed font-normal">
               Unified enterprise portal for city-wide scooter deployment, battery telemetry, automated rent reconciliation, and multi-tier fleet access.
             </p>
 
-            {/* 3 Metric Cards */}
             <div className="grid grid-cols-3 gap-2.5 mt-6 max-w-[440px]">
               <div className="p-4 rounded-2xl bg-white/90 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-900/80 border border-slate-200/90 dark:border-white/[0.08] hover:border-emerald-500/40 backdrop-blur-md transition-all group shadow-sm dark:shadow-none">
                 <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-3 group-hover:scale-105 transition-transform">
@@ -207,7 +191,6 @@ export default function RootPage() {
               </div>
             </div>
 
-            {/* Bottom Status / Security Bar */}
             <div className="mt-8 pt-5 border-t border-slate-200/80 dark:border-white/[0.08] max-w-[460px] flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
               <div className="flex items-center gap-2 min-w-0">
                 <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -220,7 +203,6 @@ export default function RootPage() {
             </div>
           </div>
 
-          {/* MOBILE BRAND HEADER (Compact, sleek, above card on phone/tablet) */}
           <div className="desk:hidden text-center mb-3 sm:mb-5">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-400 text-xs font-semibold tracking-wider mb-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -234,11 +216,9 @@ export default function RootPage() {
             </p>
           </div>
 
-          {/* LOGIN CARD */}
           <div className="gsap-login-card desk:col-span-5 w-full max-w-[450px] mx-auto desk:mr-0 desk:max-w-[460px] xl:max-w-[480px]">
             <div className="bg-white/95 dark:bg-[#0b1222]/90 backdrop-blur-2xl rounded-2xl sm:rounded-3xl p-5 sm:p-7 xl:p-8 shadow-xl dark:shadow-[0_25px_70px_rgba(0,0,0,0.7)] border border-slate-200/90 dark:border-white/[0.08] text-slate-900 dark:text-white transition-all">
 
-              {/* Header: starts directly from Welcome Back */}
               <div className="mb-4 desk:mb-6">
                 <div className="hidden desk:inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-400 text-xs font-semibold tracking-wider mb-3">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -345,14 +325,12 @@ export default function RootPage() {
                 </button>
               </form>
 
-              {/* Enterprise Security Tag */}
               <div className="mt-5 pt-3.5 border-t border-slate-200/80 dark:border-slate-800/70 flex items-center justify-center gap-2 text-[11px] text-slate-500 font-sans">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 <span>Enterprise 256-Bit SSL Encrypted Session</span>
               </div>
             </div>
 
-            {/* Mobile quick metrics strip (shown only on phone/tablet under the card) */}
             <div className="desk:hidden mt-3.5 w-full grid grid-cols-3 gap-2 text-center">
               <div className="p-2 sm:p-2.5 rounded-xl bg-white/90 dark:bg-slate-900/60 border border-slate-200/80 dark:border-white/[0.06] backdrop-blur-sm shadow-xs">
                 <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white tracking-tight">Delhi-NCR</div>
@@ -371,7 +349,6 @@ export default function RootPage() {
         </div>
       </main>
 
-      {/* ── FOOTER ── */}
       <footer className="relative z-10 pt-2 pb-5 desk:py-5 px-3 xxs:px-4 xs:px-5 sm:px-8 desk:px-16 w-full max-w-[1720px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 text-[11px] xs:text-xs text-slate-500 dark:text-slate-400 text-center sm:text-left">
         <div className="leading-relaxed space-y-0.5">
           <div>

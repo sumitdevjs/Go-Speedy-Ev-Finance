@@ -32,7 +32,6 @@ class RentalsService {
       queryBuilder = queryBuilder.eq('has_pending_docs', query.has_pending_docs === 'true');
     }
 
-    // Insurance status filter
     if (query.insurance_status) {
       const today = new Date().toISOString().split('T')[0];
       if (query.insurance_status === 'scooty_expired') {
@@ -52,7 +51,6 @@ class RentalsService {
 
     if (error) throw error;
 
-    // Safely batch-resolve branch details if branch_id exists on rows
     if (tenants && tenants.some(t => t.branch_id)) {
       try {
         const branchIds = [...new Set(tenants.map(t => t.branch_id).filter(Boolean))];
@@ -64,7 +62,6 @@ class RentalsService {
       } catch (e) { }
     }
 
-    // Fetch total paid for all these tenants to compute balance
     const tenantIds = tenants.map(t => t.id);
     const { data: payments, error: paymentsError } = await supabase
       .from('payments')
@@ -73,7 +70,6 @@ class RentalsService {
 
     if (paymentsError) throw paymentsError;
 
-    // Group payments by tenant
     const paymentsByTenant = payments.reduce((acc, p) => {
       acc[p.tenant_id] = (acc[p.tenant_id] || 0) + Number(p.amount);
       return acc;
@@ -88,7 +84,6 @@ class RentalsService {
       };
     });
 
-    // Optionally filter by overdue_days if requested (done in-memory for now)
     let finalData = enrichedData;
     if (query.overdue_days) {
       const minOverdue = parseInt(query.overdue_days);
@@ -136,14 +131,12 @@ class RentalsService {
   }
 
   async createRental(tenantData, createdBy, req = null) {
-    // Sanitize empty strings to undefined so they are inserted as NULL in DB
     Object.keys(tenantData).forEach(key => {
       if (tenantData[key] === '') {
         delete tenantData[key];
       }
     });
 
-    // Remove fields not in DB schema to prevent PostgREST errors
     delete tenantData.include_gst;
     delete tenantData.gst_percent;
 
@@ -168,7 +161,6 @@ class RentalsService {
       assignedHoId = scope.head_office_id;
     }
 
-    // Prevent new rental if an active one exists for this phone
     if (tenantData.phone) {
       const { data: existingActive } = await supabase
         .from('tenants')
@@ -198,13 +190,11 @@ class RentalsService {
 
       modelTotalPrice = Number(oldEv.price) || 0;
 
-      // Mark old EV as rented or sold
       await supabase
         .from('old_evs')
         .update({ status: tenantData.status === 'direct_purchase' ? 'sold' : 'rented' })
         .eq('id', tenantData.old_ev_id);
     } else {
-      // 1. Fetch Model to get price and check stock
       const { data: model, error: modelError } = await supabase
         .from('ev_models')
         .select('total_price, stock_count')
@@ -216,7 +206,6 @@ class RentalsService {
 
       originalStockCount = model.stock_count;
 
-      // 2. Decrement stock
       const { error: stockError } = await supabase
         .from('ev_models')
         .update({ stock_count: model.stock_count - 1 })
@@ -227,10 +216,8 @@ class RentalsService {
       modelTotalPrice = model.total_price;
     }
 
-    // 3. Compute dates and validate against back-dating
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // Validate Contract Start Date for rentals (no back-dating)
     if (tenantData.status !== 'direct_purchase' && tenantData.start_date) {
       const sDate = tenantData.start_date.split('T')[0];
       if (sDate < todayStr) {
@@ -238,7 +225,6 @@ class RentalsService {
       }
     }
 
-    // Validate AMC Dates (no back-dating, expire > start)
     if (tenantData.amc_start_date) {
       const amcStart = tenantData.amc_start_date.split('T')[0];
       if (amcStart < todayStr) {
@@ -257,7 +243,6 @@ class RentalsService {
     const expectedEndDate = new Date(startDate);
     expectedEndDate.setMonth(expectedEndDate.getMonth() + totalMonths);
 
-    // Ensure NOT NULL fields are never null for direct_purchase
     if (tenantData.status === 'direct_purchase') {
       tenantData.installment_daily_rate = 0;
       tenantData.installment_frequency = tenantData.installment_frequency || 'daily';
@@ -268,7 +253,6 @@ class RentalsService {
       tenantData.installment_frequency = tenantData.installment_frequency || 'daily';
     }
 
-    // 4. Insert Tenant
     try {
       const { data, error } = await supabase
         .from('tenants')
@@ -290,7 +274,6 @@ class RentalsService {
       if (error) throw error;
       return data;
     } catch (error) {
-      // Rollback stock or old_ev reservation
       if (!isOldEv && tenantData.ev_model_id) {
         await supabase
           .from('ev_models')
@@ -333,17 +316,14 @@ class RentalsService {
       }
     }
 
-    // Sanitize empty strings to undefined so they are updated as NULL in DB
     Object.keys(updates).forEach(key => {
       if (updates[key] === '') {
-        updates[key] = null; // Use null for update to explicitly clear it
+        updates[key] = null;
       }
     });
 
-    // Validate Dates in updates
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // Fetch existing tenant record if needed to compare dates
     const needsExistingCheck = updates.amc_start_date !== undefined || updates.amc_expire_date !== undefined || updates.start_date !== undefined || updates.scooty_policy_expiry !== undefined || updates.rider_policy_expiry !== undefined;
     let existingTenant = null;
     if (needsExistingCheck) {
@@ -389,7 +369,6 @@ class RentalsService {
       throw new Error('Rider Policy Expiry must be strictly after Rider Insurance Start Date.');
     }
 
-    // Handle expected_end_date recalculation if start_date changes
     if (updates.start_date || updates.total_months) {
       const { data: existing, error: err } = await supabase.from('tenants').select('start_date, total_months').eq('id', id).single();
       if (!err && existing) {
@@ -445,7 +424,6 @@ class RentalsService {
       throw new Error('Only active rentals, direct purchases, or completed purchases can be cancelled');
     }
 
-    // 1. Update status
     const { error: cancelError } = await supabase
       .from('tenants')
       .update({ status: 'cancelled' })
@@ -453,7 +431,6 @@ class RentalsService {
 
     if (cancelError) throw cancelError;
 
-    // 2. Insert into old_evs instead of restoring stock to ev_models
     const { data: tenantDetails } = await supabase
       .from('tenants')
       .select('chassis_no, motor_no, controller_no, battery_no, charger_no, ev_model_id, branch_id, head_office_id')
@@ -473,7 +450,7 @@ class RentalsService {
           charger_no: tenantDetails.charger_no,
           branch_id: tenantDetails.branch_id,
           head_office_id: tenantDetails.head_office_id,
-          price: 0, // Admin can update this later
+          price: 0,
           status: 'available'
         }]);
     }
@@ -482,13 +459,11 @@ class RentalsService {
   }
 
   async completeRental(id, req = null) {
-    // Verify it can be completed (outstanding = 0, dp cleared)
     const rental = await this.getRentalById(id, req);
 
     if (rental.status !== 'rented') throw new Error('Rental is not currently active');
 
     const dpOwed = (rental.total_price - (rental.booking_amount || 0)) - (rental.downpayment_paid || 0);
-    // Actually the calculation logic in balanceCalc handles downpayment properly via contractAmount
 
     if (rental.computed_balance.outstanding > 0) {
       throw new Error(`Cannot complete: Outstanding balance is ₹${rental.computed_balance.outstanding}`);
@@ -508,8 +483,6 @@ class RentalsService {
   async checkUniqueHardwareOrPolicy(fields) {
     const { chassis_no, motor_no, controller_no, charger_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number } = fields;
 
-    // buildEqOrFilter escapes values so a comma/parenthesis can't inject
-    // extra filter clauses into the query.
     const orFilter = buildEqOrFilter({
       chassis_no, motor_no, controller_no, charger_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number,
     });
@@ -526,7 +499,6 @@ class RentalsService {
     if (error) throw error;
 
     if (data && data.length > 0) {
-      // Find which one matched to give a specific error message
       const conflict = data[0];
       if (chassis_no && conflict.chassis_no === chassis_no) return { exists: true, message: 'Chassis number already exists in the system.' };
       if (motor_no && conflict.motor_no === motor_no) return { exists: true, message: 'Motor number already exists in the system.' };

@@ -60,7 +60,6 @@ export default function BranchDashboard() {
     recentPayments: [],
   });
 
-  // Modals
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedTenantForPayment, setSelectedTenantForPayment] = useState(null);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
@@ -78,7 +77,6 @@ export default function BranchDashboard() {
         setData(res.data.data);
       }
     } catch (err) {
-      // On API error, try to compose from individual endpoints
       await fetchFallbackData();
     } finally {
       setLoading(false);
@@ -124,13 +122,11 @@ export default function BranchDashboard() {
         recentPayments: payments.slice(0, 6),
       }));
     } catch (err) {
-      // silenced fallback error
     }
   };
 
   const { branch, summary, overdueTenants, recentRentals, staffList, recentPayments } = data;
 
-  // GSAP animations
   useEffect(() => {
     if (!loading) {
       staggerFadeIn('.gsap-branch-kpi', { stagger: 0.07, y: 16, duration: 0.5, hover: true });
@@ -152,7 +148,6 @@ export default function BranchDashboard() {
 
   return (
     <div className="w-full">
-      {/* Header */}
       <Header
         title={branch ? `${branch.name}` : 'Ward Dashboard'}
         subtitle={branch
@@ -187,10 +182,7 @@ export default function BranchDashboard() {
       />
 
       <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-6 pb-8">
-
-        {/* ── WARD IDENTITY BANNER ── */}
         <div className="rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-[#0d1527] dark:via-[#111e38] dark:to-[#0d1527] border border-slate-700/50 dark:border-white/10 p-5 md:p-6 text-white shadow-lg relative overflow-hidden">
-          {/* Background decoration */}
           <div className="absolute inset-0 opacity-5 pointer-events-none">
             <div className="absolute right-0 top-0 w-64 h-64 rounded-full bg-blue-400 blur-3xl -translate-y-1/2 translate-x-1/2" />
             <div className="absolute left-0 bottom-0 w-48 h-48 rounded-full bg-emerald-400 blur-3xl translate-y-1/2 -translate-x-1/4" />
@@ -237,7 +229,6 @@ export default function BranchDashboard() {
               )}
             </div>
 
-            {/* Today's collection pill */}
             <div className="flex items-center gap-3 bg-white/10 dark:bg-white/5 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/10 self-start sm:self-center shrink-0">
               <IndianRupee className="w-5 h-5 text-emerald-400" />
               <div>
@@ -252,9 +243,7 @@ export default function BranchDashboard() {
           </div>
         </div>
 
-        {/* ── 4 KPI STAT CARDS ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-          {/* Stock */}
           <div className="gsap-branch-kpi lg:col-span-1 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">EV Stock</span>
@@ -268,7 +257,6 @@ export default function BranchDashboard() {
             </div>
           </div>
 
-          {/* Active Rentals */}
           <div className="gsap-branch-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Active</span>
@@ -282,7 +270,6 @@ export default function BranchDashboard() {
             </div>
           </div>
 
-          {/* Overdue */}
           <div className="gsap-branch-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Overdue</span>
@@ -296,7 +283,6 @@ export default function BranchDashboard() {
             </div>
           </div>
 
-          {/* Bookings */}
           <div className="gsap-branch-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Bookings</span>
@@ -310,7 +296,6 @@ export default function BranchDashboard() {
             </div>
           </div>
 
-          {/* Staff */}
           <div className="gsap-branch-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Staff</span>
@@ -324,7 +309,6 @@ export default function BranchDashboard() {
             </div>
           </div>
 
-          {/* Total Collections */}
           <div className="gsap-branch-kpi col-span-2 sm:col-span-1 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 shadow-xs flex flex-col justify-between overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Collected</span>
@@ -339,7 +323,6 @@ export default function BranchDashboard() {
           </div>
         </div>
 
-        {/* ── 4 ACTION TILES ── */}
         <div>
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 px-1">
             Fast Desk Actions
@@ -417,9 +400,7 @@ export default function BranchDashboard() {
           </div>
         </div>
 
-        {/* ── TWO FEED COLUMNS: Overdue + Recent Rentals ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Overdue Follow-ups */}
           <Card
             title="Overdue Accounts — Your Ward"
             subtitle="Sorted by days overdue — immediate follow-up needed"
@@ -479,7 +460,6 @@ export default function BranchDashboard() {
             )}
           </Card>
 
-          {/* Recent Rentals */}
           <Card
             title="Recent Rentals — Your Ward"
             subtitle="Latest contracts registered in this branch"
@@ -527,7 +507,6 @@ export default function BranchDashboard() {
           </Card>
         </div>
 
-        {/* ── STAFF IN THIS WARD ── */}
         {staffList.length > 0 && (
           <Card
             title="Staff Members — This Ward"
@@ -558,7 +537,6 @@ export default function BranchDashboard() {
           </Card>
         )}
 
-        {/* ── RECENT PAYMENTS ── */}
         {recentPayments.length > 0 && (
           <Card
             title="Recent Payments — Your Ward"
@@ -597,7 +575,6 @@ export default function BranchDashboard() {
 
       </div>
 
-      {/* Modals */}
       <QuickPaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => { setIsPaymentModalOpen(false); setSelectedTenantForPayment(null); }}

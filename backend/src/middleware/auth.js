@@ -4,7 +4,6 @@ const supabase = require('../config/db');
 
 const requireAuth = async (req, res, next) => {
   try {
-    // We accept access_token from cookie or Authorization Bearer header
     const authHeader = req.headers?.authorization;
     const token = req.cookies?.access_token || (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null);
     
@@ -18,7 +17,6 @@ const requireAuth = async (req, res, next) => {
       return errorResponse(res, 401, 'Unauthorized - Invalid or expired token');
     }
 
-    // Verify user is still active
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
@@ -33,7 +31,6 @@ const requireAuth = async (req, res, next) => {
       return errorResponse(res, 401, 'Unauthorized - Account is deactivated');
     }
 
-    // Super admin detection based on database role
     const isMasterAdmin = user.role === 'super_admin' || (user.role === 'admin' && !user.ward_area);
 
     let effectiveRole = isMasterAdmin ? 'super_admin' : user.role;

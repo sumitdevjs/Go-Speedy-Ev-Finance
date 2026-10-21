@@ -32,16 +32,13 @@ export default function ModelViewPage({ params }) {
   const [savingLogs, setSavingLogs] = useState(false);
   const [error, setError] = useState('');
 
-  // Edit Mode for details
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState({});
 
-  // Logs states
   const [logs, setLogs] = useState([]);
   const [isEditingLogs, setIsEditingLogs] = useState(false);
   const [editableLogs, setEditableLogs] = useState([]);
 
-  // Add Stock state
   const [isAddStockOpen, setIsAddStockOpen] = useState(false);
   const [stockDate, setStockDate] = useState(new Date().toISOString().split('T')[0]);
   const [stockAdded, setStockAdded] = useState('');
@@ -78,7 +75,6 @@ export default function ModelViewPage({ params }) {
           kilometres: data.kilometres?.toString() || '0'
         });
         const fetchedLogs = data.stock_logs || [];
-        // Sort logs descending by date
         fetchedLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
         setLogs(fetchedLogs);
         setEditableLogs(JSON.parse(JSON.stringify(fetchedLogs)));

@@ -14,7 +14,6 @@ import CustomExportModal from '../../../components/ui/CustomExportModal';
 import { useAuthStore } from '../../../store/authStore';
 import { toast } from '../../../lib/toast';
 
-// ── Human-readable action descriptions ──────────────────────────────────────
 const ACTION_LABELS = {
   CREATE_STAFF:      'Added a new staff member',
   UPDATE_STAFF:      'Updated staff details',
@@ -46,7 +45,6 @@ const ACTION_LABELS = {
   LOGOUT:            'User logged out',
 };
 
-// ── Human-readable entity names ──────────────────────────────────────────────
 const ENTITY_LABELS = {
   USERS:       'Staff / Users',
   PAYMENTS:    'Payments',
@@ -56,7 +54,6 @@ const ENTITY_LABELS = {
   EV_MODELS:   'EV Models',
 };
 
-// ── Format a single change field label ──────────────────────────────────────
 const FIELD_LABELS = {
   name:               'Name',
   email:              'Email',
@@ -113,11 +110,9 @@ function formatValue(val, key) {
   }
 
   if (typeof val === 'object') return JSON.stringify(val);
-  // Try to detect ISO date strings
   if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(val)) {
     return new Date(val).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
-  // role / status are stored lowercase (admin, staff, active...) — capitalize for readability
   if ((key === 'role' || key === 'status') && typeof val === 'string') {
     return val.charAt(0).toUpperCase() + val.slice(1);
   }
@@ -144,9 +139,6 @@ function formatChangesForExport(changes) {
   return parts.length > 0 ? parts.join(' | ') : 'No details recorded';
 }
 
-// ── Change diff renderer ─────────────────────────────────────────────────────
-// Shown expanded by default (admin should see "who changed what" without an
-// extra click) — the toggle only lets them collapse a noisy row if they want.
 function ChangeDiff({ changes, isExpanded, onToggle, targetName }) {
   if (!changes || Object.keys(changes).length === 0) {
     return <span className="text-xs text-slate-400">No changes recorded</span>;
@@ -228,7 +220,6 @@ function ChangeDiff({ changes, isExpanded, onToggle, targetName }) {
   );
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
 export default function AuditPage() {
   const { role } = useAuthStore();
   const [logs, setLogs] = useState([]);
@@ -238,7 +229,6 @@ export default function AuditPage() {
   const [totalRecords, setTotalRecords] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
   const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
-  // Track only rows the admin has *manually expanded* — everything starts collapsed.
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   const toggleRow = (id) => {
     setExpandedIds(prev => {
@@ -260,7 +250,6 @@ export default function AuditPage() {
         setTotalRecords(res.data.pagination?.totalItems || 0);
       }
     } catch (err) {
-      // silenced error
     } finally {
       setLoading(false);
     }
@@ -353,9 +342,6 @@ export default function AuditPage() {
       key: 'action',
       className: 'w-[45%] min-w-[350px]',
       render: (row) => {
-        // Skip the " — name" suffix when the actor acted on themselves (e.g. a
-        // self-service forgot-password reset) — "Done By" already shows that name,
-        // repeating it right next to it would just be noise.
         const targetName = row.entity_type === 'users' && row.entity_id !== row.user_id
           ? row.entity_name
           : null;
@@ -427,7 +413,6 @@ export default function AuditPage() {
           />
         </div>
 
-        {/* Universal Custom Export Modal */}
         <CustomExportModal
           isOpen={isCustomExportOpen}
           onClose={() => setIsCustomExportOpen(false)}

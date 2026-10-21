@@ -46,7 +46,6 @@ export default function QuickPaymentModal({
     }
   }, [isOpen, initialTenant]);
 
-  // Search active tenants
   useEffect(() => {
     if (!search || search.length < 2) {
       setTenants([]);
@@ -58,7 +57,6 @@ export default function QuickPaymentModal({
         const res = await api.get(`/api/rentals?search=${encodeURIComponent(search)}&status=rented&limit=6`);
         setTenants(res.data?.data || []);
       } catch (err) {
-        // silenced search error
       } finally {
         setSearching(false);
       }

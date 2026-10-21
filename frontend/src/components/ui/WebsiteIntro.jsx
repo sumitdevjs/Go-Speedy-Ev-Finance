@@ -13,7 +13,6 @@ export default function WebsiteIntro() {
   const line2Ref = useRef(null);
   const line3Ref = useRef(null);
 
-  // Check if intro has already been shown in this browser session
   useEffect(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -27,15 +26,12 @@ export default function WebsiteIntro() {
         }
       }
     } catch (e) {
-      // Fallback
     }
   }, []);
 
-  // GSAP animation runs only once when shouldRender becomes true on initial website load
   useEffect(() => {
     if (!shouldRender || !containerRef.current) return;
 
-    // Respect prefers-reduced-motion
     const prefersReducedMotion =
       typeof window !== 'undefined' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -56,7 +52,6 @@ export default function WebsiteIntro() {
       const tl = gsap.timeline({
         defaults: { ease: 'power3.out' },
         onComplete: () => {
-          // Smooth fade-out into the main website / login page
           gsap.to(containerRef.current, {
             opacity: 0,
             duration: 0.5,
@@ -66,7 +61,6 @@ export default function WebsiteIntro() {
         },
       });
 
-      // 1. Center radial ambient glow
       tl.fromTo(
         glowRef.current,
         { opacity: 0, scale: 0.8 },
@@ -74,7 +68,6 @@ export default function WebsiteIntro() {
         0
       );
 
-      // 2. Brand logo reveal
       tl.fromTo(
         logoRef.current,
         { opacity: 0, y: 16, scale: 0.94 },
@@ -82,7 +75,6 @@ export default function WebsiteIntro() {
         0.08
       );
 
-      // 3. Staggered reveal of all 3 lines
       tl.fromTo(
         [line1Ref.current, line2Ref.current, line3Ref.current],
         { opacity: 0, y: 14 },
@@ -90,10 +82,8 @@ export default function WebsiteIntro() {
         0.24
       );
 
-      // 4. Hold state so user reads all three lines clearly (~1.8 seconds)
       tl.to({}, { duration: 1.8 }, 0.9);
 
-      // 5. Smooth exit transition
       tl.to(
         contentRef.current,
         { opacity: 0, y: -10, scale: 0.98, duration: 0.45, ease: 'power2.inOut' },
@@ -101,7 +91,6 @@ export default function WebsiteIntro() {
       );
     }, containerRef);
 
-    // Allow user to click anywhere or press Escape to skip immediately
     const handleSkip = () => {
       gsap.killTweensOf(containerRef.current);
       gsap.killTweensOf(contentRef.current);
@@ -136,7 +125,6 @@ export default function WebsiteIntro() {
         shouldRender ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none !hidden'
       }`}
       onClick={() => {
-        // Quick skip on click
         gsap.to(containerRef.current, {
           opacity: 0,
           duration: 0.3,
@@ -148,23 +136,18 @@ export default function WebsiteIntro() {
         fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       }}
     >
-      {/* Ambient background glow & subtle vignette */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {/* Subtle dark radial backdrop */}
         <div
           ref={glowRef}
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] sm:w-[620px] md:w-[750px] h-[480px] sm:h-[620px] md:h-[750px] rounded-full bg-gradient-to-tr from-emerald-500/15 via-teal-500/10 to-sky-500/15 blur-[120px] will-change-transform"
         />
-        {/* Edge vignette */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_45%,#050811_95%)]" />
       </div>
 
-      {/* Centered Brand Lockup: Logo + 3 Exact Lines */}
       <div
         ref={contentRef}
         className="relative z-10 flex flex-col items-center justify-center text-center px-6 max-w-4xl mx-auto will-change-transform"
       >
-        {/* Brand Logo */}
         <div ref={logoRef} className="relative mb-5 sm:mb-7 shrink-0">
           <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-2xl -z-10 scale-125" />
           <img
@@ -174,7 +157,6 @@ export default function WebsiteIntro() {
           />
         </div>
 
-        {/* Line 1: Go Speedy Pvt. Ltd */}
         <div
           ref={line1Ref}
           className="text-xs sm:text-sm md:text-base font-semibold tracking-[0.26em] uppercase text-emerald-400 mb-2 sm:mb-3 drop-shadow-sm"
@@ -182,7 +164,6 @@ export default function WebsiteIntro() {
           Go Speedy Pvt. Ltd
         </div>
 
-        {/* Line 2: Welcome to The Future */}
         <h1
           ref={line2Ref}
           className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-tight mb-2 sm:mb-3 drop-shadow-[0_4px_24px_rgba(255,255,255,0.18)]"
@@ -190,7 +171,6 @@ export default function WebsiteIntro() {
           Welcome to The Future
         </h1>
 
-        {/* Line 3: The House of Ev */}
         <p
           ref={line3Ref}
           className="text-sm xs:text-base sm:text-lg md:text-xl font-medium tracking-[0.22em] uppercase text-cyan-300 drop-shadow-sm"
@@ -199,7 +179,6 @@ export default function WebsiteIntro() {
         </p>
       </div>
 
-      {/* Subtle bottom skip hint */}
       <div className="absolute bottom-6 sm:bottom-8 inset-x-0 text-center pointer-events-none">
         <span className="text-[11px] sm:text-xs font-medium tracking-widest text-slate-600 uppercase">
           Click anywhere or press Esc to skip

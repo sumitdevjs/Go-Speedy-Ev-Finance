@@ -1,7 +1,3 @@
-/**
- * Scoping middleware & query helpers for Multi-Branch and Head-Office Hierarchy
- */
-
 let hasBranchSupport = true;
 
 const checkBranchSupport = async () => {
@@ -15,7 +11,6 @@ const checkBranchSupport = async () => {
   return hasBranchSupport;
 };
 
-// Initial check and periodic background refresh
 checkBranchSupport();
 const branchTimer = setInterval(checkBranchSupport, 30000);
 if (branchTimer.unref) branchTimer.unref();
@@ -38,14 +33,6 @@ const getScope = (req) => {
   };
 };
 
-/**
- * Automatically applies scoping filters to a Supabase query builder based on the authenticated user's role.
- *
- * @param {Object} queryBuilder - Supabase query builder instance
- * @param {Object} req - Express request object
- * @param {Object} options - Scoping options (e.g. tableName, overrideBranchId)
- * @returns {Object} queryBuilder with filters applied
- */
 const applyScope = (queryBuilder, req, options = {}) => {
   if (!hasBranchSupport) {
     return queryBuilder;
@@ -63,7 +50,6 @@ const applyScope = (queryBuilder, req, options = {}) => {
   const selectedBranchId = isValidId(rawBranchId) ? rawBranchId.trim() : null;
   const selectedHoId = isValidId(rawHoId) ? rawHoId.trim() : null;
 
-  // 1. Super Admin: full access, with optional query/header filters
   if (scope.isSuperAdmin) {
     if (selectedBranchId) {
       return queryBuilder.eq(branchCol, selectedBranchId);
@@ -74,7 +60,6 @@ const applyScope = (queryBuilder, req, options = {}) => {
     return queryBuilder;
   }
 
-  // 2. HO Admin: strictly scoped to their assigned head office
   if (scope.isHoAdmin) {
     if (scope.userHeadOfficeId) {
       queryBuilder = queryBuilder.eq(hoCol, scope.userHeadOfficeId);
@@ -85,22 +70,16 @@ const applyScope = (queryBuilder, req, options = {}) => {
     return queryBuilder;
   }
 
-  // 3. Branch Admin & Staff: strictly scoped to their assigned branch/ward
   if (scope.isBranchScoped) {
     if (scope.userBranchId) {
       return queryBuilder.eq(branchCol, scope.userBranchId);
     }
-    // Fail-closed: Prevent unscoped global data exposure if user has no assigned branch
     return queryBuilder.eq(branchCol, '00000000-0000-0000-0000-000000000000');
   }
 
   return queryBuilder;
 };
 
-/**
- * Resolves the branch_id and head_office_id when creating a new record.
- * Ensures staff cannot spoof another branch.
- */
 const resolveCreateScope = (req, payload = {}) => {
   if (!hasBranchSupport) {
     return { branch_id: null, head_office_id: null };
@@ -128,7 +107,6 @@ const resolveCreateScope = (req, payload = {}) => {
     };
   }
 
-  // Branch Admin & Staff are forced to their assigned branch & HO
   return {
     branch_id: scope.userBranchId || null,
     head_office_id: scope.userHeadOfficeId || null,

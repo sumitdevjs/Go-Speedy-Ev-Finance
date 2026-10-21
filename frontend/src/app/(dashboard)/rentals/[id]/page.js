@@ -62,12 +62,10 @@ export default function TenantDetailPage() {
   const [loading, setLoading] = useState(true);
   const [isPenaltyModalOpen, setIsPenaltyModalOpen] = useState(false);
 
-  // Edit Mode
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editData, setEditData] = useState({});
 
-  // Record Payment Modal
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('250');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
@@ -77,11 +75,9 @@ export default function TenantDetailPage() {
   const [paymentError, setPaymentError] = useState('');
   const [autoCompleteNotice, setAutoCompleteNotice] = useState(false);
 
-  // Cancel Rental Modal
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
 
-  // Document Viewer Modal
   const [viewingDoc, setViewingDoc] = useState(null);
 
   useEffect(() => {
@@ -152,7 +148,6 @@ export default function TenantDetailPage() {
         setSignedDocs(docsRes.data.data || {});
       }
     } catch (err) {
-      // silenced error
     } finally {
       setLoading(false);
     }
@@ -243,7 +238,6 @@ export default function TenantDetailPage() {
       return;
     }
 
-    // Contract Start Date
     if (editData.start_date) {
       const origStartDate = tenant?.start_date ? tenant.start_date.split('T')[0] : null;
       if (editData.start_date !== origStartDate && editData.start_date < todayStr) {
@@ -252,7 +246,6 @@ export default function TenantDetailPage() {
       }
     }
 
-    // Insurance Start & Expiry dates
     if (editData.scooty_insurance_start) {
       const origScootyStart = tenant?.scooty_insurance_start ? tenant.scooty_insurance_start.split('T')[0] : null;
       if (editData.scooty_insurance_start !== origScootyStart && editData.scooty_insurance_start < todayStr) {
@@ -281,7 +274,6 @@ export default function TenantDetailPage() {
       }
     }
 
-    // AMC Dates
     if (editData.amc_start_date) {
       const origAmcStart = tenant?.amc_start_date ? tenant.amc_start_date.split('T')[0] : null;
       if (editData.amc_start_date !== origAmcStart && editData.amc_start_date < todayStr) {
@@ -332,7 +324,6 @@ export default function TenantDetailPage() {
     }
   };
 
-  // Edit Array Helpers
   const updateReference = (index, field, value) => {
     const newRefs = [...editData.references];
     newRefs[index] = { ...newRefs[index], [field]: value };
@@ -475,7 +466,6 @@ export default function TenantDetailPage() {
       />
 
       <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        {/* Auto Complete Success Banner */}
         {autoCompleteNotice && !isEditMode && (
           <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-800 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -497,7 +487,6 @@ export default function TenantDetailPage() {
           </div>
         )}
 
-        {/* Financial KPI Grid (Hidden in Edit Mode for focus) */}
         {!isEditMode && (
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <Card className="text-center p-4">
@@ -546,13 +535,8 @@ export default function TenantDetailPage() {
           </div>
         )}
 
-        {/* Details & Documents Tabs/Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Main Details (Personal, Hardware, Contract) */}
           <Card title={isEditMode ? "Edit Profile & Contract" : "Vehicle & Contract Profile"} className="lg:col-span-2">
-            
-            {/* PERSONAL INFO (Only shown as editable in Edit Mode) */}
             {isEditMode && (
               <>
                 <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Personal Details</h4>
@@ -725,7 +709,6 @@ export default function TenantDetailPage() {
                 )}
               </div>
 
-              {/* Scooty Insurance */}
               <div>
                 {isEditMode ? (
                   <Input
@@ -822,7 +805,6 @@ export default function TenantDetailPage() {
                 )}
               </div>
               
-              {/* Rider Insurance */}
               <div>
                 {isEditMode ? (
                   <Input
@@ -1151,7 +1133,6 @@ export default function TenantDetailPage() {
               </>
             )}
 
-            {/* Reference & Guarantors summary */}
             {tenant.status !== 'direct_purchase' && (
               <div className="mt-6 pt-5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                 <div>
@@ -1346,7 +1327,6 @@ export default function TenantDetailPage() {
                 </div>
           </Card>
 
-          {/* Documents Vault */}
           <Card title={isEditMode ? "Edit Documents" : "Secured Documents"}>
             <div className="space-y-3">
               {[
@@ -1404,7 +1384,6 @@ export default function TenantDetailPage() {
           </Card>
         </div>
 
-        {/* Payment History Timeline (Hidden in edit mode) */}
         {!isEditMode && (
           <Card
             title="Payment Ledger & Collection Timeline"
@@ -1468,7 +1447,6 @@ export default function TenantDetailPage() {
         )}
       </div>
 
-      {/* Record Payment Modal */}
       <Modal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
@@ -1546,7 +1524,6 @@ export default function TenantDetailPage() {
         </form>
       </Modal>
 
-      {/* Cancel Rental/Purchase Confirmation Modal */}
       <Modal
         isOpen={isCancelModalOpen}
         onClose={() => setIsCancelModalOpen(false)}
@@ -1579,8 +1556,6 @@ export default function TenantDetailPage() {
         </div>
       </Modal>
 
-
-      {/* View Document Modal */}
       <Modal
         isOpen={Boolean(viewingDoc)}
         onClose={() => setViewingDoc(null)}
@@ -1596,7 +1571,6 @@ export default function TenantDetailPage() {
         </div>
       </Modal>
 
-      {/* Add Penalty Modal */}
       {isPenaltyModalOpen && tenant && (
         <AddPenaltyModal
           isOpen={isPenaltyModalOpen}

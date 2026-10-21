@@ -18,7 +18,6 @@ export default function BranchSwitcher({ isMobileBar = false }) {
   const isHoAdmin = role === 'ho_admin';
   const canSwitch = isSuperAdmin || isHoAdmin;
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -29,7 +28,6 @@ export default function BranchSwitcher({ isMobileBar = false }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch branches and head offices for switcher
   useEffect(() => {
     if (!canSwitch) return;
 
@@ -47,7 +45,6 @@ export default function BranchSwitcher({ isMobileBar = false }) {
           setHeadOffices(hoRes.data.data || []);
         }
       } catch (err) {
-        // silent fail
       } finally {
         setLoading(false);
       }
@@ -56,7 +53,6 @@ export default function BranchSwitcher({ isMobileBar = false }) {
     fetchDropdownData();
   }, [canSwitch]);
 
-  // If user is regular staff or branch admin without switch privileges:
   if (!canSwitch) {
     const branchName = user?.branch?.name
       ? (user.branch.ward_no ? `Ward ${user.branch.ward_no}: ${user.branch.name}` : user.branch.name)
@@ -82,7 +78,6 @@ export default function BranchSwitcher({ isMobileBar = false }) {
     );
   }
 
-  // Filter branches by search query across names, codes, wards, areas, candidates, and phones
   const filteredBranches = branches.filter((b) => {
     if (!search.trim()) return true;
     const query = search.trim().toLowerCase();
@@ -108,7 +103,6 @@ export default function BranchSwitcher({ isMobileBar = false }) {
     );
   });
 
-  // Group branches by Head Office
   const grouped = filteredBranches.reduce((acc, b) => {
     const hoName = b.head_office?.name || b.head_offices?.name || 'Head Office';
     if (!acc[hoName]) acc[hoName] = [];
@@ -164,7 +158,6 @@ export default function BranchSwitcher({ isMobileBar = false }) {
           }
           onWheel={(e) => e.stopPropagation()}
         >
-          {/* Header & Search */}
           <div className="p-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/90 shrink-0">
             <div className="relative">
               <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -188,7 +181,6 @@ export default function BranchSwitcher({ isMobileBar = false }) {
             </div>
           </div>
 
-          {/* Option List */}
           <div
             data-lenis-prevent
             className="overflow-y-auto flex-1 min-h-0 p-1 divide-y divide-slate-100 dark:divide-slate-800/60 overscroll-contain dropdown-scroll"
@@ -199,7 +191,6 @@ export default function BranchSwitcher({ isMobileBar = false }) {
             onWheel={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}
           >
-            {/* Global All Option (Super Admin or HO Admin) */}
             {(isSuperAdmin || isHoAdmin) && (
               <div className="pb-1">
                 <button
@@ -228,7 +219,6 @@ export default function BranchSwitcher({ isMobileBar = false }) {
               </div>
             )}
 
-            {/* HO-Level Zone View (Super Admin only) */}
             {isSuperAdmin && headOffices.length > 0 && !search.trim() && (
               <div className="py-1 border-t border-slate-100 dark:border-slate-800/60">
                 <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
@@ -264,7 +254,6 @@ export default function BranchSwitcher({ isMobileBar = false }) {
               </div>
             )}
 
-            {/* Groups */}
             {Object.keys(grouped).length === 0 ? (
               <p className="text-xs text-slate-400 text-center py-6">
                 No matching wards found.

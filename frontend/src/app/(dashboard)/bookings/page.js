@@ -49,13 +49,12 @@ export default function BookingsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'pending' | 'converted' | 'cancelled'
+  const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
   const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
 
-  // Form fields
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [modelId, setModelId] = useState('');
@@ -63,7 +62,6 @@ export default function BookingsPage() {
   const [bookingAmount, setBookingAmount] = useState('2000');
   const [notes, setNotes] = useState('');
 
-  // Edit Modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editData, setEditData] = useState({
     id: '',
@@ -76,7 +74,6 @@ export default function BookingsPage() {
   });
   const [isEditing, setIsEditing] = useState(false);
 
-  // Convert Modal (Dedicated Mobile-friendly & Overflow-proof)
   const [convertBookingData, setConvertBookingData] = useState(null);
   const { selectedBranch } = useAuthStore();
 
@@ -84,12 +81,10 @@ export default function BookingsPage() {
     fetchData();
   }, [search, page, statusFilter, selectedBranch]);
 
-  // Reset page when branch changes
   useEffect(() => {
     setPage(1);
   }, [selectedBranch]);
 
-  // Listen to branchChange event for instant reactive refetch
   useEffect(() => {
     const handleBranchChange = () => {
       fetchData();
@@ -98,7 +93,6 @@ export default function BookingsPage() {
     return () => window.removeEventListener('branchChange', handleBranchChange);
   }, [search, page, statusFilter, selectedBranch]);
 
-  // Entrance animation for filter bar
   useEffect(() => {
     staggerFadeIn('.gsap-filter-bar', { y: 14, duration: 0.45, stagger: 0 });
   }, []);
@@ -131,7 +125,6 @@ export default function BookingsPage() {
         setModels(modelsRes.data.data || []);
       }
     } catch (err) {
-      // silenced error
     } finally {
       setLoading(false);
     }
@@ -278,7 +271,6 @@ export default function BookingsPage() {
     }
   };
 
-  // Table columns for Desktop view
   const columns = [
     {
       header: 'Customer',
@@ -412,7 +404,6 @@ export default function BookingsPage() {
       />
 
       <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        {/* Filter bar: Search + Status Filter Pills */}
         <div className="gsap-filter-bar flex flex-col md:flex-row flex-wrap items-stretch md:items-center justify-between gap-3 bg-white/95 dark:bg-slate-900/80 backdrop-blur-xl p-3 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs transition-colors">
           <div className="flex w-full md:max-w-sm md:flex-1 min-w-0 gap-2 items-center">
             <SearchBar
@@ -436,7 +427,6 @@ export default function BookingsPage() {
             </Button>
           </div>
 
-          {/* Status filter tabs for 1-tap mobile filtering */}
           <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 md:pb-0 scrollbar-thin shrink-0">
             {[
               { id: 'all', label: 'All' },
@@ -465,7 +455,6 @@ export default function BookingsPage() {
           </div>
         </div>
 
-        {/* ─── DESKTOP VIEW: Full Table (Hidden on Mobile) ─── */}
         <div className="hidden md:block">
           <Table
             columns={columns}
@@ -476,7 +465,6 @@ export default function BookingsPage() {
           />
         </div>
 
-        {/* ─── MOBILE VIEW: Touch-Friendly Responsive Cards (Visible on Phones & Small Tablets) ─── */}
         <div className="block md:hidden space-y-3.5">
           {loading ? (
             <div className="p-10 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
@@ -500,7 +488,6 @@ export default function BookingsPage() {
                   key={row.id}
                   className="p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl shadow-xs space-y-3 transition-all"
                 >
-                  {/* Card Header: Customer Info & Status Badge */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 font-black text-sm flex items-center justify-center shrink-0 border border-blue-500/20">
@@ -519,7 +506,6 @@ export default function BookingsPage() {
                     <Badge status={row.status} size="sm" />
                   </div>
 
-                  {/* Card Body: Model + Token + Date */}
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <div className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs">
                       <Bike className="w-3.5 h-3.5 text-blue-500 shrink-0" />
@@ -536,7 +522,6 @@ export default function BookingsPage() {
                     </div>
                   </div>
 
-                  {/* Notes & Date Row */}
                   <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 px-0.5">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" /> Booked: {formatDate(row.booking_date)}
@@ -546,11 +531,9 @@ export default function BookingsPage() {
                     )}
                   </div>
 
-                  {/* Card Action Footer */}
                   <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
                     {isPending ? (
                       <div className="flex items-center gap-2">
-                        {/* Primary Convert Button */}
                         <Button
                           variant="primary"
                           size="sm"
@@ -562,7 +545,6 @@ export default function BookingsPage() {
                           <ChevronDown className="w-3.5 h-3.5" />
                         </Button>
 
-                        {/* Edit Button */}
                         <Button
                           variant="outline"
                           size="sm"
@@ -584,7 +566,6 @@ export default function BookingsPage() {
                           <Edit className="w-4 h-4" />
                         </Button>
 
-                        {/* Cancel Button */}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -615,7 +596,6 @@ export default function BookingsPage() {
           )}
         </div>
 
-        {/* Pagination */}
         <Pagination
           currentPage={page}
           totalPages={totalPages}
@@ -624,8 +604,6 @@ export default function BookingsPage() {
         />
       </div>
 
-      {/* ─── DEDICATED OVERFLOW-PROOF CONVERT BOOKING MODAL ─── */}
-      {/* Works seamlessly on all phones (never cut off, no table clipping) */}
       <Modal
         isOpen={!!convertBookingData}
         onClose={() => setConvertBookingData(null)}
@@ -634,7 +612,6 @@ export default function BookingsPage() {
       >
         {convertBookingData && (
           <div className="space-y-4">
-            {/* Customer Summary Box */}
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between">
               <div>
                 <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -664,7 +641,6 @@ export default function BookingsPage() {
               Choose how you want to convert this booking:
             </p>
 
-            {/* Option 1: Convert to EV Rental Agreement */}
             <Link
               href={`/rentals/new?booking_id=${convertBookingData.id}&name=${encodeURIComponent(convertBookingData.name)}&phone=${encodeURIComponent(convertBookingData.phone)}&model_id=${convertBookingData.ev_model_id || ''}&amount=${convertBookingData.booking_amount || 0}`}
               onClick={() => setConvertBookingData(null)}
@@ -688,7 +664,6 @@ export default function BookingsPage() {
               </div>
             </Link>
 
-            {/* Option 2: Direct Vehicle Purchase */}
             <Link
               href={`/purchases/new?booking_id=${convertBookingData.id}&name=${encodeURIComponent(convertBookingData.name)}&phone=${encodeURIComponent(convertBookingData.phone)}&model_id=${convertBookingData.ev_model_id || ''}&amount=${convertBookingData.booking_amount || 0}`}
               onClick={() => setConvertBookingData(null)}
@@ -726,7 +701,6 @@ export default function BookingsPage() {
         )}
       </Modal>
 
-      {/* ─── NEW BOOKING MODAL ─── */}
       <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -820,7 +794,6 @@ export default function BookingsPage() {
         </form>
       </Modal>
 
-      {/* ─── EDIT BOOKING MODAL ─── */}
       <Modal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
@@ -901,7 +874,6 @@ export default function BookingsPage() {
         </form>
       </Modal>
 
-      {/* Universal Custom Export Modal */}
       <CustomExportModal
         isOpen={isCustomExportOpen}
         onClose={() => setIsCustomExportOpen(false)}

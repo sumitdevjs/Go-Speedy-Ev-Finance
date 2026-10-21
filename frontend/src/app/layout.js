@@ -31,7 +31,6 @@ export default function RootLayout({ children }) {
           href="https://fonts.googleapis.com/css2?family=Charis+SIL:ital,wght@0,400;0,700;1,400;1,700&display=swap"
           rel="stylesheet"
         />
-        {/* Silence all browser console output on production/remote domains so clients cannot inspect internal requests or data */}
         <script
           dangerouslySetInnerHTML={{
             __html: `

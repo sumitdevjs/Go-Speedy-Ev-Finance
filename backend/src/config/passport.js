@@ -3,11 +3,6 @@ const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
 const env = require('./env');
 const authService = require('../modules/auth/auth.service');
 
-/**
- * Configure Passport with Google OAuth 2.0 strategy.
- * We use a stateless JWT approach so we only use passport for the
- * OAuth dance itself — no session serialisation needed.
- */
 if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
   const callbackURL =
     env.GOOGLE_CALLBACK_URL ||
@@ -42,8 +37,6 @@ if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
   console.warn('⚠️  Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env');
 }
 
-// Minimal serialise/deserialise — only needed by express-session for the
-// brief period between the OAuth callback and the redirect.
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
 

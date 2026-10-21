@@ -46,7 +46,6 @@ export default function ReturnEvModal({
         const res = await api.get(`/api/rentals?search=${encodeURIComponent(search)}&status=rented&limit=6`);
         setTenants(res.data?.data || []);
       } catch (err) {
-        // silenced search error
       } finally {
         setSearching(false);
       }

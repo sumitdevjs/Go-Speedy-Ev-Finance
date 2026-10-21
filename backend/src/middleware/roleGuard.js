@@ -1,7 +1,6 @@
 const { errorResponse } = require('../utils/response');
 
 const requireRole = (...roles) => {
-  // Support both requireRole('admin', 'staff') and requireRole(['admin', 'staff'])
   const allowedRoles = Array.isArray(roles[0]) ? roles[0] : roles;
 
   return (req, res, next) => {
@@ -10,7 +9,6 @@ const requireRole = (...roles) => {
     }
 
     const userRole = req.user.role;
-    // super_admin always has access if 'admin' is allowed
     const hasPermission = allowedRoles.includes(userRole) || 
       (allowedRoles.includes('admin') && userRole === 'super_admin');
 
@@ -22,7 +20,6 @@ const requireRole = (...roles) => {
   };
 };
 
-// Common usage helpers
 const requireSuperAdmin = requireRole('super_admin', 'admin');
 const requireHoAdmin = requireRole('super_admin', 'ho_admin', 'admin');
 const requireBranchAdmin = requireRole('super_admin', 'ho_admin', 'branch_admin', 'admin');

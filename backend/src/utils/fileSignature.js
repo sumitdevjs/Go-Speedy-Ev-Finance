@@ -1,9 +1,7 @@
-// Detects a file's real type from its magic bytes — a client can freely lie
-// about Content-Type or extension, so that alone can't be trusted.
 const SIGNATURES = [
   { mime: 'image/jpeg', bytes: [0xff, 0xd8, 0xff] },
   { mime: 'image/png', bytes: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] },
-  { mime: 'application/pdf', bytes: [0x25, 0x50, 0x44, 0x46] }, // %PDF
+  { mime: 'application/pdf', bytes: [0x25, 0x50, 0x44, 0x46] },
 ];
 
 function matchesSignature(buffer, bytes) {
@@ -19,8 +17,6 @@ function isWebp(buffer) {
   return buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP';
 }
 
-// Returns the verified mime type, or null if the content doesn't match any
-// allowed format (SVG/HTML/executables included — never allowed here).
 function detectFileType(buffer) {
   if (isWebp(buffer)) return 'image/webp';
   for (const sig of SIGNATURES) {

@@ -6,17 +6,10 @@ import { Draggable } from 'gsap/Draggable';
 import { Flip } from 'gsap/Flip';
 import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
 
-// Register plugins safely on client-side
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger, Draggable, Flip, MotionPathPlugin);
 }
 
-/**
- * Animate numbers counting up smoothly
- * @param {HTMLElement|string} target - DOM element or selector
- * @param {number} endValue - final target number
- * @param {object} options - format options (prefix, suffix, decimals, duration)
- */
 export const animateCounter = (target, endValue, options = {}) => {
   if (typeof window === 'undefined' || !target) return;
   const {
@@ -49,11 +42,6 @@ export const animateCounter = (target, endValue, options = {}) => {
   });
 };
 
-/**
- * Staggered entrance animation for lists, grid cards, or rows
- * @param {Array|NodeList|string} elements
- * @param {object} options
- */
 export const staggerFadeIn = (elements, options = {}) => {
   if (typeof window === 'undefined' || !elements) return;
   const {
@@ -63,12 +51,12 @@ export const staggerFadeIn = (elements, options = {}) => {
     scale = 0.97,
     ease = 'back.out(1.4)',
     delay = 0,
-    hover = false, // also give each element a subtle lift-on-hover (see attachCardHover)
+    hover = false,
   } = options;
 
   if (hover) {
     gsap.utils.toArray(elements).forEach((el) => {
-      if (el.dataset.gsapHoverBound) return; // don't rebind on every re-render
+      if (el.dataset.gsapHoverBound) return;
       el.dataset.gsapHoverBound = 'true';
       attachCardHover(el);
     });
@@ -90,10 +78,6 @@ export const staggerFadeIn = (elements, options = {}) => {
   );
 };
 
-/**
- * Smooth pop & scale animation for modals
- * @param {HTMLElement} modalContentElement
- */
 export const animateModalIn = (modalContentElement) => {
   if (typeof window === 'undefined' || !modalContentElement) return;
   gsap.killTweensOf(modalContentElement);
@@ -110,11 +94,6 @@ export const animateModalIn = (modalContentElement) => {
   );
 };
 
-/**
- * Smooth exit animation for modals before unmounting
- * @param {HTMLElement} modalContentElement
- * @param {Function} onComplete
- */
 export const animateModalOut = (modalContentElement, onComplete) => {
   if (typeof window === 'undefined' || !modalContentElement) {
     onComplete?.();
@@ -130,10 +109,6 @@ export const animateModalOut = (modalContentElement, onComplete) => {
   });
 };
 
-/**
- * Subtle interactive 3D physics hover on interactive cards
- * @param {HTMLElement} element
- */
 export const attachCardHover = (element) => {
   if (typeof window === 'undefined' || !element) return () => {};
 
@@ -166,3 +141,4 @@ export const attachCardHover = (element) => {
 
 export { gsap, ScrollTrigger, Draggable, Flip, MotionPathPlugin };
 export default gsap;
+

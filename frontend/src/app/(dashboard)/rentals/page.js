@@ -40,12 +40,10 @@ export default function RentalsListPage() {
     fetchRentals();
   }, [search, statusFilter, overdueFilter, insuranceFilter, page, showCancelled, selectedBranch]);
 
-  // Reset page when branch changes
   useEffect(() => {
     setPage(1);
   }, [selectedBranch]);
 
-  // Listen to branchChange event for instant reactive refetch
   useEffect(() => {
     const handleBranchChange = () => {
       fetchRentals();
@@ -54,7 +52,6 @@ export default function RentalsListPage() {
     return () => window.removeEventListener('branchChange', handleBranchChange);
   }, [search, statusFilter, overdueFilter, insuranceFilter, page, showCancelled, selectedBranch]);
 
-  // One-time entrance for the header/filter chrome when the page first mounts.
   useEffect(() => {
     staggerFadeIn('.gsap-filter-bar', { y: 14, duration: 0.45, stagger: 0 });
   }, []);
@@ -85,7 +82,6 @@ export default function RentalsListPage() {
         setTotalRecords(res.data.pagination?.totalItems || 0);
       }
     } catch (err) {
-      // silent
     } finally {
       setLoading(false);
     }
@@ -328,7 +324,6 @@ export default function RentalsListPage() {
       />
 
       <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        {/* Filters and Search Bar */}
         <div className="gsap-filter-bar flex flex-col xl:flex-row flex-wrap items-stretch xl:items-center justify-between gap-3 sm:gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
           <div className="flex w-full xl:max-w-md xl:flex-1 min-w-0 gap-2 items-center">
             <SearchBar
@@ -410,7 +405,6 @@ export default function RentalsListPage() {
           </div>
         </div>
 
-        {/* Tenant Table */}
         <Table
           columns={columns}
           data={tenants}
@@ -427,7 +421,6 @@ export default function RentalsListPage() {
         />
       </div>
 
-      {/* Universal Custom Export Modal */}
       <CustomExportModal
         isOpen={isCustomExportOpen}
         onClose={() => setIsCustomExportOpen(false)}

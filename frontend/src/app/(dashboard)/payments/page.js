@@ -61,20 +61,17 @@ export default function PaymentsPage() {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [modeFilter, setModeFilter] = useState('all'); // 'all', 'cash', 'online'
-  const [datePreset, setDatePreset] = useState('all'); // 'all', 'today', 'this_week', 'this_month'
+  const [modeFilter, setModeFilter] = useState('all');
+  const [datePreset, setDatePreset] = useState('all');
   const [selectedHo, setSelectedHo] = useState('');
   const [selectedWard, setSelectedWard] = useState('');
 
-  // Dropdown options
   const [headOffices, setHeadOffices] = useState([]);
   const [branches, setBranches] = useState([]);
 
-  // Pagination
   const [page, setPage] = useState(1);
   const pageSize = 12;
 
-  // Export Modal
   const [isExportOpen, setIsExportOpen] = useState(false);
 
   useEffect(() => {
@@ -90,9 +87,7 @@ export default function PaymentsPage() {
       }
       const bRes = await api.get('/api/branches?limit=100');
       if (bRes.data?.success) setBranches(bRes.data.data || []);
-    } catch (e) {
-      // silent
-    }
+    } catch (e) {}
   };
 
   const fetchPayments = async () => {
@@ -119,13 +114,11 @@ export default function PaymentsPage() {
         setPayments(res.data.data || []);
       }
     } catch (err) {
-      // silent
     } finally {
       setLoading(false);
     }
   };
 
-  // Helper to format exact collection time
   const formatTime = (isoString) => {
     if (!isoString) return '—';
     try {
@@ -140,7 +133,6 @@ export default function PaymentsPage() {
     }
   };
 
-  // Date Presets filter
   const dateFilteredPayments = useMemo(() => {
     if (datePreset === 'all') return payments;
     const now = new Date();
@@ -164,7 +156,6 @@ export default function PaymentsPage() {
     });
   }, [payments, datePreset]);
 
-  // Client search filter
   const filteredPayments = useMemo(() => {
     if (!search.trim()) return dateFilteredPayments;
     const q = search.toLowerCase();
@@ -194,12 +185,10 @@ export default function PaymentsPage() {
     });
   }, [dateFilteredPayments, search]);
 
-  // Pagination calculation
   const totalItems = filteredPayments.length;
   const totalPages = Math.ceil(totalItems / pageSize) || 1;
   const paginatedPayments = filteredPayments.slice((page - 1) * pageSize, page * pageSize);
 
-  // Summary Metrics
   const metrics = useMemo(() => {
     const totalAmount = filteredPayments.reduce((acc, p) => acc + Number(p.amount || 0), 0);
     const cashAmount = filteredPayments
@@ -219,7 +208,6 @@ export default function PaymentsPage() {
     };
   }, [filteredPayments]);
 
-  // Transform row for CSV / Excel Universal Export
   const transformPaymentExportRow = (p) => {
     const timeFormatted = formatTime(p.created_at);
     return {

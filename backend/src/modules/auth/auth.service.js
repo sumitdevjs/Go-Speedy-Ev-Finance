@@ -5,12 +5,8 @@ const { generateAccessToken } = require('../../utils/jwt');
 const emailService = require('../../services/email.service');
 const { logAudit } = require('../../utils/auditLog');
 
-/**
- * Service to handle authentication logic
- */
 class AuthService {
   constructor() {
-    // In-memory cache for OTPs as a resilient fallback
     this.otpCache = new Map();
   }
 
@@ -25,7 +21,6 @@ class AuthService {
 
     const isEmail = cleanId.includes('@');
 
-    // Direct Database Authentication for all roles (Super Admin, HO Admin, Ward Admin, Staff)
     let query = supabase.from('users').select('*');
     if (isEmail) {
       query = query.ilike('email', cleanId.toLowerCase());
@@ -46,7 +41,6 @@ class AuthService {
       throw new Error('Your account is deactivated. Kindly contact admin.');
     }
 
-    // Check password
     if (!user.password_hash) {
       throw new Error('No password set for this account. Please use Google Sign-In or Reset Password.');
     }
@@ -55,12 +49,10 @@ class AuthService {
       throw new Error('Wrong password! Please check your password and try again.');
     }
 
-    // Generate Tokens
     return this._generateTokens(user);
   }
 
   async refresh(refreshToken, userId) {
-    // Find user
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
@@ -71,18 +63,15 @@ class AuthService {
       throw new Error('Invalid session');
     }
 
-    // Check expiry
     if (new Date(user.refresh_token_expires_at) < new Date()) {
       throw new Error('Refresh token expired');
     }
 
-    // Verify token
     const isMatch = await bcrypt.compare(refreshToken, user.refresh_token_hash);
     if (!isMatch) {
       throw new Error('Invalid refresh token');
     }
 
-    // Generate Tokens (Rotates the refresh token)
     return this._generateTokens(user);
   }
 
@@ -117,13 +106,11 @@ class AuthService {
       branch_id: branchId,
     });
 
-    // Generate new refresh token
     const refreshToken = crypto.randomBytes(64).toString('hex');
     const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+    expiresAt.setDate(expiresAt.getDate() + 7);
 
-    // Store hash in DB
     const { error } = await supabase
       .from('users')
       .update({
@@ -156,7 +143,6 @@ class AuthService {
     const oauthId = String(profile.id);
     const name = profile.displayName || profile.name?.givenName || 'Google User';
 
-    // 1. Try to find existing user by oauth_id (if column exists)
     try {
       const { data: byOAuth, error: oauthErr } = await supabase
         .from('users')
@@ -177,7 +163,6 @@ class AuthService {
       console.warn('[OAuth] oauth_id lookup skipped:', e.message);
     }
 
-    // 2. Try to find by email (user must be pre-registered by Admin)
     if (email) {
       const { data: byEmail, error: emailErr } = await supabase
         .from('users')
@@ -192,32 +177,23 @@ class AuthService {
           throw err;
         }
 
-        // Link OAuth credentials to this admin-created user account
         try {
           await supabase
             .from('users')
             .update({ oauth_provider: 'google', oauth_id: oauthId })
             .eq('id', byEmail.id);
         } catch (_) {
-          // If oauth columns don't exist yet, continue without error
         }
 
         return this._generateTokens({ ...byEmail, oauth_provider: 'google', oauth_id: oauthId });
       }
     }
 
-    // 3. User is NOT found in database!
-    // Strict Access Control: DO NOT allow open self-registration.
-    // Only users whose email was pre-registered by Admin can log in.
     const notRegErr = new Error('Access denied. Your email is not registered. Kindly contact admin.');
     notRegErr.code = 'NOT_REGISTERED';
     throw notRegErr;
   }
 
-  /**
-   * Request Password Reset OTP
-   * Generates a 6-digit OTP, stores its hash with a 10-min expiry, and emails it.
-   */
   async requestPasswordReset(email) {
     if (!email) {
       throw new Error('Email address is required.');
@@ -225,7 +201,6 @@ class AuthService {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // Look up user by email
     const { data: user, error } = await supabase
       .from('users')
       .select('id, name, email, is_active')
@@ -240,19 +215,16 @@ class AuthService {
       throw new Error('This account is deactivated. Kindly contact the administrator.');
     }
 
-    // Generate secure 6-digit numeric OTP
     const otp = String(crypto.randomInt(100000, 1000000));
     const otpHash = await bcrypt.hash(otp, 10);
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Store in memory cache as immediate guarantee
     this.otpCache.set(cleanEmail, {
       otpHash,
       expiresAt: expiresAt.getTime(),
       userId: user.id,
     });
 
-    // Also persist in database (if columns exist)
     try {
       await supabase
         .from('users')
@@ -265,7 +237,6 @@ class AuthService {
       console.warn('[Password Reset] DB persistence note (fallback to memory cache):', dbErr.message);
     }
 
-    // Send the email via Gmail SMTP
     await emailService.sendOtpEmail(cleanEmail, otp, user.name || 'User');
 
     return {
@@ -274,9 +245,6 @@ class AuthService {
     };
   }
 
-  /**
-   * Verify OTP and Reset Password
-   */
   async resetPasswordWithOtp(email, otp, newPassword, ip) {
     if (!email || !otp || !newPassword) {
       throw new Error('Email, OTP code, and new password are all required.');
@@ -289,7 +257,6 @@ class AuthService {
     const cleanEmail = email.trim().toLowerCase();
     const cleanOtp = String(otp).trim();
 
-    // Look up user
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
@@ -304,7 +271,6 @@ class AuthService {
       throw new Error('This account is deactivated. Kindly contact the administrator.');
     }
 
-    // Check OTP: First check DB, fallback to in-memory cache
     let storedHash = user.reset_otp_hash;
     let storedExpiry = user.reset_otp_expires_at ? new Date(user.reset_otp_expires_at).getTime() : null;
 
@@ -323,22 +289,18 @@ class AuthService {
       throw new Error('The OTP code has expired. Please request a new code.');
     }
 
-    // Compare OTP
     const isOtpValid = await bcrypt.compare(cleanOtp, storedHash);
     if (!isOtpValid) {
       throw new Error('Invalid OTP code. Please check the code in your email.');
     }
 
-    // Hash the new password
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
-    // Update password in database and clear reset OTP fields
     const updatePayload = {
       password_hash: newPasswordHash,
       updated_at: new Date().toISOString(),
     };
 
-    // Try clearing reset_otp columns if they exist
     try {
       updatePayload.reset_otp_hash = null;
       updatePayload.reset_otp_expires_at = null;
@@ -350,7 +312,6 @@ class AuthService {
       .eq('id', user.id);
 
     if (updateErr && updateErr.message?.includes('reset_otp')) {
-      // Columns don't exist yet in Supabase schema, update only password_hash
       const fallbackPayload = {
         password_hash: newPasswordHash,
         updated_at: new Date().toISOString(),
@@ -367,11 +328,8 @@ class AuthService {
       throw new Error('Failed to update password. Please try again.');
     }
 
-    // Clear cache
     this.otpCache.delete(cleanEmail);
 
-    // Never log the password itself — just record that a self-service reset happened,
-    // same convention as the admin-driven CHANGE_PASSWORD entries.
     await logAudit({
       userId: user.id,
       userRole: user.role,
@@ -405,7 +363,6 @@ class AuthService {
       throw new Error('Please enter a valid email address');
     }
 
-    // Check duplicate email or phone if provided
     if (cleanEmail) {
       const { data: existingEmail } = await supabase
         .from('users')
@@ -476,7 +433,6 @@ class AuthService {
       throw new Error('Password must contain at least 1 uppercase letter, 1 number, and 1 special character');
     }
 
-    // Fetch existing user
     const { data: user, error: fetchErr } = await supabase
       .from('users')
       .select('id, role, password_hash')
@@ -487,7 +443,6 @@ class AuthService {
       throw new Error('User not found');
     }
 
-    // If currentPassword is provided, verify it
     if (currentPassword) {
       const match = await bcrypt.compare(currentPassword, user.password_hash || '');
       if (!match) {

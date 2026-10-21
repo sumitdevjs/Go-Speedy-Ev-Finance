@@ -40,15 +40,12 @@ class ReportsService {
       if (p.mode === 'cash') cashTotal += amt;
       else if (p.mode === 'online') onlineTotal += amt;
 
-      // Collector breakdown
       const collectorName = p.users?.name || 'Unknown Staff';
       collectorMap[collectorName] = (collectorMap[collectorName] || 0) + amt;
 
-      // Branch breakdown
       const branchName = p.branches?.name || 'Head Office / Unassigned';
       branchMap[branchName] = (branchMap[branchName] || 0) + amt;
 
-      // Daily trend
       const date = p.payment_date || (p.created_at ? p.created_at.split('T')[0] : 'Unknown');
       dailyMap[date] = (dailyMap[date] || 0) + amt;
     });
@@ -86,7 +83,6 @@ class ReportsService {
       return acc;
     }, {});
 
-    // Fetch manual penalties
     let penaltiesByTenant = {};
     try {
       const { data: pLogs } = await supabase

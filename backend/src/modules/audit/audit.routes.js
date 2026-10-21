@@ -5,7 +5,6 @@ const { requireHoAdmin } = require('../../middleware/roleGuard');
 
 const router = express.Router();
 
-// Admins and Head Office Admins can view audit logs
 router.use(requireAuth);
 router.use(requireHoAdmin);
 

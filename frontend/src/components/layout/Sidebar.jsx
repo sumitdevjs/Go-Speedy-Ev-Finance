@@ -28,11 +28,6 @@ import Badge from '../ui/Badge';
 import BrandLogo from '../ui/BrandLogo';
 import { gsap } from '../../lib/gsap';
 
-/**
- * A group of nav links with one shared "pill" that glides behind whichever
- * item is active — instead of the highlight just popping on/off, it slides
- * and resizes to its new spot every time the route changes.
- */
 function NavGroup({ items, isActive }) {
   const containerRef = useRef(null);
   const indicatorRef = useRef(null);
@@ -50,9 +45,6 @@ function NavGroup({ items, isActive }) {
         return;
       }
 
-      // This same nav renders twice — a desktop copy and a mobile-drawer copy — and
-      // whichever one is currently `display:none` measures a zero-size link. Skip it;
-      // the resize listener below re-places it correctly once that copy becomes visible.
       if (activeLink.offsetHeight === 0) return;
 
       const target = { top: activeLink.offsetTop, height: activeLink.offsetHeight, opacity: 1 };
@@ -66,8 +58,6 @@ function NavGroup({ items, isActive }) {
     place(!isFirstRun.current);
     isFirstRun.current = false;
 
-    // Re-place (snapping, no animation) whenever this copy's visibility/layout could have
-    // changed — e.g. resizing across the lg breakpoint swaps which sidebar copy is shown.
     const onResize = () => place(false);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
@@ -123,7 +113,6 @@ function SidebarInner({ isOpen, onClose }) {
     { name: 'Payment Collections', href: '/payments', icon: Receipt },
   ];
 
-  // Branch admin: same as staff but also sees their ward staff
   const branchAdminNavItems = [
     { name: 'Ward Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Customers & Ledger', href: '/customers', icon: Contact2 },
@@ -161,7 +150,6 @@ function SidebarInner({ isOpen, onClose }) {
     ...(isSuperAdmin ? [{ name: 'Super Admin Profile', href: '/profile', icon: UserCog }] : []),
   ];
 
-  // Derive role label & badge variant
   let roleLabel = 'Staff Desk';
   let badgeVariant = 'emerald';
   if (role === 'super_admin' || role === 'admin') {
@@ -175,7 +163,6 @@ function SidebarInner({ isOpen, onClose }) {
     badgeVariant = 'blue';
   }
 
-  // Branch display label
   const branchDisplay = selectedBranch
     ? (selectedBranch.ward_no ? `Ward ${selectedBranch.ward_no}: ${selectedBranch.name}` : selectedBranch.name)
     : (user?.branch?.name
@@ -189,13 +176,11 @@ function SidebarInner({ isOpen, onClose }) {
 
   return (
     <aside className="w-64 shrink-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 flex flex-col h-full select-none transition-colors">
-      {/* Brand Header */}
       <div className="h-[76px] shrink-0 flex items-center justify-center px-4 border-b border-slate-100 dark:border-slate-800 relative">
         <Link href="/dashboard" className="flex flex-col items-center justify-center">
           <BrandLogo size="sidebar" showText={true} />
         </Link>
 
-        {/* Close button for mobile drawer */}
         <button
           type="button"
           onClick={onClose}
@@ -206,7 +191,6 @@ function SidebarInner({ isOpen, onClose }) {
         </button>
       </div>
 
-      {/* Navigation Section */}
       <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-1" data-lenis-prevent>
         <div className="px-3 pb-1 flex items-center justify-between">
           <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
@@ -231,7 +215,6 @@ function SidebarInner({ isOpen, onClose }) {
         )}
       </nav>
 
-      {/* User Card & Logout */}
       <div className="shrink-0 p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/80">
         {isSuperAdmin ? (
           <Link
@@ -271,7 +254,6 @@ function SidebarInner({ isOpen, onClose }) {
           </div>
         )}
 
-        {/* Current Active Branch / Ward Tag */}
         <div className="flex items-center gap-1.5 mb-3 px-2 py-1 rounded-md bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 text-[11px] text-slate-600 dark:text-slate-300">
           <MapPin className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0" />
           <span className="truncate font-medium">{branchDisplay}</span>
@@ -293,12 +275,10 @@ function SidebarInner({ isOpen, onClose }) {
 export default function Sidebar({ isOpen, onClose }) {
   const pathname = usePathname();
 
-  // Close mobile sidebar on route change
   useEffect(() => {
     onClose?.();
   }, [pathname]);
 
-  // Prevent body scroll when mobile drawer is open
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -312,12 +292,10 @@ export default function Sidebar({ isOpen, onClose }) {
 
   return (
     <>
-      {/* Desktop static fixed sidebar */}
       <div className="hidden lg:block fixed inset-y-0 left-0 w-64 z-30 h-screen">
         <SidebarInner isOpen={isOpen} onClose={onClose} />
       </div>
 
-      {/* Mobile Backdrop */}
       <div
         className={`fixed inset-0 z-40 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
@@ -325,7 +303,6 @@ export default function Sidebar({ isOpen, onClose }) {
         aria-hidden="true"
       />
 
-      {/* Mobile Slide-in Drawer */}
       <div
         className={`fixed inset-y-0 left-0 z-50 w-64 h-full transition-transform duration-300 ease-in-out lg:hidden shadow-2xl ${isOpen ? 'translate-x-0' : '-translate-x-full'
           }`}

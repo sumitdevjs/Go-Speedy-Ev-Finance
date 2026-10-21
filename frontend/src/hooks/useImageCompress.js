@@ -8,7 +8,6 @@ export function useImageCompress() {
   const compress = async (file) => {
     if (!file) return null;
     
-    // Allow PDFs without compression if applicable
     if (file.type === 'application/pdf') {
       return {
         file,
@@ -20,7 +19,7 @@ export function useImageCompress() {
     setError(null);
 
     const options = {
-      maxSizeMB: 0.3, // 300 KB max
+      maxSizeMB: 0.3,
       maxWidthOrHeight: 1280,
       useWebWorker: true,
       fileType: 'image/webp',
@@ -36,7 +35,6 @@ export function useImageCompress() {
         previewUrl,
       };
     } catch (err) {
-      // Fallback to original file
       setCompressing(false);
       return {
         file,

@@ -1,23 +1,13 @@
 import * as XLSX from 'xlsx';
 
-/**
- * Universal export utility to export JSON data to an Excel (.xlsx) or CSV (.csv) file with auto-calculated column widths.
- * @param {Array} data - Array of objects to be exported
- * @param {String} filename - Name of the output file
- * @param {'xlsx' | 'csv'} format - File format ('xlsx' or 'csv')
- */
 export const exportToSpreadsheet = (data, filename = 'export', format = 'xlsx') => {
   if (!data || data.length === 0) {
     return;
   }
 
-  // Create a new workbook
   const workbook = XLSX.utils.book_new();
-
-  // Convert the array of objects to a worksheet
   const worksheet = XLSX.utils.json_to_sheet(data);
 
-  // Auto-fit column widths based on maximum length in each column
   const headers = Object.keys(data[0] || {});
   const colWidths = headers.map(header => {
     let maxLen = header.length;
@@ -36,35 +26,18 @@ export const exportToSpreadsheet = (data, filename = 'export', format = 'xlsx') 
   const cleanName = filename.replace(/\.(xlsx|csv)$/i, '');
   const finalFilename = `${cleanName}.${ext}`;
 
-  // Append the worksheet to the workbook
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
-
-  // Generate file and trigger download
   XLSX.writeFile(workbook, finalFilename, { bookType: ext });
 };
 
-/**
- * Export to Excel (.xlsx) format
- */
 export const exportToExcel = (data, filename = 'export.xlsx') => {
   exportToSpreadsheet(data, filename, 'xlsx');
 };
 
-/**
- * Export to CSV (.csv) format
- */
 export const exportToCsv = (data, filename = 'export.csv') => {
   exportToSpreadsheet(data, filename, 'csv');
 };
 
-/**
- * Helper to filter records by common date presets (like a bank statement) or custom date range
- * @param {Array} records - List of records
- * @param {String|Function} dateAccessor - Field name or function returning ISO date string
- * @param {String} preset - 'all' | 'today' | 'this_month' | 'last_month' | '3_months' | '6_months' | 'this_year' | 'custom'
- * @param {String} [customFrom] - YYYY-MM-DD
- * @param {String} [customTo] - YYYY-MM-DD
- */
 export const filterRecordsByDateRange = (records, dateAccessor, preset = 'all', customFrom = '', customTo = '') => {
   if (!Array.isArray(records) || records.length === 0 || preset === 'all') {
     return records;
@@ -121,19 +94,11 @@ export const filterRecordsByDateRange = (records, dateAccessor, preset = 'all', 
   });
 };
 
-/**
- * Robustly fetches ALL records across pages in chunks to avoid Supabase row limits.
- * @param {Object} api - Axios api instance
- * @param {String} endpoint - API route (e.g. '/api/rentals')
- * @param {Object} params - Query parameters
- * @param {Number} chunkSize - Number of records per request (default: 250)
- * @returns {Promise<Array>} Complete list of records
- */
 export const fetchAllForExport = async (api, endpoint, params = {}, chunkSize = 250) => {
   let allRecords = [];
   let currentPage = 1;
   let hasMore = true;
-  const maxPages = 40; // Safety limit: up to 10,000 records
+  const maxPages = 40;
 
   while (hasMore && currentPage <= maxPages) {
     const res = await api.get(endpoint, {
@@ -166,3 +131,4 @@ export const fetchAllForExport = async (api, endpoint, params = {}, chunkSize = 
 
   return allRecords;
 };
+

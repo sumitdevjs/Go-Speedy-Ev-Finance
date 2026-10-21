@@ -59,32 +59,27 @@ export default function NewRentalWizardPage() {
   const searchParams = useSearchParams();
 
   const [currentStep, setCurrentStep] = useState(1);
-  const [modelType, setModelType] = useState('new'); // 'new' | 'old'
+  const [modelType, setModelType] = useState('new');
   const [models, setModels] = useState([]);
   const [oldEvs, setOldEvs] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Pending Docs Confirmation Modal
   const [isPendingDocsModalOpen, setIsPendingDocsModalOpen] = useState(false);
   const [missingDocsList, setMissingDocsList] = useState([]);
 
-  // Form State
   const isDirectPurchase = false;
   const STEPS = ALL_STEPS;
   const [formData, setFormData] = useState({
-    // Step 1: Model
     ev_model_id: searchParams.get('model_id') || '',
     old_ev_id: '',
 
-    // Step 2: Personal
     name: searchParams.get('name') || '',
     phone: searchParams.get('phone') || '',
     gender: 'male',
     address: '',
     rent_agreement_signed: false,
 
-    // Step 3: Documents
     aadhar_path: '',
     pan_path: '',
     cheque_path: '',
@@ -96,7 +91,6 @@ export default function NewRentalWizardPage() {
     rider_insurance_path: '',
     rider_license_path: '',
 
-    // Step 4: Scooty Hardware
     chassis_no: '',
     motor_no: '',
     controller_no: '',
@@ -109,7 +103,6 @@ export default function NewRentalWizardPage() {
     date_of_purchase: new Date().toISOString().split('T')[0],
     date_of_delivery: new Date().toISOString().split('T')[0],
 
-    // Step 5: Insurance
     scooty_insurance_company: '',
     scooty_policy_number: '',
     scooty_policy_expiry: '',
@@ -124,7 +117,6 @@ export default function NewRentalWizardPage() {
     rider_insurance_start: '',
     notes: '',
 
-    // Step 6: Financial & Downpayment
     booking_amount: Number(searchParams.get('amount') || 0),
     downpayment_paid: 10000,
     downpayment_mode: 'cash',
@@ -133,18 +125,15 @@ export default function NewRentalWizardPage() {
     dp_other_phone: '',
     buyback_amount: '',
 
-    // Step 7: 1 Reference
     references: [
       { category: '', name: '', area: '', phone: '' },
     ],
 
-    // Step 8: 2 Guarantors (1 Male + 1 Female mandatory)
     guarantors: [
       { gender: 'male', name: '', address: '', phone: '' },
       { gender: 'female', name: '', address: '', phone: '' },
     ],
 
-    // Step 9: Installments & Timeline
     installment_daily_rate: '250',
     installment_frequency: 'daily',
     installment_by_self: true,
@@ -155,17 +144,14 @@ export default function NewRentalWizardPage() {
     include_gst: false,
     gst_percent: 0,
 
-    // Step 10: AMC
     amc_amount: '',
     amc_start_date: '',
     amc_expire_date: '',
     amc_service_log: [],
 
-    // Optional booking linkage
     booking_id: searchParams.get('booking_id') || '',
   });
 
-  // Load models & draft
   useEffect(() => {
     api.get('/api/models/dropdown').then((res) => {
       if (res.data?.success) {
@@ -185,12 +171,10 @@ export default function NewRentalWizardPage() {
         const { isDirectPurchase: _, ...validData } = parsed;
         setFormData((prev) => ({ ...prev, ...validData }));
       } catch (err) {
-        // ignore invalid draft
       }
     }
   }, []);
 
-  // Autosave to localStorage
   useEffect(() => {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...formData, isDirectPurchase }));
   }, [formData, isDirectPurchase]);
@@ -402,12 +386,10 @@ export default function NewRentalWizardPage() {
     }
   };
 
-  // Submit Flow with Pending Docs check
   const handleSubmitClick = () => {
     setErrorMessage('');
     if (!validateStep(currentStep)) return;
 
-    // Check missing documents
     const docLabels = [
       { key: 'aadhar_path', label: 'Aadhar Card Photo' },
       { key: 'pan_path', label: 'PAN Card Photo' },
@@ -498,7 +480,6 @@ export default function NewRentalWizardPage() {
       />
 
       <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
-        {/* Step Progress Pills */}
         <div className="bg-white/90 dark:bg-slate-900/60 p-2 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 backdrop-blur-xl card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] overflow-x-auto -webkit-overflow-scrolling-touch transition-colors">
           <div className="flex items-center justify-between w-full">
             {STEPS.map((s, idx) => {
@@ -547,7 +528,6 @@ export default function NewRentalWizardPage() {
           </div>
         </div>
 
-        {/* Error Alert */}
         {errorMessage && (
           <div className="rounded-xl bg-rose-50 border border-rose-200 p-4 text-xs font-semibold text-rose-700 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -555,9 +535,7 @@ export default function NewRentalWizardPage() {
           </div>
         )}
 
-        {/* Wizard Form Card */}
         <Card>
-          {/* STEP 1: MODEL */}
           {currentStep === 1 && (
             <div className="space-y-5">
               <div>
@@ -605,7 +583,6 @@ export default function NewRentalWizardPage() {
                           if (inStock) {
                             updateField('ev_model_id', m.id);
                             updateField('old_ev_id', null);
-                            // Clear pre-filled hardware fields just in case
                             updateField('chassis_no', '');
                             updateField('motor_no', '');
                             updateField('controller_no', '');
@@ -659,7 +636,6 @@ export default function NewRentalWizardPage() {
                           onClick={() => {
                             updateField('old_ev_id', ev.id);
                             updateField('ev_model_id', ev.original_ev_model_id);
-                            // Pre-fill hardware numbers
                             updateField('chassis_no', ev.chassis_no || '');
                             updateField('motor_no', ev.motor_no || '');
                             updateField('controller_no', ev.controller_no || '');
@@ -692,7 +668,6 @@ export default function NewRentalWizardPage() {
             </div>
           )}
 
-          {/* STEP 2: PERSONAL */}
           {currentStep === 2 && (
             <div className="space-y-4">
               <div>
@@ -755,7 +730,6 @@ export default function NewRentalWizardPage() {
             </div>
           )}
 
-          {/* STEP 3: DOCUMENTS */}
           {currentStep === 3 && (
             <div className="space-y-4">
               <div>
@@ -833,7 +807,6 @@ export default function NewRentalWizardPage() {
             </div>
           )}
 
-          {/* STEP 4: SCOOTY HARDWARE */}
           {currentStep === 4 && (
             <div className="space-y-4">
               <div>
@@ -957,7 +930,6 @@ export default function NewRentalWizardPage() {
             </div>
           )}
 
-          {/* STEP 5: INSURANCE DETAILS */}
           {currentStep === 5 && (
             <div className="space-y-4">
               <div>
@@ -1069,7 +1041,6 @@ export default function NewRentalWizardPage() {
             </div>
           )}
 
-          {/* STEP 6: DOWNPAYMENT */}
           {currentStep === 6 && (
             <div className="space-y-4">
               <div>
@@ -1169,7 +1140,6 @@ export default function NewRentalWizardPage() {
             </div>
           )}
 
-          {/* STEP 7: REFERENCE */}
           {currentStep === 7 && (
             <div className="space-y-4">
               <div>
@@ -1228,7 +1198,6 @@ export default function NewRentalWizardPage() {
             </div>
           )}
 
-          {/* STEP 8: 2 GUARANTORS */}
           {currentStep === 8 && (
             <div className="space-y-4">
               <div>
@@ -1276,7 +1245,6 @@ export default function NewRentalWizardPage() {
             </div>
           )}
 
-          {/* STEP 9: INSTALLMENTS & TIMELINE */}
           {currentStep === 9 && (
             <div className="space-y-4">
               <div>
@@ -1407,7 +1375,6 @@ export default function NewRentalWizardPage() {
             </div>
           )}
 
-          {/* STEP 10: AMC */}
           {currentStep === 10 && (
             <div className="space-y-4">
               <div>
@@ -1538,8 +1505,6 @@ export default function NewRentalWizardPage() {
             </div>
           )}
 
-
-          {/* Wizard Footer Controls */}
           <div className="flex items-center justify-between border-t border-slate-100 pt-5 mt-6">
             <Button
               variant="outline"
@@ -1573,7 +1538,6 @@ export default function NewRentalWizardPage() {
         </Card>
       </div>
 
-      {/* Pending Documents Warning Modal */}
       <Modal
         isOpen={isPendingDocsModalOpen}
         onClose={() => setIsPendingDocsModalOpen(false)}

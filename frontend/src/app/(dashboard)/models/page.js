@@ -45,7 +45,7 @@ import CustomExportModal from '../../../components/ui/CustomExportModal';
 
 export default function ModelsPage() {
   const todayStr = new Date().toISOString().split('T')[0];
-  const [activeTab, setActiveTab] = useState('new'); // 'new', 'old', or 'ward_breakdown'
+  const [activeTab, setActiveTab] = useState('new');
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -63,20 +63,17 @@ export default function ModelsPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
-  // Old EVs State
   const [oldEvs, setOldEvs] = useState([]);
   const [loadingOldEvs, setLoadingOldEvs] = useState(false);
   const [isEditPriceOpen, setIsEditPriceOpen] = useState(false);
   const [selectedOldEv, setSelectedOldEv] = useState(null);
   const [editPrice, setEditPrice] = useState('');
 
-  // Ward Stock Matrix State
   const [wardBreakdown, setWardBreakdown] = useState([]);
   const [loadingWardBreakdown, setLoadingWardBreakdown] = useState(false);
   const [wardSearch, setWardSearch] = useState('');
   const [onlyWithStock, setOnlyWithStock] = useState(false);
 
-  // Add Stock state
   const [isAddStockOpen, setIsAddStockOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState(null);
   const [stockDate, setStockDate] = useState(new Date().toISOString().split('T')[0]);
@@ -86,7 +83,6 @@ export default function ModelsPage() {
   const [branches, setBranches] = useState([]);
   const [isStockSubmitting, setIsStockSubmitting] = useState(false);
 
-  // Form fields
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [ward, setWard] = useState('Delhi Central');
@@ -97,7 +93,6 @@ export default function ModelsPage() {
 
   const { selectedBranch, setSelectedBranch } = useAuthStore();
 
-  // Check URL tab parameter on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -112,12 +107,10 @@ export default function ModelsPage() {
     fetchModels();
   }, [search, stockStatus, activeFilter, page, selectedBranch]);
 
-  // Reset page when branch changes
   useEffect(() => {
     setPage(1);
   }, [selectedBranch]);
 
-  // Listen to branchChange custom event for instant updates
   useEffect(() => {
     const handleBranchChange = () => {
       fetchModels();
@@ -131,7 +124,6 @@ export default function ModelsPage() {
     return () => window.removeEventListener('branchChange', handleBranchChange);
   }, [activeTab, page, search, stockStatus, activeFilter, selectedBranch]);
 
-  // One-time entrance animation for the filter bar
   useEffect(() => {
     staggerFadeIn('.gsap-filter-bar', { y: 14, duration: 0.45, stagger: 0 });
   }, []);
@@ -163,7 +155,6 @@ export default function ModelsPage() {
         setOldEvs(res.data.data || []);
       }
     } catch (err) {
-      // silent
     } finally {
       setLoadingOldEvs(false);
     }
@@ -178,7 +169,6 @@ export default function ModelsPage() {
         setWardBreakdown(res.data.data || []);
       }
     } catch (err) {
-      // silent
     } finally {
       setLoadingWardBreakdown(false);
     }
@@ -202,7 +192,6 @@ export default function ModelsPage() {
         setTotalRecords(res.data.pagination?.totalItems || 0);
       }
     } catch (err) {
-      // silent
     } finally {
       setLoading(false);
     }
@@ -521,7 +510,6 @@ export default function ModelsPage() {
               )}
             </div>
 
-            {/* When viewing All Wards (Global), show which wards hold stock for this model */}
             {!isScoped && Array.isArray(row.ward_stock_summary) && row.ward_stock_summary.length > 0 ? (
               <div className="flex flex-wrap items-center gap-1.5">
                 {row.ward_stock_summary.map((ws, idx) => (
@@ -663,7 +651,6 @@ export default function ModelsPage() {
     },
   ];
 
-  // Filtered ward breakdown list
   const filteredWards = wardBreakdown.filter((w) => {
     if (onlyWithStock && w.total_stock <= 0) return false;
     if (!wardSearch.trim()) return true;
@@ -713,7 +700,6 @@ export default function ModelsPage() {
       />
 
       <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        {/* Navigation Tabs */}
         <div className="w-full flex items-center gap-1.5 p-1.5 bg-slate-100/90 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-white/10 overflow-x-auto scrollbar-thin">
           <button
             onClick={() => setActiveTab('new')}
@@ -753,7 +739,6 @@ export default function ModelsPage() {
 
         {activeTab === 'new' ? (
           <>
-            {/* Search & Filter Bar */}
             <div className="gsap-filter-bar flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-3 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
               <div className="flex flex-1 min-w-0 gap-2 items-center">
                 <SearchBar
@@ -802,7 +787,6 @@ export default function ModelsPage() {
               </div>
             </div>
 
-            {/* Desktop Table View */}
             <div className="hidden md:block">
               <Table
                 columns={columns}
@@ -813,7 +797,6 @@ export default function ModelsPage() {
               />
             </div>
 
-            {/* Mobile Touch Cards View */}
             <div className="block md:hidden space-y-3">
               {loading ? (
                 <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800">
@@ -914,7 +897,6 @@ export default function ModelsPage() {
                           </div>
                         </div>
 
-                        {/* When viewing All Wards (Global), show which wards hold stock */}
                         {!isScoped && Array.isArray(m.ward_stock_summary) && m.ward_stock_summary.length > 0 && (
                           <div className="flex flex-wrap gap-1 pt-1">
                             {m.ward_stock_summary.map((ws, idx) => (
@@ -942,9 +924,7 @@ export default function ModelsPage() {
             />
           </>
         ) : activeTab === 'ward_breakdown' ? (
-          /* Ward-Wise Stock Matrix Tab */
           <div className="space-y-6 animate-in fade-in duration-300">
-            {/* Top KPI Banner */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl shadow-xs">
                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Fleet Stock</p>
@@ -969,7 +949,6 @@ export default function ModelsPage() {
               </div>
             </div>
 
-            {/* Filter & Search Bar */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-white/10">
               <div className="flex w-full sm:max-w-md sm:flex-1 min-w-0 gap-2 items-center">
                 <SearchBar
@@ -1005,7 +984,6 @@ export default function ModelsPage() {
               </div>
             </div>
 
-            {/* Ward Stock Cards Grid */}
             {loadingWardBreakdown ? (
               <div className="flex justify-center p-12">
                 <Spinner size="lg" />
@@ -1030,7 +1008,6 @@ export default function ModelsPage() {
                       }`}
                     >
                       <div>
-                        {/* Header */}
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <div className="flex items-center gap-1.5">
@@ -1063,7 +1040,6 @@ export default function ModelsPage() {
                           </div>
                         </div>
 
-                        {/* Candidate / Admin Info */}
                         {w.contact_person && (
                           <div className="mt-3 pt-3 border-t border-slate-100 dark:border-white/5 text-xs text-slate-600 dark:text-slate-400 flex items-center justify-between">
                             <span className="flex items-center gap-1 font-medium truncate">
@@ -1079,7 +1055,6 @@ export default function ModelsPage() {
                           </div>
                         )}
 
-                        {/* Model-by-model breakdown chips */}
                         <div className="mt-3.5 space-y-1.5">
                           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                             Model Inventory Breakdown
@@ -1108,7 +1083,6 @@ export default function ModelsPage() {
                         </div>
                       </div>
 
-                      {/* Card Actions */}
                       <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/10 flex items-center gap-2">
                         <Button
                           variant="primary"
@@ -1139,9 +1113,7 @@ export default function ModelsPage() {
             )}
           </div>
         ) : (
-          /* Returned / Refurbished EVs Tab */
           <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
-            {/* Filter & Search Bar */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-white/10">
               <div className="flex w-full sm:max-w-md sm:flex-1 min-w-0 gap-2 items-center">
                 <SearchBar
@@ -1174,7 +1146,6 @@ export default function ModelsPage() {
         )}
       </div>
 
-      {/* Add/Edit Model Modal */}
       <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -1277,7 +1248,6 @@ export default function ModelsPage() {
         </form>
       </Modal>
 
-      {/* Add Stock Modal */}
       <Modal
         isOpen={isAddStockOpen}
         onClose={() => setIsAddStockOpen(false)}
@@ -1363,7 +1333,6 @@ export default function ModelsPage() {
         </form>
       </Modal>
 
-      {/* Edit Old EV Price Modal */}
       <Modal
         isOpen={isEditPriceOpen}
         onClose={() => setIsEditPriceOpen(false)}
@@ -1401,7 +1370,6 @@ export default function ModelsPage() {
         </form>
       </Modal>
 
-      {/* Universal Custom Export Modal */}
       <CustomExportModal
         isOpen={isCustomExportOpen}
         onClose={() => setIsCustomExportOpen(false)}

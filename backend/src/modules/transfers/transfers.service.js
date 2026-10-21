@@ -19,17 +19,14 @@ class TransfersService {
       created_at: l.created_at || l.changes?.created_at
     })).filter(t => t && t.transfer_id);
 
-    // Filter by status
     if (query.status && query.status !== 'all') {
       transfers = transfers.filter(t => t.status === query.status);
     }
 
-    // Filter by branch
     if (query.branch_id) {
       transfers = transfers.filter(t => t.from_branch_id === query.branch_id || t.to_branch_id === query.branch_id);
     }
 
-    // Role-based scoping
     if (req && req.user) {
       const { role, branch_id } = req.user;
       const isSuper = role === 'super_admin' || (role === 'admin' && !req.user.ward_area);
@@ -38,7 +35,6 @@ class TransfersService {
       }
     }
 
-    // Enrich with model names & branch names
     const { data: models } = await supabase.from('ev_models').select('id, name, company');
     const modelMap = new Map((models || []).map(m => [m.id, m]));
 
@@ -63,7 +59,6 @@ class TransfersService {
 
     const transferId = `TRF-${Date.now()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
 
-    // Look up model & branch names
     const { data: model } = await supabase.from('ev_models').select('name').eq('id', ev_model_id).single();
     const { data: fromBranch } = from_branch_id ? await supabase.from('branches').select('name').eq('id', from_branch_id).single() : { data: null };
     const { data: toBranch } = to_branch_id ? await supabase.from('branches').select('name').eq('id', to_branch_id).single() : { data: null };
@@ -79,7 +74,7 @@ class TransfersService {
       ev_model_id,
       model_name: model?.name || 'EV Bike',
       quantity: Number(quantity),
-      status: 'requested', // requested, in_transit, received, cancelled
+      status: 'requested',
       notes: notes || '',
       initiated_by: user.id,
       initiated_by_name: user.name || 'Admin',
@@ -155,7 +150,6 @@ class TransfersService {
 
     await supabase.from('audit_logs').update({ changes: updated }).eq('id', targetLog.id);
 
-    // Adjust ev_models stock logs if possible
     try {
       const modelId = updated.ev_model_id;
       const { data: model } = await supabase.from('ev_models').select('stock_logs').eq('id', modelId).single();

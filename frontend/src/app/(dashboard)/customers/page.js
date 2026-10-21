@@ -57,32 +57,27 @@ export default function CustomersPage() {
   const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
   const pageSize = 12;
 
-  // 360 Profile Modal State
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerDetails, setCustomerDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Penalty Modal State
   const [penaltyModalTarget, setPenaltyModalTarget] = useState(null);
 
   useEffect(() => {
     fetchCustomers();
   }, [search, statusFilter, selectedBranch]);
 
-  // Reset page when branch or filter changes
   useEffect(() => {
     setPage(1);
   }, [selectedBranch, statusFilter]);
 
-  // Listen to universal branchChange event
   useEffect(() => {
     const handleBranchChange = () => fetchCustomers();
     window.addEventListener('branchChange', handleBranchChange);
     return () => window.removeEventListener('branchChange', handleBranchChange);
   }, [selectedBranch]);
 
-  // GSAP animation entrance
   useEffect(() => {
     if (!loading) {
       staggerFadeIn('.gsap-admin-kpi', { stagger: 0.08, y: 15, duration: 0.5, hover: true });
@@ -197,11 +192,9 @@ export default function CustomersPage() {
     };
   };
 
-  // Pagination slice
   const totalPages = Math.max(1, Math.ceil(customers.length / pageSize));
   const paginatedCustomers = customers.slice((page - 1) * pageSize, page * pageSize);
 
-  // Table Columns (Clean, matching the rest of the application)
   const columns = [
     {
       header: 'Customer & Contact',

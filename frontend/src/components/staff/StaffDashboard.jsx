@@ -51,7 +51,6 @@ export default function StaffDashboard() {
   const [evModels, setEvModels] = useState([]);
   const [todayPayments, setTodayPayments] = useState([]);
 
-  // Modals
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [selectedTenantForPayment, setSelectedTenantForPayment] = useState(null);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
@@ -65,13 +64,11 @@ export default function StaffDashboard() {
     try {
       setLoading(true);
 
-      // 1. Fetch EV Models
       const modelsRes = await api.get('/api/models/dropdown');
       const models = modelsRes.data?.data || [];
       const totalAvailable = models.reduce((sum, m) => sum + (m.stock_count || 0), 0);
       setEvModels(models);
 
-      // 2. Fetch Rentals
       const rentalsRes = await api.get('/api/rentals?limit=100');
       const rentals = rentalsRes.data?.data || [];
       const active = rentals.filter((r) => r.status === 'rented');
@@ -81,17 +78,14 @@ export default function StaffDashboard() {
 
       setOverdueTenants(overdue.slice(0, 5));
 
-      // 3. Fetch Bookings (pending walk-ins)
       const bookingsRes = await api.get('/api/bookings');
       const bookings = bookingsRes.data?.data || [];
       const pending = bookings.filter((b) => b.status === 'pending');
       setPendingBookings(pending.slice(0, 5));
 
-      // 4. Fetch Payments
       const paymentsRes = await api.get('/api/payments?limit=100');
       const payments = paymentsRes.data?.data || [];
 
-      // Filter today's collections
       const todayStr = new Date().toISOString().split('T')[0];
       const todayOnly = payments.filter((p) => (p.payment_date || '').startsWith(todayStr));
       const todayTotal = todayOnly.reduce((sum, p) => sum + Number(p.amount || 0), 0);
@@ -105,7 +99,6 @@ export default function StaffDashboard() {
         overdueCount: overdue.length,
       });
     } catch (err) {
-      // silenced error in UI
     } finally {
       setLoading(false);
     }
@@ -113,12 +106,10 @@ export default function StaffDashboard() {
 
   useEffect(() => {
     if (!loading) {
-      // Stagger action tiles & KPI cards with GSAP
       staggerFadeIn('.gsap-action-card', { stagger: 0.07, y: 14, duration: 0.45, hover: true });
       staggerFadeIn('.gsap-kpi-card', { stagger: 0.05, y: 12, duration: 0.45, delay: 0.05, hover: true });
       staggerFadeIn('.gsap-feed-item', { stagger: 0.04, y: 10, duration: 0.4, delay: 0.1 });
 
-      // Rolling number counters with GSAP
       animateCounter('#gsap-kpi-available', stats.availableStock, { duration: 0.8 });
       animateCounter('#gsap-kpi-pending', stats.pendingBookingsCount, { duration: 0.8 });
       animateCounter('#gsap-kpi-rentals', stats.activeRentalsCount, { duration: 0.8 });

@@ -73,7 +73,6 @@ function AdminDashboard() {
     fetchDashboardData();
   }, [selectedBranch]);
 
-  // Listen to branchChange event for instant reactive refetch
   useEffect(() => {
     const handleBranchChange = () => {
       fetchDashboardData();
@@ -89,32 +88,26 @@ function AdminDashboard() {
       const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
       const bQuery = `branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`;
 
-      // Fetch Models for stock
       const modelsRes = await api.get(`/api/models/dropdown?${bQuery}`);
       const models = modelsRes.data?.data || [];
       const totalStock = models.filter(m => m.is_active).reduce((sum, m) => sum + (m.stock_count || 0), 0);
 
-      // Fetch Used EVs for stock
       const oldEvsRes = await api.get(`/api/old-evs/available?${bQuery}`);
       const oldStock = oldEvsRes.data?.data?.length || 0;
 
-      // Fetch Rentals (Active/Cancelled)
       const rentalsRes = await api.get(`/api/rentals?limit=10000&${bQuery}`);
       const rentals = rentalsRes.data?.data || [];
       const active = rentals.filter((r) => r.status === 'rented');
 
-      // Fetch Purchases (Completed/Direct)
       const purchasesRes = await api.get(`/api/purchases?limit=10000&${bQuery}`);
       const purchases = purchasesRes.data?.data || [];
 
       const allTenants = [...rentals, ...purchases];
 
-      // Calculate overdue tenants
       const overdue = active
         .filter((r) => (r.computed_balance?.daysOverdue || 0) > 0)
         .sort((a, b) => b.computed_balance.daysOverdue - a.computed_balance.daysOverdue);
 
-      // Fetch Payments
       const paymentsRes = await api.get(`/api/payments?limit=10000&${bQuery}`);
       const payments = paymentsRes.data?.data || [];
 
@@ -135,7 +128,6 @@ function AdminDashboard() {
       setOverdueTenants(overdue.slice(0, 6));
       setRecentRentals(rentals.slice(0, 5));
 
-      // Fetch live Ward Fleet Distribution
       try {
         const wbRes = await api.get(`/api/models/ward-breakdown?${bQuery}`);
         if (wbRes.data?.success) {
@@ -144,7 +136,6 @@ function AdminDashboard() {
         }
       } catch (_) {}
     } catch (err) {
-      // Handled silently
     } finally {
       setLoading(false);
     }
@@ -442,7 +433,6 @@ function AdminDashboard() {
                     </button>
 
                     {Array.from({ length: totalWardPages }, (_, i) => i + 1).map((p) => {
-                      // Only show current, first, last and immediate neighbors if many pages
                       if (
                         totalWardPages > 6 &&
                         p !== 1 &&

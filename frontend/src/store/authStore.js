@@ -12,8 +12,8 @@ export const useAuthStore = create((set, get) => ({
   isLoggedIn: false,
   isLoading: false,
   hasCheckedAuth: false,
-  selectedBranch: null,       // null = "All" for super_admin / ho_admin
-  selectedHeadOffice: null,   // For super_admin: which HO zone they are viewing
+  selectedBranch: null,
+  selectedHeadOffice: null,
 
   setUser: (user) => {
     const isSuperAdmin = isMasterSuperAdmin(user);
@@ -32,7 +32,6 @@ export const useAuthStore = create((set, get) => ({
 
   setSelectedBranch: (branch) => {
     const state = get();
-    // Super admins and HO admins can switch branches
     const canSwitch = isMasterSuperAdmin(state.user) || state.user?.role === 'ho_admin';
     if (!canSwitch) return;
 
@@ -43,16 +42,13 @@ export const useAuthStore = create((set, get) => ({
       } else {
         localStorage.removeItem('gospeedy_selected_branch');
       }
-      // Dispatch custom event for dashboard/components to reactively reload
       window.dispatchEvent(new CustomEvent('branchChange', { detail: branch }));
     }
   },
 
-  // Super Admin only: switch to an HO-level aggregate view
   setSelectedHeadOffice: (ho) => {
     const state = get();
     if (!isMasterSuperAdmin(state.user)) return;
-    // Switching to HO view resets any individual branch selection
     set({ selectedHeadOffice: ho, selectedBranch: null });
     if (typeof window !== 'undefined') {
       if (ho) {
@@ -82,7 +78,6 @@ export const useAuthStore = create((set, get) => ({
             const raw = localStorage.getItem('gospeedy_selected_branch');
             if (raw) {
               const parsed = JSON.parse(raw);
-              // For ho_admin: discard stored branch if it belongs to a different HO
               if (isHoAdmin && parsed?.head_office_id && parsed.head_office_id !== user.head_office_id) {
                 localStorage.removeItem('gospeedy_selected_branch');
               } else {
@@ -91,7 +86,6 @@ export const useAuthStore = create((set, get) => ({
             }
           } catch (e) { storedBranch = null; }
 
-          // Super admin: also restore selected HO zone
           if (isSuperAdmin) {
             try {
               const rawHo = localStorage.getItem('gospeedy_selected_ho');
@@ -148,7 +142,6 @@ export const useAuthStore = create((set, get) => ({
             const raw = localStorage.getItem('gospeedy_selected_branch');
             if (raw) {
               const parsed = JSON.parse(raw);
-              // For ho_admin: discard stored branch if it belongs to a different HO
               if (isHoAdmin && parsed?.head_office_id && parsed.head_office_id !== user.head_office_id) {
                 localStorage.removeItem('gospeedy_selected_branch');
               } else {
@@ -193,7 +186,6 @@ export const useAuthStore = create((set, get) => ({
       set({ isLoading: false });
       let message = error.response?.data?.message || error.message || 'Login failed';
 
-      // If there are detailed validation errors, show the first one
       if (error.response?.data?.errors?.length > 0) {
         message = error.response.data.errors[0].message;
       }
@@ -206,7 +198,6 @@ export const useAuthStore = create((set, get) => ({
     try {
       await api.post('/api/auth/logout');
     } catch (err) {
-      // Clean up session in finally
     } finally {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('gospeedy_token');

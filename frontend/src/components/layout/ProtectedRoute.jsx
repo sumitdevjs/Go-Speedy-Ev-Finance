@@ -5,7 +5,6 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '../../store/authStore';
 import Spinner from '../ui/Spinner';
 
-// ALL roles that can access admin-only pages
 const ADMIN_ROLES = ['admin', 'super_admin', 'ho_admin', 'branch_admin'];
 
 export default function ProtectedRoute({ children, adminOnly = false }) {

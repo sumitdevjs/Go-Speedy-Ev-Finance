@@ -29,32 +29,24 @@ const TIME_OPTIONS = [
   { id: 'custom', label: 'Custom Date Range', subtext: 'Pick specific start & end dates', icon: Sparkles },
 ];
 
-/**
- * Universal Easy Export Modal
- * 1. Choose Time Duration (All Time, 3 Months, 6 Months, This Month, Custom)
- * 2. Choose File Format (Excel or CSV)
- * 3. Optional: Customize Columns (Collapsed by default for zero clutter)
- * 4. One-Click Download button
- */
 export default function CustomExportModal({
   isOpen,
   onClose,
   title = 'Export Data',
   subtitle = 'Download records in Excel (.xlsx) or CSV format',
   defaultFilename = 'Export_Report',
-  columns = [], // Array of string or { key, label }
+  columns = [],
   dateAccessor = 'created_at',
-  onFetchData, // async () => array of raw records
-  transformRow, // (rawRow) => object
+  onFetchData,
+  transformRow,
 }) {
-  const [format, setFormat] = useState('xlsx'); // 'xlsx' or 'csv'
+  const [format, setFormat] = useState('xlsx');
   const [preset, setPreset] = useState('all');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState(new Date().toISOString().split('T')[0]);
   const [showColumns, setShowColumns] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  // Normalize column list
   const normalizedColumns = useMemo(() => {
     return columns.map(c => {
       if (typeof c === 'string') return { key: c, label: c };
@@ -62,7 +54,6 @@ export default function CustomExportModal({
     });
   }, [columns]);
 
-  // Selected columns (all checked by default)
   const [selectedColumnKeys, setSelectedColumnKeys] = useState(() =>
     normalizedColumns.map(c => c.key)
   );
@@ -113,14 +104,12 @@ export default function CustomExportModal({
       setIsExporting(true);
       toast.info('Preparing export file, please wait...');
 
-      // 1. Fetch records
       const rawRecords = await onFetchData();
       if (!rawRecords || rawRecords.length === 0) {
         toast.warning('No records available to export.');
         return;
       }
 
-      // 2. Filter by date range
       const filtered = filterRecordsByDateRange(
         rawRecords,
         dateAccessor,
@@ -134,7 +123,6 @@ export default function CustomExportModal({
         return;
       }
 
-      // 3. Format rows
       const selectedColSet = new Set(selectedColumnKeys);
       const dataToExport = filtered.map(item => {
         let fullRow = typeof transformRow === 'function' ? transformRow(item) : item;
@@ -151,7 +139,6 @@ export default function CustomExportModal({
         return fullRow;
       });
 
-      // 4. Generate filename
       const rangeTag = preset === 'all' 
         ? 'AllTime' 
         : preset === 'custom' 
@@ -159,7 +146,6 @@ export default function CustomExportModal({
           : preset.replace('_', '-');
       const filename = `${defaultFilename}_${rangeTag}_${new Date().toISOString().split('T')[0]}`;
 
-      // 5. Download
       exportToSpreadsheet(dataToExport, filename, format);
       toast.success(`Successfully exported ${dataToExport.length} records!`);
       onClose();
@@ -179,8 +165,6 @@ export default function CustomExportModal({
       maxWidth="max-w-xl"
     >
       <form onSubmit={handleExport} className="p-4 sm:p-6 space-y-5">
-        
-        {/* 1. Time Duration Selection */}
         <div>
           <label className="block text-sm font-bold text-slate-800 dark:text-slate-200 mb-2.5">
             1. Select Time Duration
@@ -219,7 +203,6 @@ export default function CustomExportModal({
             })}
           </div>
 
-          {/* Custom Date Pickers */}
           {preset === 'custom' && (
             <div className="mt-3 p-3.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in duration-150">
               <Input
@@ -240,13 +223,11 @@ export default function CustomExportModal({
           )}
         </div>
 
-        {/* 2. Format Selection (Excel vs CSV) */}
         <div>
           <label className="block text-sm font-bold text-slate-800 dark:text-slate-200 mb-2.5">
             2. Choose File Format
           </label>
           <div className="grid grid-cols-2 gap-3">
-            {/* Excel Button */}
             <button
               type="button"
               onClick={() => setFormat('xlsx')}
@@ -270,7 +251,6 @@ export default function CustomExportModal({
               )}
             </button>
 
-            {/* CSV Button */}
             <button
               type="button"
               onClick={() => setFormat('csv')}
@@ -296,7 +276,6 @@ export default function CustomExportModal({
           </div>
         </div>
 
-        {/* 3. Optional Columns Selector (Collapsed by default) */}
         {normalizedColumns.length > 0 && (
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-slate-50/80 dark:bg-slate-900/40">
             <button
@@ -370,7 +349,6 @@ export default function CustomExportModal({
           </div>
         )}
 
-        {/* Action Buttons */}
         <div className="pt-2 flex items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800">
           <Button
             variant="outline"

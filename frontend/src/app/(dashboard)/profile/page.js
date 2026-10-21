@@ -37,14 +37,12 @@ export default function ProfilePage() {
     }
   }, [role, isSuperAdmin, router]);
 
-  // Profile Form State
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState('');
 
-  // Password Form State
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -62,14 +60,12 @@ export default function ProfilePage() {
     }
   }, [user]);
 
-  // Password validation rules
   const hasMinLength = newPassword.length >= 6;
   const hasUppercase = /[A-Z]/.test(newPassword);
   const hasNumber = /[0-9]/.test(newPassword);
   const hasSpecial = /[^A-Za-z0-9]/.test(newPassword);
   const isPasswordValid = hasMinLength && hasUppercase && hasNumber && hasSpecial;
 
-  // Handle Profile Update
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setProfileError('');
@@ -111,7 +107,6 @@ export default function ProfilePage() {
     }
   };
 
-  // Handle Password Change
   const handleUpdatePassword = async (e) => {
     e.preventDefault();
     setPasswordError('');
@@ -165,7 +160,6 @@ export default function ProfilePage() {
         />
 
         <main className="flex-1 p-3.5 sm:p-5 md:p-7 max-w-6xl w-full mx-auto space-y-6">
-          {/* Top Hero Banner */}
           <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-white/10 bg-gradient-to-br from-white via-slate-50 to-blue-50/40 dark:from-slate-900 dark:via-slate-900/90 dark:to-blue-950/30 p-5 sm:p-7 shadow-sm">
             <div className="absolute top-0 right-0 -mt-12 -mr-12 w-48 h-48 sm:w-64 sm:h-64 rounded-full bg-gradient-to-br from-blue-500/10 to-indigo-500/20 blur-3xl pointer-events-none" />
 
@@ -198,7 +192,6 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              {/* Status Chips */}
               <div className="flex flex-wrap items-center gap-2.5 sm:self-center">
                 <div className="px-3 py-1.5 rounded-xl bg-white/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-white/10 text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 shadow-2xs">
                   <Fingerprint className="w-3.5 h-3.5 text-blue-500" />
@@ -213,7 +206,6 @@ export default function ProfilePage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            {/* Card 1: Personal Credentials & Contact */}
             <Card
               title="Identity & Contact Information"
               subtitle="Update your full name, login email ID, and phone number"
@@ -304,7 +296,6 @@ export default function ProfilePage() {
               </form>
             </Card>
 
-            {/* Card 2: Password & Root Security */}
             <Card
               title="Master Password & Security"
               subtitle="Change your Super Admin account password"
@@ -395,7 +386,6 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Password Strength Checklist */}
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 space-y-1.5">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Security Requirements:
@@ -435,7 +425,6 @@ export default function ProfilePage() {
             </Card>
           </div>
 
-          {/* Bottom Security Information Notice */}
           <div className="p-4 sm:p-5 rounded-2xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200/80 dark:border-blue-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-900 dark:text-blue-200">
             <div className="flex items-start gap-3">
               <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />

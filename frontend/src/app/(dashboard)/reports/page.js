@@ -26,23 +26,20 @@ export default function ReportsPage() {
   const { user } = useAuthStore();
   const isSuperAdmin = user?.role === 'super_admin' || (user?.role === 'admin' && !user?.ward_area);
 
-  const [activeTab, setActiveTab] = useState('collections'); // collections, overdue, sales, penalties
-  const [datePreset, setDatePreset] = useState('this_month'); // today, last_7_days, this_month, custom
+  const [activeTab, setActiveTab] = useState('collections');
+  const [datePreset, setDatePreset] = useState('this_month');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Data states
   const [collectionsData, setCollectionsData] = useState(null);
   const [overdueData, setOverdueData] = useState(null);
   const [salesData, setSalesData] = useState(null);
   const [penaltiesData, setPenaltiesData] = useState(null);
 
-  // Penalty Modal state
   const [penaltyModalTarget, setPenaltyModalTarget] = useState(null);
 
-  // Setup initial dates
   useEffect(() => {
     handleDatePresetChange('this_month');
   }, []);
@@ -209,7 +206,6 @@ export default function ReportsPage() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto print:p-0">
-      {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2.5">
@@ -240,10 +236,8 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Date Range Selector & Tabs */}
       <div className="p-4 rounded-2xl border border-border bg-card shadow-sm space-y-4 print:hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Main Module Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
             {[
               { id: 'collections', label: 'Collections MIS', icon: IndianRupee },
@@ -269,7 +263,6 @@ export default function ReportsPage() {
             })}
           </div>
 
-          {/* Date Presets */}
           <div className="flex items-center gap-1.5">
             {[
               { id: 'today', label: 'Today' },
@@ -292,7 +285,6 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* Custom Date Inputs if Custom selected */}
         {datePreset === 'custom' && (
           <div className="flex items-center gap-3 pt-2 border-t border-border/50 text-xs">
             <div className="flex items-center gap-2">
@@ -323,7 +315,6 @@ export default function ReportsPage() {
         )}
       </div>
 
-      {/* Main Tab Content */}
       {loading ? (
         <div className="p-16 text-center text-muted-foreground rounded-2xl border border-border bg-card">
           <div className="inline-block w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
@@ -331,10 +322,8 @@ export default function ReportsPage() {
         </div>
       ) : (
         <>
-          {/* TAB 1: COLLECTIONS MIS */}
           {activeTab === 'collections' && collectionsData && (
             <div className="space-y-6">
-              {/* Summary Metric Cards */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="p-5 rounded-2xl border border-border bg-card shadow-sm">
                   <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Collection</span>
@@ -373,9 +362,7 @@ export default function ReportsPage() {
                 </div>
               </div>
 
-              {/* Breakdown Grids */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Collector Wise */}
                 <div className="p-5 rounded-2xl border border-border bg-card shadow-sm">
                   <h3 className="font-bold text-foreground text-sm flex items-center justify-between mb-4">
                     <span>Staff / Field Collector Recovery</span>
@@ -395,7 +382,6 @@ export default function ReportsPage() {
                   </div>
                 </div>
 
-                {/* Branch Wise */}
                 <div className="p-5 rounded-2xl border border-border bg-card shadow-sm">
                   <h3 className="font-bold text-foreground text-sm flex items-center justify-between mb-4">
                     <span>Branch & Ward Breakdown</span>
@@ -418,10 +404,8 @@ export default function ReportsPage() {
             </div>
           )}
 
-          {/* TAB 2: OVERDUE AGEING & DEFAULTERS */}
           {activeTab === 'overdue' && overdueData && (
             <div className="space-y-6">
-              {/* Overdue Ageing Buckets Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
                   { key: 'b1_15', label: '1 - 15 Days', color: 'border-amber-500/30 text-amber-600 bg-amber-500/5' },
@@ -442,7 +426,6 @@ export default function ReportsPage() {
                 })}
               </div>
 
-              {/* Comprehensive Defaulters Table with Quick Penalty */}
               <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-border bg-muted/40 flex items-center justify-between">
                   <h3 className="font-bold text-foreground text-sm flex items-center gap-2">
@@ -528,7 +511,6 @@ export default function ReportsPage() {
             </div>
           )}
 
-          {/* TAB 3: SALES PERFORMANCE */}
           {activeTab === 'sales' && salesData && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -565,7 +547,6 @@ export default function ReportsPage() {
                 </div>
               </div>
 
-              {/* Model & Branch Split */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="p-5 rounded-2xl border border-border bg-card shadow-sm">
                   <h3 className="font-bold text-foreground text-sm mb-4">Model Performance</h3>
@@ -594,7 +575,6 @@ export default function ReportsPage() {
             </div>
           )}
 
-          {/* TAB 4: PENALTIES REGISTER */}
           {activeTab === 'penalties' && (
             <div className="space-y-6">
               {penaltiesData && (
@@ -710,7 +690,6 @@ export default function ReportsPage() {
         </>
       )}
 
-      {/* Add Penalty Modal */}
       {penaltyModalTarget && (
         <AddPenaltyModal
           isOpen={Boolean(penaltyModalTarget)}
@@ -720,7 +699,6 @@ export default function ReportsPage() {
         />
       )}
 
-      {/* Universal Custom Export Modal */}
       <CustomExportModal
         isOpen={isCustomExportOpen}
         onClose={() => setIsCustomExportOpen(false)}

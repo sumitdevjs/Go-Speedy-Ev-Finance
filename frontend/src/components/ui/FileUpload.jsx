@@ -6,7 +6,7 @@ import Spinner from './Spinner';
 
 export default function FileUpload({
   label,
-  docType, // e.g. 'aadhar_path', 'tenant_photo_path'
+  docType,
   currentPath,
   currentUrl,
   onUploaded,
@@ -28,14 +28,12 @@ export default function FileUpload({
     setUploadError(null);
 
     try {
-      // 1. Compress image to WebP <= 300KB
       const compressed = await compress(file);
       if (!compressed) return;
 
       setPreview(compressed.previewUrl);
       setUploading(true);
 
-      // 2. Upload via FormData
       const formData = new FormData();
       formData.append('file', compressed.file);
       formData.append('doc_type', docType);

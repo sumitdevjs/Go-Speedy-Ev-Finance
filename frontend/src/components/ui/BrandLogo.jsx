@@ -2,15 +2,10 @@
 
 import React from 'react';
 
-/**
- * BrandLogo:
- * Renders the exact user-provided logo image (/logo-user-transparent.png)
- * and the company name underneath in Charis SIL font (.charis-sil-bold)
- */
 export default function BrandLogo({
-  size = 'nav', // 'nav' | 'lg' | 'sidebar' | 'compact'
+  size = 'nav',
   showText = true,
-  theme = 'auto', // 'auto' | 'dark' | 'light'
+  theme = 'auto',
   className = '',
 }) {
   const isDark = theme === 'dark' || (theme === 'auto' && size === 'nav');

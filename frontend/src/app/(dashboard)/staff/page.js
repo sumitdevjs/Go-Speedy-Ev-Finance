@@ -41,7 +41,7 @@ export default function StaffPage() {
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState('true'); // '' | 'true' | 'false'
+  const [activeFilter, setActiveFilter] = useState('true');
   const [selectedHoFilter, setSelectedHoFilter] = useState(isHoAdmin ? (currentUser?.head_office_id || '') : '');
   const [selectedBranchFilter, setSelectedBranchFilter] = useState(selectedBranch?.id || '');
   const [roleFilter, setRoleFilter] = useState('');
@@ -51,11 +51,9 @@ export default function StaffPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
 
-  // Reference data for assignments
   const [headOffices, setHeadOffices] = useState([]);
   const [branches, setBranches] = useState([]);
 
-  // Add Staff Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -69,7 +67,6 @@ export default function StaffPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Edit Staff Modal
   const [editingStaff, setEditingStaff] = useState(null);
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
@@ -82,7 +79,6 @@ export default function StaffPage() {
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState('');
 
-  // Password Reset Modal
   const [passwordModalUser, setPasswordModalUser] = useState(null);
   const [newPassword, setNewPassword] = useState('');
   const [resetSubmitting, setResetSubmitting] = useState(false);
@@ -97,21 +93,17 @@ export default function StaffPage() {
         ]);
         if (hoRes.data?.success) setHeadOffices(hoRes.data.data || []);
         if (brRes.data?.success) setBranches(brRes.data.data || []);
-      } catch (err) {
-        // silent
-      }
+      } catch (err) {}
     };
     fetchDropdowns();
   }, []);
 
-  // Sync if HO Admin logs in or user details update
   useEffect(() => {
     if (isHoAdmin && currentUser?.head_office_id) {
       setSelectedHoFilter(currentUser.head_office_id);
     }
   }, [isHoAdmin, currentUser?.head_office_id]);
 
-  // Listen to branch change from top header switcher
   useEffect(() => {
     const handleBranchChange = (e) => {
       if (e.detail?.id) {
@@ -132,7 +124,6 @@ export default function StaffPage() {
     fetchStaff();
   }, [search, activeFilter, selectedHoFilter, selectedBranchFilter, roleFilter, page, selectedBranch]);
 
-  // One-time entrance animation for the filter bar
   useEffect(() => {
     staggerFadeIn('.gsap-filter-bar', { y: 14, duration: 0.45, stagger: 0 });
   }, []);
@@ -154,7 +145,6 @@ export default function StaffPage() {
         setTotalRecords(res.data.pagination?.totalItems || 0);
       }
     } catch (err) {
-      // silent
     } finally {
       setLoading(false);
     }
@@ -216,7 +206,6 @@ export default function StaffPage() {
     };
   };
 
-  // Filter available branches based on chosen Head Office
   const filteredBranches = branches.filter((b) => {
     if (isHoAdmin) {
       return b.head_office_id === currentUser?.head_office_id;
@@ -228,7 +217,6 @@ export default function StaffPage() {
   const handleHoFilterChange = (hoId) => {
     setSelectedHoFilter(hoId);
     setPage(1);
-    // If the currently selected branch doesn't belong to the new HO, clear it
     if (hoId && selectedBranchFilter) {
       const match = branches.find((b) => b.id === selectedBranchFilter);
       if (match && match.head_office_id !== hoId) {
@@ -240,7 +228,6 @@ export default function StaffPage() {
   const handleBranchFilterChange = (brId) => {
     setSelectedBranchFilter(brId);
     setPage(1);
-    // If a branch is picked and no HO was selected yet, auto-select its HO for clarity
     if (brId && !selectedHoFilter && !isHoAdmin) {
       const match = branches.find((b) => b.id === brId);
       if (match?.head_office_id) {
@@ -342,7 +329,6 @@ export default function StaffPage() {
 
     const isSelfWardAdmin = isEditingSelf && isBranchAdmin;
 
-    // If Ward Admin editing self, only verification doc is updated
     if (isSelfWardAdmin) {
       try {
         setEditSubmitting(true);
@@ -578,10 +564,6 @@ export default function StaffPage() {
       render: (row) => {
         const isRowSelf = row.id === currentUser?.id;
 
-        // Can edit logic:
-        // - Super Admin can edit everyone
-        // - HO Admin can edit branch_admin and staff in their HO, but NOT self, NOT other ho_admin, NOT super_admin
-        // - Ward Admin can edit staff in their branch, and on self can ONLY upload verification doc
         let showEdit = false;
         if (isSuperAdmin) {
           showEdit = true;
@@ -591,10 +573,6 @@ export default function StaffPage() {
           showEdit = isRowSelf || row.role === 'staff';
         }
 
-        // Can change password logic:
-        // - Super Admin can change everyone's password
-        // - HO Admin can change branch_admin and staff passwords, but NEVER own password or super_admin
-        // - Ward Admin can change staff passwords in their branch, but NEVER own password or other admins
         let showPasswordReset = false;
         if (isSuperAdmin) {
           showPasswordReset = true;
@@ -669,9 +647,7 @@ export default function StaffPage() {
       />
 
       <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        {/* Search & Filter Bar */}
         <div className="gsap-filter-bar flex flex-col gap-3.5 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
-          {/* Top Row: Search & Export */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div className="flex w-full sm:max-w-md sm:flex-1 min-w-0 gap-2 items-center">
               <SearchBar
@@ -708,9 +684,7 @@ export default function StaffPage() {
             )}
           </div>
 
-          {/* Bottom Filter Controls: Head Office, Ward/Branch, Role, and Status */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-2 border-t border-slate-100 dark:border-white/5">
-            {/* 1. Head Office Filter */}
             {!isHoAdmin ? (
               <div className="relative">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-500">
@@ -738,7 +712,6 @@ export default function StaffPage() {
               </div>
             )}
 
-            {/* 2. Branch / Ward Filter */}
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-500">
                 <MapPin className="w-4 h-4" />
@@ -759,7 +732,6 @@ export default function StaffPage() {
               </select>
             </div>
 
-            {/* 3. Role Privilege Filter */}
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-500">
                 <Shield className="w-4 h-4" />
@@ -780,7 +752,6 @@ export default function StaffPage() {
               </select>
             </div>
 
-            {/* 4. Active Status Filter */}
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-500">
                 <UserCheck className="w-4 h-4" />
@@ -823,7 +794,6 @@ export default function StaffPage() {
         />
       </div>
 
-      {/* Add Staff Modal */}
       <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -972,7 +942,6 @@ export default function StaffPage() {
         </form>
       </Modal>
 
-      {/* Edit Staff Modal */}
       <Modal
         isOpen={Boolean(editingStaff)}
         onClose={() => setEditingStaff(null)}
@@ -1138,7 +1107,6 @@ export default function StaffPage() {
         </form>
       </Modal>
 
-      {/* Reset Password Modal */}
       <Modal
         isOpen={Boolean(passwordModalUser)}
         onClose={() => setPasswordModalUser(null)}
@@ -1182,7 +1150,6 @@ export default function StaffPage() {
         </form>
       </Modal>
 
-      {/* Universal Custom Export Modal */}
       <CustomExportModal
         isOpen={isCustomExportOpen}
         onClose={() => setIsCustomExportOpen(false)}

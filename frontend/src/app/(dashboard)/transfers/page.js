@@ -33,17 +33,14 @@ export default function TransfersPage() {
   const [search, setSearch] = useState('');
   const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
 
-  // Dropdown lists
   const [models, setModels] = useState([]);
   const [branches, setBranches] = useState([]);
 
-  // Modals state
   const [isInitiateOpen, setIsInitiateOpen] = useState(false);
   const [dispatchTarget, setDispatchTarget] = useState(null);
   const [receiveTarget, setReceiveTarget] = useState(null);
   const [detailsTarget, setDetailsTarget] = useState(null);
 
-  // Form states
   const [formData, setFormData] = useState({
     from_branch_id: '',
     from_ward_area: '',
@@ -92,9 +89,7 @@ export default function TransfersPage() {
       ]);
       if (modelsRes.data?.success) setModels(modelsRes.data.data || []);
       if (branchesRes.data?.success) setBranches(branchesRes.data.data || []);
-    } catch (err) {
-      // silenced error
-    }
+    } catch (err) {}
   };
 
   useEffect(() => {
@@ -102,7 +97,6 @@ export default function TransfersPage() {
     fetchDropdownData();
   }, [statusFilter]);
 
-  // Initiate Transfer
   const handleInitiate = async (e) => {
     e.preventDefault();
     if (!formData.ev_model_id || !formData.quantity) {
@@ -133,7 +127,6 @@ export default function TransfersPage() {
     }
   };
 
-  // Dispatch Transfer
   const handleDispatch = async (e) => {
     e.preventDefault();
     if (!dispatchTarget) return;
@@ -153,7 +146,6 @@ export default function TransfersPage() {
     }
   };
 
-  // Receive Transfer
   const handleReceive = async (e) => {
     e.preventDefault();
     if (!receiveTarget) return;
@@ -173,7 +165,6 @@ export default function TransfersPage() {
     }
   };
 
-  // Cancel Transfer
   const handleCancel = async (transferId) => {
     const reason = prompt('Please enter cancellation reason:');
     if (!reason) return;
@@ -189,7 +180,6 @@ export default function TransfersPage() {
     }
   };
 
-  // Filter transfers by search
   const filteredTransfers = transfers.filter(t => {
     if (!search) return true;
     const s = search.toLowerCase();
@@ -202,7 +192,6 @@ export default function TransfersPage() {
     );
   });
 
-  // Calculate summary counts
   const totalCount = transfers.length;
   const requestedCount = transfers.filter(t => t.status === 'requested').length;
   const inTransitCount = transfers.filter(t => t.status === 'in_transit').length;
@@ -210,7 +199,6 @@ export default function TransfersPage() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2.5">
@@ -241,7 +229,6 @@ export default function TransfersPage() {
         </div>
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-5 rounded-2xl border border-border bg-card shadow-sm">
           <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Transfers</span>
@@ -268,7 +255,6 @@ export default function TransfersPage() {
         </div>
       </div>
 
-      {/* Filters and Search */}
       <div className="p-4 rounded-2xl border border-border bg-card shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -298,7 +284,6 @@ export default function TransfersPage() {
         </div>
       </div>
 
-      {/* Transfers Table */}
       <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -447,7 +432,6 @@ export default function TransfersPage() {
         </div>
       </div>
 
-      {/* MODAL 1: INITIATE TRANSFER */}
       {isInitiateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="relative w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col">
@@ -470,7 +454,6 @@ export default function TransfersPage() {
             </div>
 
             <form onSubmit={handleInitiate} className="p-6 space-y-4">
-              {/* Model Selection */}
               <div>
                 <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
                   Select EV Bike Model *
@@ -490,7 +473,6 @@ export default function TransfersPage() {
                 </select>
               </div>
 
-              {/* Quantity */}
               <div>
                 <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
                   Number of Units (Quantity) *
@@ -505,7 +487,6 @@ export default function TransfersPage() {
                 />
               </div>
 
-              {/* Origin Branch */}
               <div>
                 <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
                   Origin (Source Branch / Ward)
@@ -531,7 +512,6 @@ export default function TransfersPage() {
                 </select>
               </div>
 
-              {/* Destination Branch */}
               <div>
                 <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
                   Destination (Receiving Branch / Ward) *
@@ -558,7 +538,6 @@ export default function TransfersPage() {
                 </select>
               </div>
 
-              {/* Notes */}
               <div>
                 <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
                   Internal Transfer Notes / Purpose
@@ -593,7 +572,6 @@ export default function TransfersPage() {
         </div>
       )}
 
-      {/* MODAL 2: DISPATCH MODAL */}
       {dispatchTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-6 space-y-4">
@@ -671,7 +649,6 @@ export default function TransfersPage() {
         </div>
       )}
 
-      {/* MODAL 3: RECEIVE MODAL */}
       {receiveTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-6 space-y-4">
@@ -728,7 +705,6 @@ export default function TransfersPage() {
         </div>
       )}
 
-      {/* MODAL 4: DETAILS VIEW */}
       {detailsTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-6 space-y-4">
@@ -792,7 +768,6 @@ export default function TransfersPage() {
         </div>
       )}
 
-      {/* Universal Custom Export Modal */}
       <CustomExportModal
         isOpen={isCustomExportOpen}
         onClose={() => setIsCustomExportOpen(false)}

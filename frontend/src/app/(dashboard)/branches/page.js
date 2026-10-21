@@ -54,7 +54,6 @@ export default function BranchesPage() {
   const [loading, setLoading] = useState(true);
   const [copiedAddressId, setCopiedAddressId] = useState(null);
 
-  // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreateHoOpen, setIsCreateHoOpen] = useState(false);
   const [isOverviewOpen, setIsOverviewOpen] = useState(false);
@@ -63,7 +62,6 @@ export default function BranchesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [hoSubmitting, setHoSubmitting] = useState(false);
 
-  // Form state for Branch
   const [formData, setFormData] = useState({
     head_office_id: isHoAdmin ? (user?.head_office_id || '') : '',
     ward_no: '',
@@ -75,7 +73,6 @@ export default function BranchesPage() {
     ward_area: '',
   });
 
-  // Form state for Head Office
   const [hoFormData, setHoFormData] = useState({
     name: '',
     code: '',
@@ -115,7 +112,6 @@ export default function BranchesPage() {
     }
   }, [urlSearch]);
 
-  // Listen to branch change from top header switcher
   useEffect(() => {
     const handleBranchChange = (e) => {
       if (e.detail?.name) {
@@ -128,7 +124,6 @@ export default function BranchesPage() {
     return () => window.removeEventListener('branchChange', handleBranchChange);
   }, []);
 
-  // One-time entrance animation for the filter chrome
   useEffect(() => {
     staggerFadeIn('.gsap-filter-bar', { y: 14, duration: 0.45, stagger: 0 });
   }, []);
@@ -144,7 +139,6 @@ export default function BranchesPage() {
         setHeadOffices(res.data.data || []);
       }
     } catch (err) {
-      // silent
     }
   };
 
@@ -165,7 +159,6 @@ export default function BranchesPage() {
         setTotalPages(res.data.meta?.totalPages || 1);
       }
     } catch (err) {
-      // silent
     } finally {
       setLoading(false);
     }

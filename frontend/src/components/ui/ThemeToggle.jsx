@@ -34,7 +34,6 @@ export default function ThemeToggle({ variant = 'default' }) {
 
   return (
     <>
-      {/* Mobile / Ultra-compact (< sm:): Sleek single icon button with 1-tap cycling */}
       <button
         type="button"
         onClick={cycleTheme}
@@ -57,7 +56,6 @@ export default function ThemeToggle({ variant = 'default' }) {
         />
       </button>
 
-      {/* Screens sm: and above (Tablets, Laptops, Desktops 640px+): Sleek, minimal 3-icon segmented pill */}
       <div
         className={`h-9 hidden sm:inline-flex items-center p-1 rounded-xl transition-colors shrink-0 gap-0.5 shadow-2xs ${
           variant === 'glass'

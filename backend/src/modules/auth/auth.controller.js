@@ -8,7 +8,6 @@ class AuthController {
       const { email, password } = req.body;
       const result = await authService.login(email, password);
 
-      // Set cookies
       this._setCookies(req, res, result.accessToken, result.refreshToken, result.user.id);
 
       return successResponse(res, 200, { user: result.user, token: result.accessToken }, 'Login successful');
@@ -21,7 +20,7 @@ class AuthController {
   async refresh(req, res) {
     try {
       const refreshToken = req.cookies?.refresh_token;
-      const userId = req.cookies?.user_id; // Stored alongside refresh token to identify user
+      const userId = req.cookies?.user_id;
 
       if (!refreshToken || !userId) {
         return errorResponse(res, 401, 'Unauthorized');
@@ -29,13 +28,11 @@ class AuthController {
 
       const result = await authService.refresh(refreshToken, userId);
 
-      // Set cookies (rotation)
       this._setCookies(req, res, result.accessToken, result.refreshToken, result.user.id);
 
       return successResponse(res, 200, { user: result.user, token: result.accessToken }, 'Token refreshed');
     } catch (error) {
       console.error('Refresh Token Error:', error);
-      // Clear cookies on fail with proper options
       this._clearCookies(req, res);
       return errorResponse(res, 401, 'Session expired or invalid. Please log in again.');
     }
@@ -49,7 +46,6 @@ class AuthController {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Always clear cookies with proper options
       this._clearCookies(req, res);
       return successResponse(res, 200, null, 'Logged out successfully');
     }
@@ -138,8 +134,6 @@ class AuthController {
   }
 
   _getCookieOpts(req) {
-    // Only use secure: true if the connection is actually HTTPS.
-    // If accessed over plain HTTP (like http://3.7.65.179), secure must be false so browsers accept the cookie.
     const isHttps = Boolean(req && (req.secure || req.headers?.['x-forwarded-proto'] === 'https'));
     return {
       httpOnly: true,
@@ -150,7 +144,6 @@ class AuthController {
   }
 
   _setCookies(req, res, accessToken, refreshToken, userId) {
-    // Support both _setCookies(req, res, ...) and legacy _setCookies(res, ...)
     let actualReq = req;
     let actualRes = res;
     let actualAccessToken = accessToken;
@@ -167,19 +160,16 @@ class AuthController {
 
     const cookieOpts = this._getCookieOpts(actualReq);
 
-    // Access token - 15 mins
     actualRes.cookie('access_token', actualAccessToken, {
       ...cookieOpts,
       maxAge: 15 * 60 * 1000,
     });
 
-    // Refresh token - 7 days
     actualRes.cookie('refresh_token', actualRefreshToken, {
       ...cookieOpts,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    // User ID (for finding the correct refresh hash later) - 7 days
     actualRes.cookie('user_id', actualUserId, {
       ...cookieOpts,
       maxAge: 7 * 24 * 60 * 60 * 1000,

@@ -56,11 +56,8 @@ function ToastItem({ toast, onDone }) {
     let dismissed = false;
 
     function dismiss() {
-      if (dismissed) return; // clicking the X while the auto-dismiss timer is also mid-fire
+      if (dismissed) return;
       dismissed = true;
-      // Same reasoning as ConfirmDialog: don't gate removal on GSAP's onComplete
-      // (needs rAF, which pauses in a backgrounded tab) — a plain timeout is the
-      // reliable trigger, the tween is just the visual on top of it.
       gsap.to(el, { opacity: 0, x: 48, scale: 0.95, duration: 0.25, ease: 'power2.in' });
       setTimeout(onDone, 250);
     }

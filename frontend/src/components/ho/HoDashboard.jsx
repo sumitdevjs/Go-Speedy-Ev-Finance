@@ -56,7 +56,7 @@ export default function HoDashboard() {
   });
 
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'stock_alert' | 'overdue_alert'
+  const [statusFilter, setStatusFilter] = useState('all');
   const [hoPage, setHoPage] = useState(1);
   const HO_WARDS_PER_PAGE = 8;
 
@@ -64,7 +64,6 @@ export default function HoDashboard() {
     fetchDashboard();
   }, [selectedBranch]);
 
-  // Also listen to branchChange event for instant reactive refetch
   useEffect(() => {
     const handleBranchChange = () => fetchDashboard();
     window.addEventListener('branchChange', handleBranchChange);
@@ -74,7 +73,6 @@ export default function HoDashboard() {
   const fetchDashboard = async () => {
     try {
       setLoading(true);
-      // If a specific branch is drilled into, pass it as a query filter
       const branchParam = selectedBranch
         ? `?branch_id=${encodeURIComponent(selectedBranch.id || selectedBranch.code || selectedBranch.name)}`
         : '';
@@ -83,13 +81,11 @@ export default function HoDashboard() {
         setData(res.data.data);
       }
     } catch (err) {
-      // silenced error
     } finally {
       setLoading(false);
     }
   };
 
-  // GSAP animations on load
   useEffect(() => {
     if (!loading && data?.summary) {
       animateCounter('#gsap-ho-stock', data.summary.totalStock || 0);
@@ -108,7 +104,6 @@ export default function HoDashboard() {
 
   const { headOffice, summary, wardPerformance, recentRentals, recentOverdue } = data;
 
-  // Filtered wards
   const filteredWards = (wardPerformance || []).filter((w) => {
     const matchesSearch =
       !search.trim() ||
@@ -136,7 +131,6 @@ export default function HoDashboard() {
       />
 
       <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-6">
-        {/* Zonal Header Banner */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-blue-950/80 border border-blue-500/25 p-5 sm:p-7 shadow-xl text-white">
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
             <div className="space-y-1.5">
@@ -164,13 +158,10 @@ export default function HoDashboard() {
             </div>
           </div>
 
-          {/* Ambient Glow */}
           <div className="absolute -right-10 -top-10 w-64 h-64 rounded-full bg-blue-500/15 blur-3xl pointer-events-none" />
         </div>
 
-        {/* Executive Territory KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-3.5">
-          {/* Total Zonal Fleet */}
           <div className="gsap-ho-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/80 p-3.5 sm:p-4 shadow-xs flex items-center justify-between gap-2.5 transition-all min-w-0">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
@@ -188,7 +179,6 @@ export default function HoDashboard() {
             </div>
           </div>
 
-          {/* Active Rentals */}
           <div className="gsap-ho-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/80 p-3.5 sm:p-4 shadow-xs flex items-center justify-between gap-2.5 transition-all min-w-0">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
@@ -206,7 +196,6 @@ export default function HoDashboard() {
             </div>
           </div>
 
-          {/* Overdue Cases */}
           <div className="gsap-ho-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/80 p-3.5 sm:p-4 shadow-xs flex items-center justify-between gap-2.5 transition-all min-w-0">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
@@ -224,7 +213,6 @@ export default function HoDashboard() {
             </div>
           </div>
 
-          {/* Total Collections */}
           <div className="gsap-ho-kpi rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/80 p-3.5 sm:p-4 shadow-xs flex items-center justify-between gap-2.5 transition-all min-w-0">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
@@ -242,7 +230,6 @@ export default function HoDashboard() {
             </div>
           </div>
 
-          {/* Governed Branches */}
           <div className="gsap-ho-kpi col-span-2 sm:col-span-1 rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/80 p-3.5 sm:p-4 shadow-xs flex items-center justify-between gap-2.5 transition-all min-w-0">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 truncate">
@@ -261,7 +248,6 @@ export default function HoDashboard() {
           </div>
         </div>
 
-        {/* Ward Inventory Health Alert Banner */}
         {summary.depletedStockWards > 0 && (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 text-amber-800 dark:text-amber-300">
             <div className="flex items-center gap-3 min-w-0">
@@ -284,7 +270,6 @@ export default function HoDashboard() {
           </div>
         )}
 
-        {/* Main Section: Ward-by-Ward Territory Performance Matrix */}
         <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/80 p-4 sm:p-6 shadow-xs min-w-0">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4 mb-5">
             <div className="min-w-0 flex-1">
@@ -297,7 +282,6 @@ export default function HoDashboard() {
               </p>
             </div>
 
-            {/* Search and Filters */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 shrink-0">
               <div className="relative min-w-[200px] sm:min-w-[240px]">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -360,7 +344,6 @@ export default function HoDashboard() {
             </div>
           </div>
 
-          {/* Table */}
           <div className="w-full overflow-x-auto rounded-xl border border-slate-200/60 dark:border-slate-800/80 scrollbar-thin">
             <table className="w-full table-fixed min-w-[760px] text-left text-xs">
               <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200/80 dark:border-slate-800">
@@ -498,7 +481,6 @@ export default function HoDashboard() {
             </table>
           </div>
 
-          {/* Pagination */}
           {Math.ceil(filteredWards.length / HO_WARDS_PER_PAGE) > 1 && (
             <Pagination
               currentPage={hoPage}
@@ -510,9 +492,7 @@ export default function HoDashboard() {
           )}
         </div>
 
-        {/* Territory Activity Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Live Overdue Watchlist */}
           <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/80 p-5 shadow-xs flex flex-col">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -576,9 +556,7 @@ export default function HoDashboard() {
             </div>
           </div>
 
-          {/* Right Column: Zonal Revenue Split & Shortcuts */}
           <div className="space-y-6 flex flex-col justify-between">
-            {/* Zonal Collection Health */}
             <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/80 p-5 shadow-xs">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -593,7 +571,6 @@ export default function HoDashboard() {
                 Total zone revenue vs active recoverable installment debt
               </p>
 
-              {/* Progress bar for Cash vs Online split */}
               <div className="space-y-2">
                 <div className="flex justify-between text-xs font-semibold">
                   <span className="text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
@@ -625,7 +602,6 @@ export default function HoDashboard() {
               </div>
             </div>
 
-            {/* Quick Zonal Actions & Direct Links */}
             <div className="rounded-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-slate-900/80 p-5 shadow-xs">
               <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-3">
                 <ShieldCheck className="w-4 h-4 text-emerald-500" />

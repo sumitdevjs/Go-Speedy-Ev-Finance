@@ -16,14 +16,12 @@ class StaffService {
 
     if (req) {
       queryBuilder = applyScope(queryBuilder, req);
-      // If caller is branch_admin or staff, isolate to their own ward!
       if (req.user?.role === 'branch_admin' || req.user?.role === 'staff') {
         const userWard = req.user.ward_area || req.user.branch_id;
         if (userWard) {
           queryBuilder = queryBuilder.ilike('ward_area', `%${userWard}%`);
         }
       }
-      // If caller is ho_admin, strictly scope to their own HO's staff only
       if (req.user?.role === 'ho_admin') {
         queryBuilder = queryBuilder
           .in('role', ['branch_admin', 'staff', 'admin'])
@@ -35,12 +33,10 @@ class StaffService {
       queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'phone', 'email'], query.search));
     }
 
-    // Filter by active status: 'true' or 'false'
     if (query.is_active !== undefined && query.is_active !== '') {
       queryBuilder = queryBuilder.eq('is_active', query.is_active === 'true');
     }
 
-    // Filter by role if specified
     if (query.role && query.role !== 'all') {
       queryBuilder = queryBuilder.eq('role', query.role);
     }
@@ -50,7 +46,6 @@ class StaffService {
 
     if (error) throw error;
 
-    // Safely batch-resolve branch & head office info if present
     if (data && data.length > 0) {
       const branchIds = [...new Set(data.map(u => u.branch_id).filter(Boolean))];
       const hoIds = [...new Set(data.map(u => u.head_office_id).filter(Boolean))];
@@ -85,12 +80,10 @@ class StaffService {
           u.role = 'branch_admin';
         }
 
-        // Attach resolved branch
         if (u.branch_id && branchMap.has(u.branch_id)) {
           u.branches = branchMap.get(u.branch_id);
         }
 
-        // Attach resolved head office
         if (u.head_office_id && hoMap.has(u.head_office_id)) {
           u.head_offices = hoMap.get(u.head_office_id);
         } else if (u.branches?.head_office_id && hoMap.has(u.branches.head_office_id)) {
@@ -151,7 +144,6 @@ class StaffService {
       .select('*')
       .single();
 
-    // Fallback if branch_id / head_office_id / verification_doc columns do not exist yet in DB schema
     if (error && (error.code === '42703' || error.message?.includes('branch_id') || error.message?.includes('verification_doc'))) {
       delete insertPayload.branch_id;
       delete insertPayload.head_office_id;
@@ -192,13 +184,9 @@ class StaffService {
       throw new Error('User not found');
     }
 
-    // Role-based editing rules:
     if (isSelf) {
       if (requesterRole === 'super_admin' || requesterRole === 'admin') {
-        // Super admin can edit own details
       } else if (requesterRole === 'branch_admin') {
-        // Ward Admin self-edit: ONLY verification_doc is allowed!
-        // All other fields (name, phone, email, ward, role) cannot be changed by Ward Admin on their own account.
         const allowedKeys = ['verification_doc'];
         const disallowed = Object.keys(updates).filter(
           k => !allowedKeys.includes(k) && updates[k] !== undefined && updates[k] !== null && updates[k] !== before[k]
@@ -206,16 +194,12 @@ class StaffService {
         if (disallowed.length > 0) {
           throw new Error('Access denied: Ward Admin can only upload verification documents for their own profile. Other details can only be changed by Head Office or Super Admin.');
         }
-        // Restrict updates to only verification_doc
         updates = { verification_doc: updates.verification_doc };
       } else {
-        // HO Admin or Staff cannot edit themselves
         throw new Error('Access denied: You cannot edit your own profile details. Contact Super Admin.');
       }
     } else {
-      // Editing someone else
       if (requesterRole === 'super_admin' || requesterRole === 'admin') {
-        // Allowed to edit anyone
       } else if (requesterRole === 'ho_admin') {
         if (before.role !== 'branch_admin' && before.role !== 'staff') {
           throw new Error('Access denied: Head Office Admins can only edit Branch/Ward Admins and Staff.');
@@ -250,7 +234,6 @@ class StaffService {
       .select('*')
       .single();
 
-    // Fallback if branch_id/head_office_id/verification_doc column doesn't exist
     if (error && (error.code === '42703' || error.message?.includes('branch_id') || error.message?.includes('verification_doc'))) {
       if (cleanUpdates.branch_id) {
         cleanUpdates.ward_area = cleanUpdates.branch_id;
@@ -293,12 +276,10 @@ class StaffService {
           throw new Error('User not found');
         }
 
-        // Rule 1: Neither HO, Ward, nor Staff can change their own password
         if (isSelf) {
           throw new Error('Access denied: You cannot change your own password. Only Super Admin can change your password.');
         }
 
-        // Rule 2: HO Admin can change password of Ward Admins and Staff in their HO
         if (requesterRole === 'ho_admin') {
           if (targetUser.role !== 'branch_admin' && targetUser.role !== 'staff') {
             throw new Error('Access denied: Head Office Admin can only change passwords for Branch/Ward Admins and Staff.');
@@ -308,7 +289,6 @@ class StaffService {
           }
         }
 
-        // Rule 3: Ward Admin can ONLY change Staff passwords in their branch
         else if (requesterRole === 'branch_admin') {
           if (targetUser.role !== 'staff') {
             throw new Error('Access denied: Ward Admin can only change passwords for Ward Staff.');
@@ -326,7 +306,7 @@ class StaffService {
 
     const { error } = await supabase
       .from('users')
-      .update({ password_hash, refresh_token_hash: null }) // force logout on pwd change
+      .update({ password_hash, refresh_token_hash: null })
       .eq('id', id);
 
     if (error) throw error;

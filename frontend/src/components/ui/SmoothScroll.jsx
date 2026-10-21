@@ -7,10 +7,6 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import 'lenis/dist/lenis.css';
 
-/**
- * SmoothScroll component:
- * Integrates Lenis with GSAP ScrollTrigger and GSAP ticker for ultra-smooth scrolling on both PC and mobile.
- */
 export default function SmoothScroll({ children }) {
   const pathname = usePathname();
   const lenisRef = useRef(null);
@@ -18,14 +14,11 @@ export default function SmoothScroll({ children }) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Register ScrollTrigger plugin safely
     gsap.registerPlugin(ScrollTrigger);
 
-    // Tell GSAP ticker to run at native display refresh rate (120Hz / 144Hz / 240Hz)
     gsap.ticker.fps(0);
     gsap.ticker.lagSmoothing(500, 33);
 
-    // Initialize Lenis tuned for 120Hz monitors and ultra-smooth fluid momentum
     const lenis = new Lenis({
       duration: 1.15,
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
@@ -34,7 +27,7 @@ export default function SmoothScroll({ children }) {
       smoothWheel: true,
       wheelMultiplier: 0.95,
       touchMultiplier: 1.0,
-      syncTouch: false, // Allows native 120Hz GPU compositor on iOS/Android ProMotion displays
+      syncTouch: false,
       allowNestedScroll: true,
       autoResize: true,
       prevent: (node) => {
@@ -52,7 +45,6 @@ export default function SmoothScroll({ children }) {
     lenisRef.current = lenis;
     window.__lenis = lenis;
 
-    // Add Lenis's RAF to GSAP's 120Hz ticker loop in perfect lockstep
     const tickerUpdate = (time) => {
       lenis.raf(time * 1000);
     };
@@ -66,7 +58,6 @@ export default function SmoothScroll({ children }) {
     };
   }, []);
 
-  // When pathname changes, reset scroll to top cleanly and refresh ScrollTrigger
   useEffect(() => {
     if (lenisRef.current) {
       lenisRef.current.scrollTo(0, { immediate: true });

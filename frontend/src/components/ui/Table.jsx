@@ -15,14 +15,11 @@ export default function Table({
   const tbodyRef = useRef(null);
   const prevSignature = useRef('');
 
-  // Fade + stagger new rows in whenever the (filtered/paginated) result set changes —
-  // a fresh page of search results, a page-change, or the initial load — but never on
-  // the loading/empty placeholder rows.
   useEffect(() => {
     if (loading || !data.length || !tbodyRef.current) return;
 
     const signature = data.map((row) => row.id ?? '').join('|');
-    if (signature === prevSignature.current) return; // same rows re-rendering (e.g. a field updated in place)
+    if (signature === prevSignature.current) return;
     prevSignature.current = signature;
 
     const rows = tbodyRef.current.querySelectorAll('tr[data-gsap-row]');
@@ -31,7 +28,7 @@ export default function Table({
     gsap.killTweensOf(rows);
     staggerFadeIn(rows, {
       y: 8,
-      scale: 1, // no scaling on table rows — plain fade + rise reads cleanly at any column width
+      scale: 1,
       stagger: Math.min(0.035, 0.5 / rows.length),
       duration: 0.35,
       ease: 'power2.out',

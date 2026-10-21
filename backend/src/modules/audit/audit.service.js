@@ -9,7 +9,6 @@ class AuditService {
       .from('audit_logs')
       .select('*, users(name, email, ward_area)', { count: 'exact' });
 
-    // Scoping for HO Admin: only actions by or targeting users / entities under their Head Office
     if (user && user.role === 'ho_admin' && user.head_office_id) {
       const { data: deptUsers } = await supabase
         .from('users')
@@ -66,8 +65,6 @@ class AuditService {
 
     if (error) throw error;
 
-    // entity_id is polymorphic, so PostgREST can't embed it like `users`
-    // above — batch-resolve the target user's name separately.
     const targetUserIds = [...new Set(
       data
         .filter(row => row.entity_type === 'users' && row.entity_id)
@@ -90,7 +87,6 @@ class AuditService {
       });
     }
 
-    // Resolve target tenant names (from entity_id and changes)
     const allTenantIds = new Set();
     data.forEach(row => {
       if (row.entity_type === 'tenants' && row.entity_id) {
@@ -123,7 +119,6 @@ class AuditService {
           row.entity_name = nameById.get(row.entity_id) || null;
         }
 
-        // Replace UUIDs inside changes with actual names
         if (row.changes?.tenant_id && typeof row.changes.tenant_id === 'string') {
           const tName = nameById.get(row.changes.tenant_id);
           if (tName) row.changes.tenant_id = tName;

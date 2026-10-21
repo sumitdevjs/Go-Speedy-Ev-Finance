@@ -54,33 +54,28 @@ export default function NewPurchaseWizardPage() {
   const searchParams = useSearchParams();
 
   const [currentStep, setCurrentStep] = useState(1);
-  const [modelType, setModelType] = useState('new'); // 'new' | 'old'
+  const [modelType, setModelType] = useState('new');
   const [models, setModels] = useState([]);
   const [oldEvs, setOldEvs] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
 
-  // Pending Docs Confirmation Modal
   const [isPendingDocsModalOpen, setIsPendingDocsModalOpen] = useState(false);
   const [missingDocsList, setMissingDocsList] = useState([]);
 
-  // Form State
   const isDirectPurchase = true;
   const STEPS = ALL_STEPS;
   const [formData, setFormData] = useState({
-    // Step 1: Model
     ev_model_id: searchParams.get('model_id') || '',
     old_ev_id: '',
 
-    // Step 2: Personal
     name: searchParams.get('name') || '',
     phone: searchParams.get('phone') || '',
     gender: 'male',
     address: '',
     invoice_generated: false,
 
-    // Step 3: Documents
     aadhar_path: '',
     pan_path: '',
     cheque_path: '',
@@ -92,7 +87,6 @@ export default function NewPurchaseWizardPage() {
     rider_insurance_path: '',
     rider_license_path: '',
 
-    // Step 4: Scooty Hardware
     chassis_no: '',
     motor_no: '',
     controller_no: '',
@@ -105,7 +99,6 @@ export default function NewPurchaseWizardPage() {
     date_of_purchase: new Date().toISOString().split('T')[0],
     date_of_delivery: new Date().toISOString().split('T')[0],
 
-    // Step 5: Insurance
     scooty_insurance_company: '',
     scooty_policy_number: '',
     scooty_policy_expiry: '',
@@ -120,7 +113,6 @@ export default function NewPurchaseWizardPage() {
     rider_insurance_start: '',
     notes: '',
 
-    // Step 6: Financial & Downpayment
     booking_amount: Number(searchParams.get('amount') || 0),
     downpayment_paid: 10000,
     downpayment_mode: 'cash',
@@ -129,19 +121,16 @@ export default function NewPurchaseWizardPage() {
     dp_other_phone: '',
     buyback_amount: '',
 
-    // Step 7: AMC
     amc_amount: '',
     amc_start_date: '',
     amc_expire_date: '',
     amc_service_log: [],
 
-    // Optional booking linkage
     booking_id: searchParams.get('booking_id') || '',
   });
 
   const selectedModel = models.find((m) => m.id === formData.ev_model_id);
 
-  // Load models & draft
   useEffect(() => {
     api.get('/api/models/dropdown').then((res) => {
       if (res.data?.success) {
@@ -161,12 +150,10 @@ export default function NewPurchaseWizardPage() {
         const { isDirectPurchase: _, ...validData } = parsed;
         setFormData((prev) => ({ ...prev, ...validData }));
       } catch (err) {
-        // ignore invalid draft
       }
     }
   }, []);
 
-  // Autosave to localStorage
   useEffect(() => {
     localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...formData, isDirectPurchase }));
   }, [formData, isDirectPurchase]);
@@ -332,12 +319,10 @@ export default function NewPurchaseWizardPage() {
     }
   };
 
-  // Submit Flow with Pending Docs check
   const handleSubmitClick = () => {
     setErrorMessage('');
     if (!validateStep(currentStep)) return;
 
-    // Check missing documents
     const docLabels = [
       { key: 'aadhar_path', label: 'Aadhar Card Photo' },
       { key: 'pan_path', label: 'PAN Card Photo' },
@@ -520,7 +505,6 @@ export default function NewPurchaseWizardPage() {
                           if (inStock) {
                             updateField('ev_model_id', m.id);
                             updateField('old_ev_id', null);
-                            // Clear pre-filled hardware fields just in case
                             updateField('chassis_no', '');
                             updateField('motor_no', '');
                             updateField('controller_no', '');
@@ -574,7 +558,6 @@ export default function NewPurchaseWizardPage() {
                           onClick={() => {
                             updateField('old_ev_id', ev.id);
                             updateField('ev_model_id', ev.original_ev_model_id);
-                            // Pre-fill hardware numbers
                             updateField('chassis_no', ev.chassis_no || '');
                             updateField('motor_no', ev.motor_no || '');
                             updateField('controller_no', ev.controller_no || '');
@@ -970,7 +953,6 @@ export default function NewPurchaseWizardPage() {
             </div>
           )}
 
-          {/* STEP 6: DOWNPAYMENT */}
           {currentStep === 6 && (
             <div className="space-y-4">
               <div>
@@ -1070,7 +1052,6 @@ export default function NewPurchaseWizardPage() {
             </div>
           )}
 
-          {/* STEP 7: AMC */}
           {currentStep === 7 && (
             <div className="space-y-4">
               <div>
@@ -1201,7 +1182,6 @@ export default function NewPurchaseWizardPage() {
             </div>
           )}
 
-          {/* Wizard Footer Controls */}
           <div className="flex items-center justify-between border-t border-slate-100 pt-5 mt-6">
             <Button
               variant="outline"
@@ -1235,7 +1215,6 @@ export default function NewPurchaseWizardPage() {
         </Card>
       </div>
 
-      {/* Pending Documents Warning Modal */}
       <Modal
         isOpen={isPendingDocsModalOpen}
         onClose={() => setIsPendingDocsModalOpen(false)}

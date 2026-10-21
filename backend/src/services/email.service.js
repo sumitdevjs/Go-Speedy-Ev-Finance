@@ -8,9 +8,6 @@ class EmailService {
   }
 
   _initTransporter() {
-    // EMAIL_FROM is required separately from SMTP_USER — for relays like
-    // Brevo, SMTP_USER is just the login credential, not a real sender
-    // identity, and using it as the From address gets spam-filtered.
     if (env.SMTP_HOST && env.SMTP_PORT && env.SMTP_USER && env.SMTP_PASS && env.EMAIL_FROM) {
       const port = parseInt(env.SMTP_PORT, 10);
       this.transporter = nodemailer.createTransport({
@@ -31,12 +28,6 @@ class EmailService {
     }
   }
 
-  /**
-   * Send a 6-digit password reset OTP email
-   * @param {string} toEmail - Recipient email
-   * @param {string} otp - 6 digit numeric code
-   * @param {string} userName - Name of the user
-   */
   async sendOtpEmail(toEmail, otp, userName = 'User') {
     const sender = env.EMAIL_FROM ? `"GoSpeedy EV Fleet" <${env.EMAIL_FROM}>` : undefined;
     const subject = `${otp} is your GoSpeedy password reset code`;
@@ -130,7 +121,6 @@ class EmailService {
 </html>
     `;
 
-    // If transporter is ready, send real email
     if (this.transporter) {
       try {
         const info = await this.transporter.sendMail({
