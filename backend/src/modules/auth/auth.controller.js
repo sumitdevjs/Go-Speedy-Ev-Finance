@@ -32,7 +32,7 @@ class AuthController {
 
       return successResponse(res, 200, { user: result.user, token: result.accessToken }, 'Token refreshed');
     } catch (error) {
-      console.error('Refresh Token Error:', error);
+      console.warn(`[Auth] Refresh failed (${error.message || 'Unauthorized'}). Session cleared.`);
       this._clearCookies(req, res);
       return errorResponse(res, 401, 'Session expired or invalid. Please log in again.');
     }
