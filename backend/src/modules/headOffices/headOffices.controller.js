@@ -14,6 +14,7 @@ class HeadOfficesController {
 
   async getDropdown(req, res) {
     try {
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       const data = await headOfficesService.getDropdown(req.user);
       return successResponse(res, 200, data, 'Head offices dropdown retrieved');
     } catch (error) {
@@ -34,11 +35,14 @@ class HeadOfficesController {
 
   async create(req, res) {
     try {
-      const { name, code, city, state } = req.body;
+      const { name, code, city, state, admin_name, admin_phone, admin_email, admin_password } = req.body;
       if (!name || !code || !city || !state) {
         return errorResponse(res, 400, 'Name, code, city, and state are required');
       }
-      const data = await headOfficesService.create({ name, code, city, state });
+      const data = await headOfficesService.create(
+        { name, code, city, state, admin_name, admin_phone, admin_email, admin_password },
+        req.user
+      );
       return successResponse(res, 201, data, 'Head office created successfully');
     } catch (error) {
       console.error('[HeadOfficesController.create]', error);
@@ -64,6 +68,16 @@ class HeadOfficesController {
     } catch (error) {
       console.error('[HeadOfficesController.getDashboard]', error);
       return errorResponse(res, 500, error.message || 'Failed to fetch dashboard data');
+    }
+  }
+
+  async setAdmin(req, res) {
+    try {
+      const data = await headOfficesService.setAdmin(req.params.id, req.body, req.user);
+      return successResponse(res, 200, data, 'Head office admin credentials saved successfully');
+    } catch (error) {
+      console.error('[HeadOfficesController.setAdmin]', error);
+      return errorResponse(res, 400, error.message || 'Failed to save admin credentials');
     }
   }
 }

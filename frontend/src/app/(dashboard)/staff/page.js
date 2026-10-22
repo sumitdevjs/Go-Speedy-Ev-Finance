@@ -84,19 +84,37 @@ export default function StaffPage() {
   const [resetSubmitting, setResetSubmitting] = useState(false);
   const [resetError, setResetError] = useState('');
 
+  const fetchDropdowns = async () => {
+    try {
+      const [hoRes, brRes] = await Promise.all([
+        api.get(`/api/head-offices/dropdown?t=${Date.now()}`).catch(() => ({ data: { data: [] } })),
+        api.get(`/api/branches/dropdown?t=${Date.now()}`).catch(() => ({ data: { data: [] } })),
+      ]);
+      if (hoRes.data?.success) setHeadOffices(hoRes.data.data || []);
+      if (brRes.data?.success) setBranches(brRes.data.data || []);
+    } catch (err) {}
+  };
+
   useEffect(() => {
-    const fetchDropdowns = async () => {
-      try {
-        const [hoRes, brRes] = await Promise.all([
-          api.get('/api/head-offices/dropdown').catch(() => ({ data: { data: [] } })),
-          api.get('/api/branches/dropdown').catch(() => ({ data: { data: [] } })),
-        ]);
-        if (hoRes.data?.success) setHeadOffices(hoRes.data.data || []);
-        if (brRes.data?.success) setBranches(brRes.data.data || []);
-      } catch (err) {}
-    };
     fetchDropdowns();
+
+    const handleListUpdates = () => {
+      fetchDropdowns();
+    };
+
+    window.addEventListener('branchListUpdated', handleListUpdates);
+    window.addEventListener('headOfficeListUpdated', handleListUpdates);
+    return () => {
+      window.removeEventListener('branchListUpdated', handleListUpdates);
+      window.removeEventListener('headOfficeListUpdated', handleListUpdates);
+    };
   }, []);
+
+  useEffect(() => {
+    if (isAddModalOpen || isEditModalOpen) {
+      fetchDropdowns();
+    }
+  }, [isAddModalOpen, isEditModalOpen]);
 
   useEffect(() => {
     if (isHoAdmin && currentUser?.head_office_id) {

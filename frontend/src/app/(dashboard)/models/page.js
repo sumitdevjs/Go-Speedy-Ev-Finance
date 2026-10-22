@@ -131,17 +131,23 @@ export default function ModelsPage() {
   }, []);
 
   useEffect(() => {
-    api.get('/api/branches/dropdown')
-      .then((res) => {
-        if (res.data?.success) {
-          const list = res.data.data || [];
-          setBranches(list);
-          if (list.length > 0) {
-            setAddModelBranchId(list[0].id);
+    const fetchBranchesDropdown = () => {
+      api.get(`/api/branches/dropdown?t=${Date.now()}`)
+        .then((res) => {
+          if (res.data?.success) {
+            const list = res.data.data || [];
+            setBranches(list);
+            if (list.length > 0 && !addModelBranchId) {
+              setAddModelBranchId(list[0].id);
+            }
           }
-        }
-      })
-      .catch(() => {});
+        })
+        .catch(() => {});
+    };
+
+    fetchBranchesDropdown();
+    window.addEventListener('branchListUpdated', fetchBranchesDropdown);
+    return () => window.removeEventListener('branchListUpdated', fetchBranchesDropdown);
   }, []);
 
   useEffect(() => {

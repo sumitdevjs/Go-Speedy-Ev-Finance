@@ -49,11 +49,17 @@ export default function ModelViewPage({ params }) {
   const { selectedBranch } = useAuthStore();
 
   useEffect(() => {
-    api.get('/api/branches/dropdown')
-      .then((res) => {
-        if (res.data?.success) setBranches(res.data.data || []);
-      })
-      .catch(() => {});
+    const fetchBranchesDropdown = () => {
+      api.get(`/api/branches/dropdown?t=${Date.now()}`)
+        .then((res) => {
+          if (res.data?.success) setBranches(res.data.data || []);
+        })
+        .catch(() => {});
+    };
+
+    fetchBranchesDropdown();
+    window.addEventListener('branchListUpdated', fetchBranchesDropdown);
+    return () => window.removeEventListener('branchListUpdated', fetchBranchesDropdown);
   }, []);
 
   useEffect(() => {
