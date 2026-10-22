@@ -1,4 +1,5 @@
 const supabase = require('../../config/db');
+const bcrypt = require('bcryptjs');
 const { ALL_HEAD_OFFICES } = require('../branches/delhiWardsData');
 const { calcBalance } = require('../../utils/balanceCalc');
 
@@ -19,6 +20,25 @@ class HeadOfficesService {
       const { data, error } = await queryBuilder;
 
       if (!error && data) {
+        try {
+          const hoIds = data.map(h => h.id);
+          const { data: hoAdmins } = await supabase
+            .from('users')
+            .select('id, name, email, phone, head_office_id, role')
+            .in('head_office_id', hoIds)
+            .eq('role', 'ho_admin')
+            .eq('is_active', true);
+
+          const adminByHo = {};
+          (hoAdmins || []).forEach(u => {
+            if (u.head_office_id) adminByHo[u.head_office_id] = u;
+          });
+
+          data.forEach(ho => {
+            ho.admin = adminByHo[ho.id] || null;
+          });
+        } catch (enrichErr) {}
+
         return data;
       }
     } catch (e) {
@@ -89,7 +109,7 @@ class HeadOfficesService {
     throw new Error('Head Office not found');
   }
 
-  async create({ name, code, city, state }) {
+  async create({ name, code, city, state, admin_name, admin_phone, admin_email, admin_password }, user = {}) {
     const newHo = {
       id: `ho-custom-${Date.now()}`,
       name,
@@ -114,8 +134,38 @@ class HeadOfficesService {
         .single();
 
       if (!error && data) {
-        inMemoryHeadOffices.push({ ...newHo, ...data });
-        return data;
+        let createdAdmin = null;
+        if (admin_email && admin_password) {
+          try {
+            const password_hash = await bcrypt.hash(admin_password, 10);
+            const { data: userData, error: uErr } = await supabase
+              .from('users')
+              .insert([{
+                name: admin_name || `${name} Admin`,
+                phone: admin_phone || null,
+                email: String(admin_email).trim().toLowerCase(),
+                password_hash,
+                role: 'ho_admin',
+                head_office_id: data.id,
+                is_active: true,
+                created_by: user?.id || null,
+              }])
+              .select('id, name, email, role, phone')
+              .single();
+
+            if (!uErr && userData) {
+              createdAdmin = userData;
+            } else if (uErr) {
+              console.error('[Create HO Admin Error]:', uErr);
+            }
+          } catch (adminErr) {
+            console.error('[Create HO Admin Exception]:', adminErr);
+          }
+        }
+
+        const createdHo = { ...newHo, ...data, admin: createdAdmin };
+        inMemoryHeadOffices.push(createdHo);
+        return createdHo;
       }
     } catch (e) {
       // fallback
@@ -123,6 +173,61 @@ class HeadOfficesService {
 
     inMemoryHeadOffices.push(newHo);
     return newHo;
+  }
+
+  async setAdmin(hoId, { name, email, phone, password }, user = {}) {
+    const ho = await this.getById(hoId, user);
+    if (!email || !password) {
+      throw new Error('Email and password are required');
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const password_hash = await bcrypt.hash(password, 10);
+
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id, email, head_office_id')
+      .or(`email.eq.${cleanEmail},and(head_office_id.eq.${ho.id},role.eq.ho_admin)`)
+      .maybeSingle();
+
+    if (existingUser) {
+      const { data: updated, error } = await supabase
+        .from('users')
+        .update({
+          name: name || `${ho.name} Admin`,
+          phone: phone || null,
+          email: cleanEmail,
+          password_hash,
+          role: 'ho_admin',
+          head_office_id: ho.id,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingUser.id)
+        .select('id, name, email, role, phone')
+        .single();
+
+      if (error) throw error;
+      return updated;
+    } else {
+      const { data: created, error } = await supabase
+        .from('users')
+        .insert([{
+          name: name || `${ho.name} Admin`,
+          phone: phone || null,
+          email: cleanEmail,
+          password_hash,
+          role: 'ho_admin',
+          head_office_id: ho.id,
+          is_active: true,
+          created_by: user?.id || null,
+        }])
+        .select('id, name, email, role, phone')
+        .single();
+
+      if (error) throw error;
+      return created;
+    }
   }
 
   async update(id, updates) {

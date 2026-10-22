@@ -14,6 +14,7 @@ class BranchesController {
 
   async getDropdown(req, res) {
     try {
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       const data = await branchesService.getDropdown(req.query, req.user);
       return successResponse(res, 200, data, 'Branches dropdown retrieved');
     } catch (error) {
@@ -68,7 +69,7 @@ class BranchesController {
 
   async create(req, res) {
     try {
-      let { head_office_id, ward_no, name, code, ward_area, address, phone, contact_person, status_label } = req.body;
+      let { head_office_id, ward_no, name, code, ward_area, address, phone, contact_person, status_label, admin_email, admin_password } = req.body;
       if (req.user?.role === 'ho_admin' && req.user.head_office_id) {
         head_office_id = req.user.head_office_id;
       }
@@ -76,7 +77,7 @@ class BranchesController {
         return errorResponse(res, 400, 'head_office_id, name, and code are required');
       }
       const data = await branchesService.create(
-        { head_office_id, ward_no, name, code, ward_area, address, phone, contact_person, status_label },
+        { head_office_id, ward_no, name, code, ward_area, address, phone, contact_person, status_label, admin_email, admin_password },
         req.user
       );
       return successResponse(res, 201, data, 'Branch created successfully');
@@ -103,6 +104,16 @@ class BranchesController {
     } catch (error) {
       console.error('[BranchesController.delete]', error);
       return errorResponse(res, 400, error.message || 'Failed to delete branch');
+    }
+  }
+
+  async setAdmin(req, res) {
+    try {
+      const data = await branchesService.setAdmin(req.params.id, req.body, req.user);
+      return successResponse(res, 200, data, 'Ward admin credentials saved successfully');
+    } catch (error) {
+      console.error('[BranchesController.setAdmin]', error);
+      return errorResponse(res, 400, error.message || 'Failed to save admin credentials');
     }
   }
 }

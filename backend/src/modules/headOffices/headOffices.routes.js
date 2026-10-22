@@ -21,5 +21,6 @@ router.get('/:id', requireRole('super_admin', 'ho_admin', 'admin'), headOfficesC
 // Only Super Admin can create or update HOs
 router.post('/', requireRole('super_admin', 'admin'), headOfficesController.create.bind(headOfficesController));
 router.patch('/:id', requireRole('super_admin', 'admin'), headOfficesController.update.bind(headOfficesController));
+router.post('/:id/admin', requireRole('super_admin', 'admin'), headOfficesController.setAdmin.bind(headOfficesController));
 
 module.exports = router;

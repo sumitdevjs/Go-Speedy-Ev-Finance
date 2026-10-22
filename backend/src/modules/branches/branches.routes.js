@@ -27,5 +27,6 @@ router.get('/:id', branchesController.getById.bind(branchesController));
 router.post('/', requireRole('super_admin', 'ho_admin', 'admin'), branchesController.create.bind(branchesController));
 router.patch('/:id', requireRole('super_admin', 'ho_admin', 'admin'), branchesController.update.bind(branchesController));
 router.delete('/:id', requireRole('super_admin', 'ho_admin', 'admin'), branchesController.delete.bind(branchesController));
+router.post('/:id/admin', requireRole('super_admin', 'ho_admin', 'admin'), branchesController.setAdmin.bind(branchesController));
 
 module.exports = router;

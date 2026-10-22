@@ -13,6 +13,9 @@ import {
   CheckCircle2,
   Eye,
   Trash2,
+  Key,
+  Lock,
+  ShieldCheck,
   UserCheck,
   Award,
   Copy,
@@ -64,6 +67,17 @@ export default function BranchesPage() {
   const [hoSubmitting, setHoSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
+  // Credentials Management Modal State
+  const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
+  const [credentialsBranch, setCredentialsBranch] = useState(null);
+  const [credentialsForm, setCredentialsForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+  });
+  const [credentialsSubmitting, setCredentialsSubmitting] = useState(false);
+
   const handleDeleteBranch = async (branch) => {
     if (!window.confirm(`Are you sure you want to delete branch "${branch.name}" (${branch.code})? This action cannot be undone.`)) {
       return;
@@ -74,6 +88,7 @@ export default function BranchesPage() {
       if (res.data?.success) {
         toast.success(`Branch "${branch.name}" deleted successfully`);
         fetchBranches();
+        window.dispatchEvent(new CustomEvent('branchListUpdated'));
       }
     } catch (err) {
       console.error('Delete branch error:', err);
@@ -92,6 +107,9 @@ export default function BranchesPage() {
     phone: '',
     address: '',
     ward_area: '',
+    create_admin: true,
+    admin_email: '',
+    admin_password: '',
   });
 
   const [hoFormData, setHoFormData] = useState({
@@ -99,26 +117,96 @@ export default function BranchesPage() {
     code: '',
     city: '',
     state: '',
+    create_admin: true,
+    admin_name: '',
+    admin_phone: '',
+    admin_email: '',
+    admin_password: '',
   });
 
   const handleCreateHeadOffice = async (e) => {
     e.preventDefault();
     if (!hoFormData.name || !hoFormData.code || !hoFormData.city || !hoFormData.state) {
-      alert('Please fill in all Head Office fields.');
+      toast.error('Please fill in all required Head Office fields.');
+      return;
+    }
+    if (hoFormData.create_admin && (!hoFormData.admin_email || !hoFormData.admin_password)) {
+      toast.error('Please enter Admin Email and Password for the HO Admin account.');
       return;
     }
     try {
       setHoSubmitting(true);
-      const res = await api.post('/api/head-offices', hoFormData);
+      const payload = {
+        name: hoFormData.name,
+        code: hoFormData.code,
+        city: hoFormData.city,
+        state: hoFormData.state,
+        admin_name: hoFormData.create_admin ? (hoFormData.admin_name || `${hoFormData.name} Admin`) : undefined,
+        admin_phone: hoFormData.create_admin ? hoFormData.admin_phone : undefined,
+        admin_email: hoFormData.create_admin ? hoFormData.admin_email : undefined,
+        admin_password: hoFormData.create_admin ? hoFormData.admin_password : undefined,
+      };
+      const res = await api.post('/api/head-offices', payload);
       if (res.data?.success) {
         setIsCreateHoOpen(false);
-        setHoFormData({ name: '', code: '', city: '', state: '' });
+        setHoFormData({
+          name: '',
+          code: '',
+          city: '',
+          state: '',
+          create_admin: true,
+          admin_name: '',
+          admin_phone: '',
+          admin_email: '',
+          admin_password: '',
+        });
+        toast.success(
+          res.data?.data?.admin
+            ? `Head Office and Admin Login (${res.data.data.admin.email}) created successfully!`
+            : 'Head Office created successfully!'
+        );
         await fetchHeadOffices();
+        fetchBranches();
+        window.dispatchEvent(new CustomEvent('headOfficeListUpdated'));
+        window.dispatchEvent(new CustomEvent('branchListUpdated'));
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to create Head Office');
+      toast.error(err.response?.data?.message || err.message || 'Failed to create Head Office');
     } finally {
       setHoSubmitting(false);
+    }
+  };
+
+  const handleOpenCredentials = (branch) => {
+    setCredentialsBranch(branch);
+    setCredentialsForm({
+      name: branch.admin?.name || branch.contact_person || branch.name,
+      email: branch.admin?.email || '',
+      phone: branch.admin?.phone || branch.phone || '',
+      password: '',
+    });
+    setIsCredentialsModalOpen(true);
+  };
+
+  const handleSaveCredentials = async (e) => {
+    e.preventDefault();
+    if (!credentialsForm.email || !credentialsForm.password) {
+      toast.error('Email and password are required');
+      return;
+    }
+    try {
+      setCredentialsSubmitting(true);
+      const res = await api.post(`/api/branches/${credentialsBranch.id}/admin`, credentialsForm);
+      if (res.data?.success) {
+        toast.success(`Ward Admin credentials for "${credentialsBranch.name}" saved successfully!`);
+        setIsCredentialsModalOpen(false);
+        fetchBranches();
+        window.dispatchEvent(new CustomEvent('branchListUpdated'));
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to save credentials');
+    } finally {
+      setCredentialsSubmitting(false);
     }
   };
 
@@ -270,11 +358,17 @@ export default function BranchesPage() {
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
+    if (formData.create_admin && (!formData.admin_email || !formData.admin_password)) {
+      toast.error('Please enter Admin Email and Password for the Ward Admin account.');
+      return;
+    }
     try {
       setSubmitting(true);
       const payload = {
         ...formData,
         head_office_id: isHoAdmin ? (user?.head_office_id || formData.head_office_id) : formData.head_office_id,
+        admin_email: formData.create_admin ? formData.admin_email : undefined,
+        admin_password: formData.create_admin ? formData.admin_password : undefined,
       };
       const res = await api.post('/api/branches', payload);
       if (res.data?.success) {
@@ -288,11 +382,20 @@ export default function BranchesPage() {
           phone: '',
           address: '',
           ward_area: '',
+          create_admin: true,
+          admin_email: '',
+          admin_password: '',
         });
+        toast.success(
+          res.data?.data?.admin
+            ? `Ward "${res.data.data.name}" and Admin Login (${res.data.data.admin.email}) created successfully!`
+            : `Ward "${res.data.data?.name || 'New'}" created successfully!`
+        );
         fetchBranches();
+        window.dispatchEvent(new CustomEvent('branchListUpdated'));
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to create branch');
+      toast.error(err.response?.data?.message || err.message || 'Failed to create branch');
     } finally {
       setSubmitting(false);
     }
@@ -440,6 +543,18 @@ export default function BranchesPage() {
                   </span>
                 )}
               </div>
+              <div className="mt-1">
+                {row.admin ? (
+                  <span className="inline-flex items-center gap-1 font-mono text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-200/80 dark:border-emerald-800/80" title={`Active Ward Admin: ${row.admin.name}`}>
+                    <ShieldCheck className="w-2.5 h-2.5" />
+                    <span>{row.admin.email}</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 font-mono text-[9px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-200/80 dark:border-amber-800/80">
+                    No login set
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         );
@@ -549,6 +664,17 @@ export default function BranchesPage() {
             <Eye className="h-3.5 w-3.5" />
             <span>View</span>
           </button>
+          {(isSuperAdmin || isHoAdmin) && (
+            <button
+              type="button"
+              onClick={() => handleOpenCredentials(row)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-600 hover:text-white dark:hover:bg-amber-600 dark:hover:text-white border border-amber-200 dark:border-amber-500/30 transition-all shadow-2xs active:scale-95 cursor-pointer"
+              title={row.admin ? `Manage Admin Login (${row.admin.email})` : `Set Up Ward Admin Login`}
+            >
+              <Key className="h-3.5 w-3.5" />
+              <span>{row.admin ? 'Login' : 'Set Login'}</span>
+            </button>
+          )}
           {(isSuperAdmin || isHoAdmin) && (
             <button
               type="button"
@@ -893,6 +1019,16 @@ export default function BranchesPage() {
                       {(isSuperAdmin || isHoAdmin) && (
                         <button
                           type="button"
+                          onClick={() => handleOpenCredentials(b)}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors cursor-pointer flex items-center gap-1"
+                        >
+                          <Key className="w-3.5 h-3.5" />
+                          <span>{b.admin ? 'Login' : 'Set Login'}</span>
+                        </button>
+                      )}
+                      {(isSuperAdmin || isHoAdmin) && (
+                        <button
+                          type="button"
                           disabled={deletingId === b.id}
                           onClick={() => handleDeleteBranch(b)}
                           className="px-2.5 py-1 rounded-lg text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
@@ -1013,6 +1149,48 @@ export default function BranchesPage() {
             value={formData.address}
             onChange={(e) => setFormData({ ...formData, address: e.target.value })}
           />
+
+          {/* Quick Ward Admin Account Provisioning */}
+          <div className="p-3.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs font-bold text-slate-900 dark:text-white">Ward Admin Login Credentials (1-Click Setup)</span>
+              </div>
+              <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={formData.create_admin}
+                  onChange={(e) => setFormData({ ...formData, create_admin: e.target.checked })}
+                  className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
+                />
+                <span>Create Login</span>
+              </label>
+            </div>
+            {formData.create_admin && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <Input
+                  label="Ward Admin Email *"
+                  placeholder="e.g. ward@gospeedy.in"
+                  type="email"
+                  value={formData.admin_email}
+                  onChange={(e) => setFormData({ ...formData, admin_email: e.target.value })}
+                  required={formData.create_admin}
+                />
+                <Input
+                  label="Initial Password *"
+                  placeholder="e.g. Ward@123"
+                  type="password"
+                  value={formData.admin_password}
+                  onChange={(e) => setFormData({ ...formData, admin_password: e.target.value })}
+                  required={formData.create_admin}
+                />
+              </div>
+            )}
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Uses candidate name & contact phone entered above as the profile details for this Ward Admin account.
+            </p>
+          </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
             <Button
@@ -1203,6 +1381,61 @@ export default function BranchesPage() {
               required
             />
           </div>
+
+          {/* Quick HO Admin Account Provisioning */}
+          <div className="p-3.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/60 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span className="text-xs font-bold text-slate-900 dark:text-white">Head Office Admin Login (1-Click Setup)</span>
+              </div>
+              <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={hoFormData.create_admin}
+                  onChange={(e) => setHoFormData({ ...hoFormData, create_admin: e.target.checked })}
+                  className="rounded text-purple-600 focus:ring-purple-500 h-3.5 w-3.5"
+                />
+                <span>Create Login</span>
+              </label>
+            </div>
+            {hoFormData.create_admin && (
+              <div className="space-y-3 pt-1">
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="Admin Name"
+                    placeholder="e.g. Faridabad Admin"
+                    value={hoFormData.admin_name}
+                    onChange={(e) => setHoFormData({ ...hoFormData, admin_name: e.target.value })}
+                  />
+                  <Input
+                    label="Admin Contact Phone"
+                    placeholder="10-digit mobile"
+                    value={hoFormData.admin_phone}
+                    onChange={(e) => setHoFormData({ ...hoFormData, admin_phone: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="Admin Email *"
+                    placeholder="e.g. faridabad.ho@gospeedy.in"
+                    type="email"
+                    value={hoFormData.admin_email}
+                    onChange={(e) => setHoFormData({ ...hoFormData, admin_email: e.target.value })}
+                    required={hoFormData.create_admin}
+                  />
+                  <Input
+                    label="Initial Password *"
+                    placeholder="e.g. Admin@123"
+                    type="password"
+                    value={hoFormData.admin_password}
+                    onChange={(e) => setHoFormData({ ...hoFormData, admin_password: e.target.value })}
+                    required={hoFormData.create_admin}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
             <Button
               type="button"
@@ -1217,6 +1450,96 @@ export default function BranchesPage() {
               disabled={hoSubmitting}
             >
               {hoSubmitting ? 'Creating...' : 'Create Head Office'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Manage Ward Admin Credentials / Password */}
+      <Modal
+        isOpen={isCredentialsModalOpen}
+        onClose={() => setIsCredentialsModalOpen(false)}
+        title="Ward Admin Login Credentials"
+        subtitle={
+          credentialsBranch
+            ? `Manage login account for ${credentialsBranch.name} (${credentialsBranch.code})`
+            : 'Ward Credentials'
+        }
+      >
+        <form onSubmit={handleSaveCredentials} className="space-y-4">
+          {credentialsBranch?.admin ? (
+            <div className="p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 text-xs space-y-1">
+              <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>Active Ward Admin Account Found</span>
+              </div>
+              <p className="text-slate-600 dark:text-slate-300">
+                Current Login Email: <span className="font-mono font-bold text-slate-900 dark:text-white">{credentialsBranch.admin.email}</span>
+              </p>
+              <p className="text-slate-500 dark:text-slate-400">
+                Enter a new password below to reset this Ward Admin's login credentials.
+              </p>
+            </div>
+          ) : (
+            <div className="p-3 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 text-xs space-y-1">
+              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold">
+                <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <span>No Ward Admin Account Currently Assigned</span>
+              </div>
+              <p className="text-slate-600 dark:text-slate-300">
+                Fill in the details below to provision a new login account for this ward.
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Admin Full Name"
+              placeholder="e.g. S. Sarvjit Singh Virk"
+              value={credentialsForm.name}
+              onChange={(e) => setCredentialsForm({ ...credentialsForm, name: e.target.value })}
+              required
+            />
+            <Input
+              label="Contact Phone"
+              placeholder="10-digit mobile"
+              value={credentialsForm.phone}
+              onChange={(e) => setCredentialsForm({ ...credentialsForm, phone: e.target.value })}
+            />
+          </div>
+
+          <Input
+            label="Login Email Address *"
+            placeholder="e.g. rohiniward@gospeedy.in"
+            type="email"
+            value={credentialsForm.email}
+            onChange={(e) => setCredentialsForm({ ...credentialsForm, email: e.target.value })}
+            required
+          />
+
+          <Input
+            label={credentialsBranch?.admin ? "Set New Password *" : "Initial Password *"}
+            placeholder="Enter secure password (min 6 chars)"
+            type="password"
+            value={credentialsForm.password}
+            onChange={(e) => setCredentialsForm({ ...credentialsForm, password: e.target.value })}
+            required
+          />
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsCredentialsModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={credentialsSubmitting}
+            >
+              {credentialsBranch?.admin ? 'Update Password' : 'Create Login Account'}
             </Button>
           </div>
         </form>

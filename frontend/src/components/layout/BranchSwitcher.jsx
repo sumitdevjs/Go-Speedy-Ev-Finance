@@ -35,8 +35,8 @@ export default function BranchSwitcher({ isMobileBar = false }) {
       try {
         setLoading(true);
         const [branchesRes, hoRes] = await Promise.all([
-          api.get('/api/branches/dropdown'),
-          api.get('/api/head-offices/dropdown').catch(() => ({ data: { data: [] } })),
+          api.get(`/api/branches/dropdown?t=${Date.now()}`),
+          api.get(`/api/head-offices/dropdown?t=${Date.now()}`).catch(() => ({ data: { data: [] } })),
         ]);
         if (branchesRes.data?.success) {
           setBranches(branchesRes.data.data || []);
@@ -51,6 +51,17 @@ export default function BranchSwitcher({ isMobileBar = false }) {
     };
 
     fetchDropdownData();
+
+    const handleUpdates = () => {
+      fetchDropdownData();
+    };
+
+    window.addEventListener('branchListUpdated', handleUpdates);
+    window.addEventListener('headOfficeListUpdated', handleUpdates);
+    return () => {
+      window.removeEventListener('branchListUpdated', handleUpdates);
+      window.removeEventListener('headOfficeListUpdated', handleUpdates);
+    };
   }, [canSwitch]);
 
   if (!canSwitch) {

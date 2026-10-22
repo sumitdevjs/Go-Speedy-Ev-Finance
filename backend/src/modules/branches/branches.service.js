@@ -1,4 +1,5 @@
 const supabase = require('../../config/db');
+const bcrypt = require('bcryptjs');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
 const { buildSearchFilter } = require('../../utils/searchFilter');
 const { ALL_WARDS, ALL_HEAD_OFFICES, DELHI_HEAD_OFFICE } = require('./delhiWardsData');
@@ -184,6 +185,24 @@ class BranchesService {
           branch.active_rentals_count = activeCount;
           branch.available_stock = Math.max(0, totalStock - activeCount);
         });
+
+        // Enrich with assigned Branch Admin
+        const branchIds = data.map(b => b.id);
+        const { data: branchAdmins } = await supabase
+          .from('users')
+          .select('id, name, email, phone, branch_id, role')
+          .in('branch_id', branchIds)
+          .eq('role', 'branch_admin')
+          .eq('is_active', true);
+
+        const adminByBranch = {};
+        (branchAdmins || []).forEach(u => {
+          if (u.branch_id) adminByBranch[u.branch_id] = u;
+        });
+
+        data.forEach(branch => {
+          branch.admin = adminByBranch[branch.id] || null;
+        });
       } catch (err) {
         console.error('[getAllBranches] Enrichment error:', err);
       }
@@ -295,7 +314,7 @@ class BranchesService {
     throw new Error('Branch not found');
   }
 
-  async create({ head_office_id, ward_no, name, code, ward_area, address, phone, contact_person, status_label }, user = {}) {
+  async create({ head_office_id, ward_no, name, code, ward_area, address, phone, contact_person, status_label, admin_email, admin_password }, user = {}) {
     let finalHoId = (user && user.role === 'ho_admin' && user.head_office_id)
       ? user.head_office_id
       : head_office_id;
@@ -358,7 +377,38 @@ class BranchesService {
       }
 
       if (data) {
-        const createdBranch = { ...data, head_office: ho };
+        let createdAdmin = null;
+        if (admin_email && admin_password) {
+          try {
+            const password_hash = await bcrypt.hash(admin_password, 10);
+            const { data: userData, error: uErr } = await supabase
+              .from('users')
+              .insert([{
+                name: contact_person || name,
+                phone: phone || null,
+                email: String(admin_email).trim().toLowerCase(),
+                password_hash,
+                role: 'branch_admin',
+                head_office_id: finalHoId,
+                branch_id: data.id,
+                ward_area: ward_area || name,
+                is_active: true,
+                created_by: user?.id || null,
+              }])
+              .select('id, name, email, role, phone')
+              .single();
+
+            if (!uErr && userData) {
+              createdAdmin = userData;
+            } else if (uErr) {
+              console.error('[Create Branch Admin Error]:', uErr);
+            }
+          } catch (adminErr) {
+            console.error('[Create Branch Admin Exception]:', adminErr);
+          }
+        }
+
+        const createdBranch = { ...data, head_office: ho, admin: createdAdmin };
         inMemoryWards.unshift(createdBranch);
         return createdBranch;
       }
@@ -450,6 +500,65 @@ class BranchesService {
     }
 
     return true;
+  }
+
+  async setAdmin(branchId, { name, email, phone, password }, user = {}) {
+    const branch = await this.getById(branchId);
+    if (!email || !password) {
+      throw new Error('Email and password are required');
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const password_hash = await bcrypt.hash(password, 10);
+
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id, email, branch_id')
+      .or(`email.eq.${cleanEmail},branch_id.eq.${branch.id}`)
+      .maybeSingle();
+
+    if (existingUser) {
+      const { data: updated, error } = await supabase
+        .from('users')
+        .update({
+          name: name || branch.contact_person || branch.name,
+          phone: phone || branch.phone || null,
+          email: cleanEmail,
+          password_hash,
+          role: 'branch_admin',
+          branch_id: branch.id,
+          head_office_id: branch.head_office_id,
+          ward_area: branch.ward_area || branch.name,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingUser.id)
+        .select('id, name, email, role, phone')
+        .single();
+
+      if (error) throw error;
+      return updated;
+    } else {
+      const { data: created, error } = await supabase
+        .from('users')
+        .insert([{
+          name: name || branch.contact_person || branch.name,
+          phone: phone || branch.phone || null,
+          email: cleanEmail,
+          password_hash,
+          role: 'branch_admin',
+          branch_id: branch.id,
+          head_office_id: branch.head_office_id,
+          ward_area: branch.ward_area || branch.name,
+          is_active: true,
+          created_by: user?.id || null,
+        }])
+        .select('id, name, email, role, phone')
+        .single();
+
+      if (error) throw error;
+      return created;
+    }
   }
 
   async getBranchOverview(branchId) {
