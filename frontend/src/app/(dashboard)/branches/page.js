@@ -12,6 +12,7 @@ import {
   Phone,
   CheckCircle2,
   Eye,
+  Trash2,
   UserCheck,
   Award,
   Copy,
@@ -61,6 +62,26 @@ export default function BranchesPage() {
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [hoSubmitting, setHoSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
+  const handleDeleteBranch = async (branch) => {
+    if (!window.confirm(`Are you sure you want to delete branch "${branch.name}" (${branch.code})? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      setDeletingId(branch.id);
+      const res = await api.delete(`/api/branches/${branch.id}`);
+      if (res.data?.success) {
+        toast.success(`Branch "${branch.name}" deleted successfully`);
+        fetchBranches();
+      }
+    } catch (err) {
+      console.error('Delete branch error:', err);
+      toast.error(err.response?.data?.message || err.message || 'Failed to delete branch');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const [formData, setFormData] = useState({
     head_office_id: isHoAdmin ? (user?.head_office_id || '') : '',
@@ -504,7 +525,7 @@ export default function BranchesPage() {
     {
       header: 'Actions',
       key: 'actions',
-      className: 'min-w-[140px] whitespace-nowrap text-right',
+      className: 'min-w-[170px] whitespace-nowrap text-right',
       cellClassName: 'whitespace-nowrap text-right',
       render: (row) => (
         <div className="flex items-center justify-end gap-1.5">
@@ -528,6 +549,18 @@ export default function BranchesPage() {
             <Eye className="h-3.5 w-3.5" />
             <span>View</span>
           </button>
+          {(isSuperAdmin || isHoAdmin) && (
+            <button
+              type="button"
+              disabled={deletingId === row.id}
+              onClick={() => handleDeleteBranch(row)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 dark:hover:text-white border border-rose-200 dark:border-rose-500/30 transition-all shadow-2xs active:scale-95 cursor-pointer disabled:opacity-50"
+              title={`Delete ${row.name}`}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Delete</span>
+            </button>
+          )}
         </div>
       ),
     },
@@ -544,7 +577,7 @@ export default function BranchesPage() {
         subtitle={
           isHoAdmin
             ? `Active operational branches and wards governed under ${headOffices.find(h => h.id === user?.head_office_id)?.name || 'this Head Office'}`
-            : "Delhi DSGMC Wards (46 Official Wards), In-Charge Candidates, Addresses & Regional Hierarchy"
+            : "Active Operational Branches, In-Charge Candidates, Addresses & Regional Head Offices"
         }
         action={
           <div className="flex items-center gap-2">
@@ -604,7 +637,7 @@ export default function BranchesPage() {
               <div className="flex items-baseline gap-1.5 flex-wrap mt-0.5">
                 <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">{totalItems}</span>
                 <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">
-                  {isHoAdmin ? 'Under This HO' : 'Delhi Wards'}
+                  {isHoAdmin ? 'Under This HO' : 'Active Branches'}
                 </span>
               </div>
             </div>
@@ -637,10 +670,10 @@ export default function BranchesPage() {
                 <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white truncate">
                   {isHoAdmin
                     ? (headOffices.find(h => h.id === user?.head_office_id)?.city || 'Regional')
-                    : '5'}
+                    : (new Set(branches.map(b => b.ward_area).filter(Boolean)).size || headOffices.length || 0)}
                 </span>
                 <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">
-                  {isHoAdmin ? 'Head Office Hub' : 'Delhi Zones'}
+                  {isHoAdmin ? 'Head Office Hub' : 'Active Zones'}
                 </span>
               </div>
             </div>
@@ -658,10 +691,10 @@ export default function BranchesPage() {
                 <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono">
                   {isHoAdmin
                     ? (headOffices.find(h => h.id === user?.head_office_id)?.code || 'HO')
-                    : '3'}
+                    : headOffices.length}
                 </span>
                 <span className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">
-                  {isHoAdmin ? 'Jurisdiction' : 'Regions'}
+                  {isHoAdmin ? 'Jurisdiction' : 'Registered HOs'}
                 </span>
               </div>
             </div>
@@ -687,7 +720,7 @@ export default function BranchesPage() {
                   aria-label="Filter branches by Head Office region"
                 >
                   <option value="" className="dark:bg-slate-900 font-semibold">
-                    All Regions (46 Delhi + NCR)
+                    All Head Offices ({headOffices.length} Registered)
                   </option>
                   {headOffices.map((ho) => (
                     <option key={ho.id} value={ho.id} className="dark:bg-slate-900 font-semibold">
@@ -849,13 +882,26 @@ export default function BranchesPage() {
                       <Building2 className="w-3 h-3 shrink-0" />
                       <span>{getBranchHo(b)?.name || 'Head Office'} • {b.ho_admin?.name || 'Admin'}</span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenOverview(b)}
-                      className="px-3 py-1 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors cursor-pointer"
-                    >
-                      View Details
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenOverview(b)}
+                        className="px-3 py-1 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors cursor-pointer"
+                      >
+                        View Details
+                      </button>
+                      {(isSuperAdmin || isHoAdmin) && (
+                        <button
+                          type="button"
+                          disabled={deletingId === b.id}
+                          onClick={() => handleDeleteBranch(b)}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

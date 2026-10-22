@@ -95,6 +95,16 @@ class BranchesController {
       return errorResponse(res, 400, error.message || 'Failed to update branch');
     }
   }
+
+  async delete(req, res) {
+    try {
+      await branchesService.delete(req.params.id);
+      return successResponse(res, 200, null, 'Branch deleted successfully');
+    } catch (error) {
+      console.error('[BranchesController.delete]', error);
+      return errorResponse(res, 400, error.message || 'Failed to delete branch');
+    }
+  }
 }
 
 module.exports = new BranchesController();

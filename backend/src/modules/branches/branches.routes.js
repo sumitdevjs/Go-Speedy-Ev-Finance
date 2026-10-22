@@ -26,5 +26,6 @@ router.get('/:id', branchesController.getById.bind(branchesController));
 // Super admin and HO admin can create / update branches
 router.post('/', requireRole('super_admin', 'ho_admin', 'admin'), branchesController.create.bind(branchesController));
 router.patch('/:id', requireRole('super_admin', 'ho_admin', 'admin'), branchesController.update.bind(branchesController));
+router.delete('/:id', requireRole('super_admin', 'ho_admin', 'admin'), branchesController.delete.bind(branchesController));
 
 module.exports = router;

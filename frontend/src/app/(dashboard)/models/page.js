@@ -20,7 +20,8 @@ import {
   Phone, 
   Sparkles,
   TrendingUp,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Header from '../../../components/layout/Header';
@@ -86,6 +87,7 @@ export default function ModelsPage() {
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [ward, setWard] = useState('Delhi Central');
+  const [addModelBranchId, setAddModelBranchId] = useState('');
   const [totalPrice, setTotalPrice] = useState('80000');
   const [stockCount, setStockCount] = useState('5');
   const [kilometres, setKilometres] = useState('0');
@@ -132,7 +134,11 @@ export default function ModelsPage() {
     api.get('/api/branches/dropdown')
       .then((res) => {
         if (res.data?.success) {
-          setBranches(res.data.data || []);
+          const list = res.data.data || [];
+          setBranches(list);
+          if (list.length > 0) {
+            setAddModelBranchId(list[0].id);
+          }
         }
       })
       .catch(() => {});
@@ -370,7 +376,8 @@ export default function ModelsPage() {
     setEditingModelId(null);
     setName('');
     setCompany('');
-    setWard('Delhi Central');
+    setWard(branches[0]?.name || 'Central');
+    setAddModelBranchId(branches[0]?.id || '');
     setTotalPrice('80000');
     setStockCount('5');
     setKilometres('0');
@@ -394,10 +401,12 @@ export default function ModelsPage() {
 
     try {
       setIsSubmitting(true);
+      const chosenBranch = branches.find((b) => b.id === addModelBranchId);
       const payload = {
         name: name.trim(),
         company: company.trim(),
-        ward: ward.trim(),
+        branch_id: chosenBranch?.id || null,
+        ward: chosenBranch ? (chosenBranch.ward_no ? `Ward ${chosenBranch.ward_no}: ${chosenBranch.name}` : chosenBranch.name) : (ward.trim() || 'General'),
         total_price: Number(totalPrice),
         stock_count: Number(stockCount),
         kilometres: Number(kilometres) || 0,
@@ -448,6 +457,46 @@ export default function ModelsPage() {
       fetchModels();
     } catch (err) {
       toast.error(err.response?.data?.message || `Failed to ${action} model`);
+    }
+  };
+
+  const handleDeleteModel = async (model) => {
+    const ok = await confirmDialog({
+      title: `Delete Model: ${model.name}?`,
+      message: 'This will permanently remove this EV model from the fleet catalog. This action cannot be undone.',
+      tone: 'danger',
+      confirmLabel: 'Delete Model',
+    });
+    if (!ok) return;
+
+    try {
+      const res = await api.delete(`/api/models/${model.id}`);
+      if (res.data?.success) {
+        toast.success(`${model.name} deleted successfully.`);
+        fetchModels();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete model');
+    }
+  };
+
+  const handleResetStock = async (model) => {
+    const ok = await confirmDialog({
+      title: `Reset All Stock for ${model.name}?`,
+      message: 'This will clear all allocated stock logs and set the stock count to 0.',
+      tone: 'danger',
+      confirmLabel: 'Reset Stock',
+    });
+    if (!ok) return;
+
+    try {
+      const res = await api.post(`/api/models/${model.id}/reset-stock`);
+      if (res.data?.success) {
+        toast.success(`Stock for ${model.name} reset to 0.`);
+        fetchModels();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to reset stock');
     }
   };
 
@@ -568,6 +617,14 @@ export default function ModelsPage() {
             title={row.is_active ? "Cancel Model" : "Reactivate Model"}
             onClick={() => handleToggleDeactivate(row)}
             className={row.is_active ? "text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 cursor-pointer" : "text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 cursor-pointer"}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={Trash2}
+            title="Delete Model"
+            onClick={() => handleDeleteModel(row)}
+            className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 cursor-pointer"
           />
         </div>
       ),
@@ -894,6 +951,14 @@ export default function ModelsPage() {
                             >
                               {m.is_active ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteModel(m)}
+                              className="p-2 rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-100 transition-colors"
+                              title="Delete Model"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
 
@@ -1218,12 +1283,19 @@ export default function ModelsPage() {
                 required
               />
 
-              <Input
-                label="Initial Receiving Hub / Ward"
-                placeholder="e.g. Delhi Central or Ward 1: Rohini"
-                value={ward}
-                onChange={(e) => setWard(e.target.value)}
-              />
+              <Select
+                label="Initial Receiving Ward / Branch"
+                value={addModelBranchId}
+                onChange={(e) => setAddModelBranchId(e.target.value)}
+                required
+              >
+                <option value="" disabled>-- Select Municipal Ward / Branch --</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.ward_no ? `Ward ${b.ward_no}: ${b.name}` : b.name} {b.ward_area ? `(${b.ward_area})` : ''}
+                  </option>
+                ))}
+              </Select>
             </>
           )}
 

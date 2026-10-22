@@ -8,14 +8,14 @@ const { ALL_WARDS } = require('../branches/delhiWardsData');
 let dbBranchesCache = [];
 let lastCacheRefresh = 0;
 
-async function getLiveBranches() {
+async function getLiveBranches(forceRefresh = false) {
   const now = Date.now();
-  if (dbBranchesCache.length > 0 && now - lastCacheRefresh < 60000) {
+  if (!forceRefresh && dbBranchesCache.length > 0 && now - lastCacheRefresh < 5000) {
     return dbBranchesCache;
   }
   try {
-    const { data } = await supabase.from('branches').select('*');
-    if (data && data.length > 0) {
+    const { data } = await supabase.from('branches').select('*').order('ward_no', { ascending: true, nullsFirst: false });
+    if (data) {
       dbBranchesCache = data;
       lastCacheRefresh = now;
     }
@@ -23,7 +23,6 @@ async function getLiveBranches() {
   return dbBranchesCache;
 }
 
-// Initial fetch
 getLiveBranches();
 
 function findWard(targetIdOrName, branchesList = null) {
@@ -33,20 +32,9 @@ function findWard(targetIdOrName, branchesList = null) {
 
   const list = (branchesList && branchesList.length > 0) ? branchesList : dbBranchesCache;
 
-  // 1. Check live DB branches cache first
-  const fromDb = list.find(w => 
+  return list.find(w => 
     (w.id && String(w.id).toLowerCase() === s) ||
     (w.code && String(w.code).toLowerCase() === s) ||
-    (w.ward_no && (String(w.ward_no) === s || String(w.ward_no).padStart(2, '0') === s)) ||
-    (w.name && (w.name.toLowerCase() === s || w.name.toLowerCase().replace(/[^a-z0-9]/g, '') === sNorm)) ||
-    (w.ward_area && (w.ward_area.toLowerCase() === s || w.ward_area.toLowerCase().replace(/[^a-z0-9]/g, '') === sNorm))
-  );
-  if (fromDb) return fromDb;
-
-  // 2. Fallback to ALL_WARDS
-  return ALL_WARDS.find(w => 
-    (w.id && w.id.toLowerCase() === s) ||
-    (w.code && w.code.toLowerCase() === s) ||
     (w.ward_no && (String(w.ward_no) === s || String(w.ward_no).padStart(2, '0') === s)) ||
     (w.name && (w.name.toLowerCase() === s || w.name.toLowerCase().replace(/[^a-z0-9]/g, '') === sNorm)) ||
     (w.ward_area && (w.ward_area.toLowerCase() === s || w.ward_area.toLowerCase().replace(/[^a-z0-9]/g, '') === sNorm))
@@ -55,18 +43,11 @@ function findWard(targetIdOrName, branchesList = null) {
 
 function isLogForWard(log, targetWard) {
   if (!log || !targetWard) return false;
-  if (log.branch_id) {
-    const bId = String(log.branch_id).trim().toLowerCase();
-    if (targetWard.id && bId === String(targetWard.id).toLowerCase()) return true;
-    if (targetWard.code && bId === String(targetWard.code).toLowerCase()) return true;
-    if (targetWard.name && bId.replace(/[^a-z0-9]/g, '') === String(targetWard.name).toLowerCase().replace(/[^a-z0-9]/g, '')) return true;
-    if (targetWard.ward_no && (bId === `ward-del-${String(targetWard.ward_no).padStart(2, '0')}` || bId === `ward-del-${targetWard.ward_no}`)) return true;
+  if (log.branch_id && targetWard.id) {
+    return String(log.branch_id).trim().toLowerCase() === String(targetWard.id).trim().toLowerCase();
   }
-  if (log.ward_no && targetWard.ward_no && Number(log.ward_no) === Number(targetWard.ward_no)) return true;
-  if (log.ward_area && targetWard.name) {
-    const lArea = String(log.ward_area).toLowerCase().replace(/[^a-z0-9]/g, '');
-    const wName = String(targetWard.name).toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (lArea === wName || lArea.includes(wName) || wName.includes(lArea)) return true;
+  if (!log.branch_id && targetWard.ward_no && log.ward_no) {
+    return Number(targetWard.ward_no) === Number(log.ward_no);
   }
   return false;
 }
@@ -123,23 +104,25 @@ class ModelsService {
         m.total_global_stock = m.stock_count;
 
         if (scopedWard) {
-          // Calculate stock strictly for this scoped ward
           const wardLogs = modelLogs.filter(log => isLogForWard(log, scopedWard));
           const wardStockCount = wardLogs.reduce((acc, l) => acc + (Number(l.stock_added) || 0), 0);
           m.stock_count = Math.max(0, wardStockCount);
           m.scoped_ward = { id: scopedWard.id, name: scopedWard.name, ward_no: scopedWard.ward_no };
         } else {
-          // Super admin global view: calculate breakdown across all wards
           const wardSummaryMap = {};
+          let validTotalStock = 0;
           modelLogs.forEach(log => {
-            let label = log.ward_area || 'General';
             const matched = findWard(log.branch_id || log.ward_no || log.ward_area, branches);
             if (matched) {
-              label = `Ward ${matched.ward_no}: ${matched.name}`;
+              const label = matched.ward_no ? `Ward ${matched.ward_no}: ${matched.name}` : matched.name;
+              const added = Number(log.stock_added) || 0;
+              wardSummaryMap[label] = (wardSummaryMap[label] || 0) + added;
+              validTotalStock += added;
             }
-            wardSummaryMap[label] = (wardSummaryMap[label] || 0) + (Number(log.stock_added) || 0);
           });
           m.ward_stock_summary = Object.entries(wardSummaryMap).map(([ward_label, stock]) => ({ ward_label, stock }));
+          m.stock_count = validTotalStock;
+          m.total_global_stock = validTotalStock;
           m.scoped_ward = null;
         }
       });
@@ -185,12 +168,21 @@ class ModelsService {
     const targetBranchIdentifier = branchHeader || branchQuery || userBranch || userWardArea;
     const scopedWard = findWard(targetBranchIdentifier, branches);
 
-    if (data && scopedWard) {
+    if (data) {
       data.forEach(m => {
         const modelLogs = Array.isArray(m.stock_logs) ? m.stock_logs : [];
-        const wardLogs = modelLogs.filter(log => isLogForWard(log, scopedWard));
-        const wardStockCount = wardLogs.reduce((acc, l) => acc + (Number(l.stock_added) || 0), 0);
-        m.stock_count = Math.max(0, wardStockCount);
+        if (scopedWard) {
+          const wardLogs = modelLogs.filter(log => isLogForWard(log, scopedWard));
+          m.stock_count = Math.max(0, wardLogs.reduce((acc, l) => acc + (Number(l.stock_added) || 0), 0));
+        } else {
+          let validTotalStock = 0;
+          modelLogs.forEach(log => {
+            if (findWard(log.branch_id || log.ward_no || log.ward_area, branches)) {
+              validTotalStock += (Number(log.stock_added) || 0);
+            }
+          });
+          m.stock_count = validTotalStock;
+        }
       });
     }
 
@@ -231,13 +223,15 @@ class ModelsService {
 
     let initialLogs = [];
     if (restData.stock_count && Number(restData.stock_count) > 0) {
+      const branches = await getLiveBranches();
+      const matchedBranch = findWard(assignedBranchId || ward, branches);
       initialLogs.push({
         id: crypto.randomUUID(),
         date: initial_stock_date || todayStr,
         stock_added: Number(restData.stock_count),
-        ward_area: ward || 'Delhi Central',
-        branch_id: assignedBranchId,
-        ward_no: null,
+        ward_area: matchedBranch ? (matchedBranch.ward_no ? `Ward ${matchedBranch.ward_no}: ${matchedBranch.name}` : matchedBranch.name) : (ward || 'General'),
+        branch_id: matchedBranch?.id || assignedBranchId || null,
+        ward_no: matchedBranch?.ward_no || null,
       });
     }
 
@@ -299,24 +293,30 @@ class ModelsService {
     const scopedWard = findWard(targetBranchIdentifier, branches);
 
     const modelLogs = Array.isArray(data.stock_logs) ? data.stock_logs : [];
-    data.total_global_stock = data.stock_count;
 
     if (scopedWard) {
       const wardLogs = modelLogs.filter(log => isLogForWard(log, scopedWard));
       const wardStockCount = wardLogs.reduce((acc, l) => acc + (Number(l.stock_added) || 0), 0);
       data.stock_count = Math.max(0, wardStockCount);
+      data.total_global_stock = modelLogs.reduce((acc, l) => {
+        return findWard(l.branch_id || l.ward_no || l.ward_area, branches) ? acc + (Number(l.stock_added) || 0) : acc;
+      }, 0);
       data.scoped_ward = { id: scopedWard.id, name: scopedWard.name, ward_no: scopedWard.ward_no };
     } else {
       const wardSummaryMap = {};
+      let validTotalStock = 0;
       modelLogs.forEach(log => {
-        let label = log.ward_area || 'General';
         const matched = findWard(log.branch_id || log.ward_no || log.ward_area, branches);
         if (matched) {
-          label = `Ward ${matched.ward_no}: ${matched.name}`;
+          const label = matched.ward_no ? `Ward ${matched.ward_no}: ${matched.name}` : matched.name;
+          const added = Number(log.stock_added) || 0;
+          wardSummaryMap[label] = (wardSummaryMap[label] || 0) + added;
+          validTotalStock += added;
         }
-        wardSummaryMap[label] = (wardSummaryMap[label] || 0) + (Number(log.stock_added) || 0);
       });
       data.ward_stock_summary = Object.entries(wardSummaryMap).map(([ward_label, stock]) => ({ ward_label, stock }));
+      data.stock_count = validTotalStock;
+      data.total_global_stock = validTotalStock;
       data.scoped_ward = null;
     }
 
@@ -324,7 +324,7 @@ class ModelsService {
   }
 
   async addStock(id, payload, req = null) {
-    const branches = await getLiveBranches();
+    const branches = await getLiveBranches(true);
     const { date, stock_added, ward_area, branch_id, ward_no } = payload;
     
     const todayStr = new Date().toISOString().split('T')[0];
@@ -332,14 +332,16 @@ class ModelsService {
       throw new Error('Stock received date cannot be in the past (back date not allowed).');
     }
 
-    // Resolve target ward:
-    // If caller is a branch_admin / ward_admin, strictly lock to their own ward!
     let targetWard = null;
     if (req?.user && (req.user.role === 'branch_admin' || req.user.role === 'staff')) {
       const userWardIdentifier = req.user.branch_id || req.user.ward_area;
       targetWard = findWard(userWardIdentifier, branches);
     } else {
-      targetWard = findWard(branch_id || ward_no || ward_area, branches) || findWard(branch_id, branches) || findWard(ward_no, branches) || findWard(ward_area, branches);
+      targetWard = findWard(branch_id, branches) || findWard(ward_no, branches) || findWard(ward_area, branches);
+    }
+
+    if (!targetWard) {
+      throw new Error('Please select an active, registered Branch/Ward to receive stock.');
     }
 
     const { data: model, error: fetchError } = await supabase
@@ -355,20 +357,27 @@ class ModelsService {
       id: crypto.randomUUID(),
       date,
       stock_added: Number(stock_added),
-      ward_area: targetWard ? (targetWard.ward_no ? `Ward ${targetWard.ward_no}: ${targetWard.name}` : targetWard.name) : (ward_area || 'General'),
-      branch_id: targetWard?.id || branch_id || null,
-      ward_no: targetWard?.ward_no || (ward_no ? Number(ward_no) : null),
+      ward_area: targetWard.ward_no ? `Ward ${targetWard.ward_no}: ${targetWard.name}` : targetWard.name,
+      branch_id: targetWard.id,
+      ward_no: targetWard.ward_no ? Number(targetWard.ward_no) : null,
     };
     
     const existingLogs = Array.isArray(model.stock_logs) ? model.stock_logs : [];
     const updatedLogs = [...existingLogs, newLog];
-    const newCount = (model.stock_count || 0) + Number(stock_added);
+
+    let newCount = 0;
+    updatedLogs.forEach(l => {
+      if (findWard(l.branch_id || l.ward_no || l.ward_area, branches)) {
+        newCount += (Number(l.stock_added) || 0);
+      }
+    });
 
     const { data, error } = await supabase
       .from('ev_models')
       .update({ 
         stock_count: newCount,
-        stock_logs: updatedLogs
+        stock_logs: updatedLogs,
+        updated_at: new Date().toISOString()
       })
       .eq('id', id)
       .select('*')
@@ -407,15 +416,24 @@ class ModelsService {
       const todayStr = new Date().toISOString().split('T')[0];
       const { data: current } = await supabase.from('ev_models').select('stock_logs').eq('id', id).single();
       const currentLogs = Array.isArray(current?.stock_logs) ? current.stock_logs : [];
-      const hasInvalidNewPastDate = updateData.stock_logs.some((l, idx) => {
+      const hasInvalidNewPastDate = updateData.stock_logs.some((l) => {
         if (!l.date) return false;
-        const curDate = currentLogs[idx]?.date;
-        if (curDate === l.date) return false;
+        const existingLog = l.id ? currentLogs.find(orig => orig.id === l.id) : null;
+        if (existingLog && existingLog.date === l.date) return false;
         return String(l.date).split('T')[0] < todayStr;
       });
       if (hasInvalidNewPastDate) {
         throw new Error('Stock log date cannot be set to a past date (back date not allowed).');
       }
+
+      const branches = await getLiveBranches();
+      let validStock = 0;
+      updateData.stock_logs.forEach(l => {
+        if (findWard(l.branch_id || l.ward_no || l.ward_area, branches)) {
+          validStock += (Number(l.stock_added) || 0);
+        }
+      });
+      updateData.stock_count = validStock;
     }
 
     const payload = {
@@ -448,6 +466,43 @@ class ModelsService {
       }
       throw error;
     }
+    return data;
+  }
+
+  async deleteModel(id) {
+    const { data: activeRentals, error: rError } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('ev_model_id', id)
+      .eq('status', 'rented')
+      .limit(1);
+
+    if (activeRentals && activeRentals.length > 0) {
+      throw new Error('Cannot delete this EV model because it has active rented contracts.');
+    }
+
+    const { error } = await supabase
+      .from('ev_models')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
+  }
+
+  async resetModelStock(id) {
+    const { data, error } = await supabase
+      .from('ev_models')
+      .update({
+        stock_count: 0,
+        stock_logs: [],
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) throw error;
     return data;
   }
 

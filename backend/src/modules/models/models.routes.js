@@ -276,4 +276,18 @@ router.post(
   modelsController.addStock.bind(modelsController)
 );
 
+router.delete(
+  '/:id',
+  requireRole('super_admin', 'admin'),
+  requestLogger('ev_models', 'DELETE_MODEL'),
+  modelsController.delete.bind(modelsController)
+);
+
+router.post(
+  '/:id/reset-stock',
+  requireRole('super_admin', 'admin'),
+  requestLogger('ev_models', 'RESET_STOCK'),
+  modelsController.resetStock.bind(modelsController)
+);
+
 module.exports = router;

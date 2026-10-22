@@ -168,11 +168,13 @@ class BranchesService {
           allModels.forEach(m => {
             const logs = Array.isArray(m.stock_logs) ? m.stock_logs : [];
             logs.forEach(l => {
-              if (
-                (l.branch_id && String(l.branch_id).toLowerCase() === String(branch.id).toLowerCase()) ||
-                (l.ward_no && branch.ward_no && Number(l.ward_no) === Number(branch.ward_no)) ||
-                (l.ward_area && branch.name && String(l.ward_area).toLowerCase().includes(String(branch.name).toLowerCase()))
-              ) {
+              let matches = false;
+              if (l.branch_id) {
+                matches = String(l.branch_id).toLowerCase() === String(branch.id).toLowerCase();
+              } else if (l.ward_no && branch.ward_no) {
+                matches = Number(l.ward_no) === Number(branch.ward_no);
+              }
+              if (matches) {
                 totalStock += (Number(l.stock_added) || 0);
               }
             });
@@ -199,13 +201,15 @@ class BranchesService {
         .eq('is_active', true)
         .order('ward_no', { ascending: true, nullsFirst: false });
 
-      // Direct DB isolation for Ward Admin
+      // Direct DB isolation for Ward Admin and HO Admin
       if (user && (user.role === 'branch_admin' || user.role === 'staff')) {
         if (user.branch_id) {
           queryBuilder = queryBuilder.eq('id', user.branch_id);
         } else if (user.ward_area) {
           queryBuilder = queryBuilder.ilike('name', `%${user.ward_area}%`);
         }
+      } else if (user && user.role === 'ho_admin' && user.head_office_id) {
+        queryBuilder = queryBuilder.eq('head_office_id', user.head_office_id);
       } else if (query.head_office_id) {
         queryBuilder = queryBuilder.eq('head_office_id', query.head_office_id);
       }
@@ -405,6 +409,47 @@ class BranchesService {
       return inMemoryWards[idx];
     }
     throw new Error('Branch not found');
+  }
+
+  async delete(id) {
+    const { data: activeRentals } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('branch_id', id)
+      .eq('status', 'rented')
+      .limit(1);
+
+    if (activeRentals && activeRentals.length > 0) {
+      throw new Error('Cannot delete this branch because it has active rented contracts.');
+    }
+
+    const { data: activeUsers } = await supabase
+      .from('users')
+      .select('id, name')
+      .eq('branch_id', id)
+      .eq('is_active', true)
+      .limit(1);
+
+    if (activeUsers && activeUsers.length > 0) {
+      throw new Error(`Cannot delete this branch because it has assigned staff (${activeUsers[0].name}). Reassign or remove staff first.`);
+    }
+
+    const { error } = await supabase
+      .from('branches')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('[deleteBranch DB Error]:', error);
+      throw error;
+    }
+
+    const idx = inMemoryWards.findIndex(w => w.id === id || w.code === id);
+    if (idx >= 0) {
+      inMemoryWards.splice(idx, 1);
+    }
+
+    return true;
   }
 
   async getBranchOverview(branchId) {

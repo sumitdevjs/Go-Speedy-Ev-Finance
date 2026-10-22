@@ -128,6 +128,48 @@ export default function ModelViewPage({ params }) {
     }
   };
 
+  const handleDeleteModel = async () => {
+    if (!model) return;
+    const ok = await confirmDialog({
+      title: `Delete Model: ${model.name}?`,
+      message: 'This will permanently remove this EV model from the fleet catalog. This cannot be undone.',
+      tone: 'danger',
+      confirmLabel: 'Delete Model',
+    });
+    if (!ok) return;
+
+    try {
+      const res = await api.delete(`/api/models/${model.id}`);
+      if (res.data?.success) {
+        toast.success(`${model.name} deleted successfully.`);
+        router.push('/models');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete model');
+    }
+  };
+
+  const handleResetStock = async () => {
+    if (!model) return;
+    const ok = await confirmDialog({
+      title: `Reset All Stock for ${model.name}?`,
+      message: 'This will clear all allocated stock logs and set the stock count to 0.',
+      tone: 'danger',
+      confirmLabel: 'Reset Stock',
+    });
+    if (!ok) return;
+
+    try {
+      const res = await api.post(`/api/models/${model.id}/reset-stock`);
+      if (res.data?.success) {
+        toast.success(`Stock for ${model.name} reset to 0.`);
+        fetchModel();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to reset stock');
+    }
+  };
+
   const handleLogChange = (index, field, value) => {
     const newLogs = [...editableLogs];
     newLogs[index][field] = field === 'stock_added' ? Number(value) : value;
@@ -141,10 +183,10 @@ export default function ModelViewPage({ params }) {
   };
 
   const handleSaveLogs = async () => {
-    const hasInvalidPastLog = editableLogs.some((l, idx) => {
+    const hasInvalidPastLog = editableLogs.some((l) => {
       if (!l.date) return false;
-      const origDate = logs[idx]?.date;
-      if (origDate === l.date) return false;
+      const orig = l.id ? logs.find(item => item.id === l.id) : null;
+      if (orig && orig.date === l.date) return false;
       return l.date < todayStr;
     });
     if (hasInvalidPastLog) {
@@ -313,6 +355,17 @@ export default function ModelViewPage({ params }) {
             >
               <span className="hidden md:inline">{model.is_active ? 'Deactivate Model' : 'Reactivate Model'}</span>
               <span className="hidden xs:inline md:hidden">{model.is_active ? 'Deactivate' : 'Reactivate'}</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Trash2}
+              onClick={handleDeleteModel}
+              className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-2.5 xs:py-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/50"
+              title="Delete Model"
+            >
+              <span className="hidden md:inline">Delete Model</span>
+              <span className="hidden xs:inline md:hidden">Delete</span>
             </Button>
             {!isEditMode ? (
               <Button

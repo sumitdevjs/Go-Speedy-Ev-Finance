@@ -18,7 +18,7 @@ class HeadOfficesService {
 
       const { data, error } = await queryBuilder;
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data;
       }
     } catch (e) {
@@ -45,7 +45,7 @@ class HeadOfficesService {
 
       const { data, error } = await queryBuilder;
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data;
       }
     } catch (e) {

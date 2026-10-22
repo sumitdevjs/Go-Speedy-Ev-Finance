@@ -92,6 +92,27 @@ class ModelsController {
       return errorResponse(res, 500, error.message || 'Internal Server Error');
     }
   }
+
+  async delete(req, res) {
+    try {
+      const { id } = req.params;
+      await modelsService.deleteModel(id);
+      return successResponse(res, 200, null, 'Model deleted successfully');
+    } catch (error) {
+      const status = error.message?.includes('active') ? 400 : 500;
+      return errorResponse(res, status, error.message || 'Failed to delete model');
+    }
+  }
+
+  async resetStock(req, res) {
+    try {
+      const { id } = req.params;
+      const data = await modelsService.resetModelStock(id);
+      return successResponse(res, 200, data, 'Model stock reset to zero successfully');
+    } catch (error) {
+      return errorResponse(res, 500, error.message || 'Failed to reset stock');
+    }
+  }
 }
 
 module.exports = new ModelsController();
