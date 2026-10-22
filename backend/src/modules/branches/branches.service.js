@@ -473,15 +473,14 @@ class BranchesService {
       throw new Error('Cannot delete this branch because it has active rented contracts.');
     }
 
-    const { data: activeUsers } = await supabase
-      .from('users')
-      .select('id, name')
-      .eq('branch_id', id)
-      .eq('is_active', true)
-      .limit(1);
-
-    if (activeUsers && activeUsers.length > 0) {
-      throw new Error(`Cannot delete this branch because it has assigned staff (${activeUsers[0].name}). Reassign or remove staff first.`);
+    // Disassociate any assigned users/admins from this branch
+    try {
+      await supabase
+        .from('users')
+        .update({ branch_id: null })
+        .eq('branch_id', id);
+    } catch (uErr) {
+      console.warn('[Branch delete] Disassociating users warning:', uErr);
     }
 
     const { error } = await supabase
