@@ -111,10 +111,10 @@ export default function StaffPage() {
   }, []);
 
   useEffect(() => {
-    if (isAddModalOpen || isEditModalOpen) {
+    if (isAddModalOpen || editingStaff) {
       fetchDropdowns();
     }
-  }, [isAddModalOpen, isEditModalOpen]);
+  }, [isAddModalOpen, editingStaff]);
 
   useEffect(() => {
     if (isHoAdmin && currentUser?.head_office_id) {
