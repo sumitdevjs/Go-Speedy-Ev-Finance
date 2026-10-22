@@ -36,7 +36,7 @@ app.use(cookieParser());
 
 // Session — used briefly during OAuth redirect (not for general auth)
 app.use(session({
-  secret: env.SESSION_SECRET,
+  secret: env.SESSION_SECRET || env.JWT_SECRET || 'gospeedy-session-secret-fallback',
   resave: false,
   saveUninitialized: false,
   cookie: { secure: env.NODE_ENV === 'production', maxAge: 5 * 60 * 1000 }, // 5 min
@@ -46,8 +46,9 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Swagger Docs (enabled by default unless explicitly disabled)
-if (env.SWAGGER_ENABLED) {
+// Swagger Docs: strictly enabled ONLY in local testing/development; completely disabled in live production
+const isProduction = env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+if (env.SWAGGER_ENABLED && !isProduction) {
   app.get(['/api/docs', '/api/docs/'], (req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.send(`
@@ -96,6 +97,13 @@ const bookingsRoutes = require('./src/modules/bookings/bookings.routes');
 const documentsRoutes = require('./src/modules/documents/documents.routes');
 const purchasesRoutes = require('./src/modules/purchases/purchases.routes');
 const auditRoutes = require('./src/modules/audit/audit.routes');
+const oldEvsRoutes = require('./src/modules/models/oldEvs.routes');
+const headOfficesRoutes = require('./src/modules/headOffices/headOffices.routes');
+const branchesRoutes = require('./src/modules/branches/branches.routes');
+const customersRoutes = require('./src/modules/customers/customers.routes');
+const reportsRoutes = require('./src/modules/reports/reports.routes');
+const transfersRoutes = require('./src/modules/transfers/transfers.routes');
+const penaltiesRoutes = require('./src/modules/penalties/penalties.routes');
 
 // Use Routes
 app.use('/api/auth', authRoutes);
@@ -107,6 +115,13 @@ app.use('/api/bookings', bookingsRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api/purchases', purchasesRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/old-evs', oldEvsRoutes);
+app.use('/api/head-offices', headOfficesRoutes);
+app.use('/api/branches', branchesRoutes);
+app.use('/api/customers', customersRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/transfers', transfersRoutes);
+app.use('/api/penalties', penaltiesRoutes);
 
 // Global Error Handler (must be last)
 app.use(errorHandler);
@@ -116,7 +131,7 @@ const PORT = env.PORT || 5000;
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT} in ${env.NODE_ENV} mode`);
-    if (env.SWAGGER_ENABLED) {
+    if (env.SWAGGER_ENABLED && !isProduction) {
       console.log(`📄 Swagger docs available at http://localhost:${PORT}/api/docs`);
     }
   });

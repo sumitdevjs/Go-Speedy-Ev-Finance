@@ -66,4 +66,46 @@ describe('Financial Balance Calculation', () => {
     const result = calcBalance(tenant, 10000);
     expect(result.contractExpired).toBe(true);
   });
+
+  test('calculates late fee and net total due when overdue with default ₹50/day rate', () => {
+    const tenant = {
+      total_price: 500,
+      booking_amount: 50,
+      downpayment_paid: 100,
+      installment_daily_rate: 250,
+    };
+    const result = calcBalance(tenant, 0);
+    expect(result.daysOverdue).toBe(2);
+    expect(result.lateFeeDailyRate).toBe(50);
+    expect(result.totalLateFee).toBe(100); // 2 days * ₹50
+    expect(result.netTotalDue).toBe(450); // 350 outstanding + 100 late fee
+  });
+
+  test('calculates late fee with custom branch/tenant late_fee_daily_rate', () => {
+    const tenant = {
+      total_price: 500,
+      booking_amount: 50,
+      downpayment_paid: 100,
+      installment_daily_rate: 250,
+      late_fee_daily_rate: 75,
+    };
+    const result = calcBalance(tenant, 0);
+    expect(result.daysOverdue).toBe(2);
+    expect(result.lateFeeDailyRate).toBe(75);
+    expect(result.totalLateFee).toBe(150); // 2 days * ₹75
+    expect(result.netTotalDue).toBe(500); // 350 outstanding + 150 late fee
+  });
+
+  test('zero late fee when fully paid', () => {
+    const tenant = {
+      total_price: 500,
+      booking_amount: 50,
+      downpayment_paid: 100,
+      installment_daily_rate: 250,
+    };
+    const result = calcBalance(tenant, 350);
+    expect(result.daysOverdue).toBe(0);
+    expect(result.totalLateFee).toBe(0);
+    expect(result.netTotalDue).toBe(0);
+  });
 });

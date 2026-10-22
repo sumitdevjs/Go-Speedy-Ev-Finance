@@ -5,7 +5,7 @@ class PaymentsController {
   async getAll(req, res) {
     try {
       const { tenant_id } = req.query;
-      const data = await paymentsService.getPayments(tenant_id);
+      const data = await paymentsService.getPayments(tenant_id, req);
       return successResponse(res, 200, data, 'Payments retrieved successfully');
     } catch (error) {
       console.error(error);
@@ -15,11 +15,14 @@ class PaymentsController {
 
   async record(req, res) {
     try {
-      const data = await paymentsService.recordPayment(req.body, req.user.id);
+      const data = await paymentsService.recordPayment(req.body, req.user.id, req);
       return successResponse(res, 201, data, 'Payment recorded successfully');
     } catch (error) {
       if (error.message.startsWith('Cannot record payment') || error.message === 'Tenant not found') {
         return errorResponse(res, 400, error.message);
+      }
+      if (error.message.startsWith('Access denied')) {
+        return errorResponse(res, 403, error.message);
       }
       console.error(error);
       return errorResponse(res, 500, 'Internal Server Error');

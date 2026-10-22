@@ -7,7 +7,7 @@ const clientIp = (req) => req.ip || req.headers['x-forwarded-for'];
 class StaffController {
   async getAll(req, res) {
     try {
-      const { data, meta } = await staffService.getAllStaff(req.query);
+      const { data, meta } = await staffService.getAllStaff(req.query, req);
       return successResponse(res, 200, data, 'Staff retrieved successfully', meta);
     } catch (error) {
       console.error(error);
@@ -17,7 +17,7 @@ class StaffController {
 
   async create(req, res) {
     try {
-      const data = await staffService.createStaff(req.body, req.user.id);
+      const data = await staffService.createStaff(req.body, req.user.id, req);
       await logAudit({
         userId: req.user.id,
         userRole: req.user.role,
@@ -40,7 +40,7 @@ class StaffController {
   async update(req, res) {
     try {
       const { id } = req.params;
-      const { data, diff } = await staffService.updateStaff(id, req.body, req.user.id);
+      const { data, diff } = await staffService.updateStaff(id, req.body, req.user.id, req);
       await logAudit({
         userId: req.user.id,
         userRole: req.user.role,
@@ -67,7 +67,7 @@ class StaffController {
     try {
       const { id } = req.params;
       const { password } = req.body;
-      await staffService.changePassword(id, password);
+      await staffService.changePassword(id, password, req.user);
       // Never log the password itself (hashed or not) — just record that a reset happened.
       await logAudit({
         userId: req.user.id,
@@ -81,7 +81,8 @@ class StaffController {
       return successResponse(res, 200, null, 'Password updated successfully');
     } catch (error) {
       console.error(error);
-      return errorResponse(res, 500, 'Internal Server Error');
+      const status = error.message?.includes('Access denied') ? 403 : 400;
+      return errorResponse(res, status, error.message || 'Internal Server Error');
     }
   }
 

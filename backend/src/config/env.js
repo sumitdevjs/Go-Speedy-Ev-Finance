@@ -1,10 +1,8 @@
 const { z } = require('zod');
 const dotenv = require('dotenv');
 
-// Load environment variables from .env file
 dotenv.config();
 
-// Define the schema for our environment variables
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().default('5000'),
@@ -13,24 +11,18 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
   FRONTEND_URL: z.string().optional().default('*'),
   SWAGGER_ENABLED: z.string().transform((val) => val === 'true').default('true'),
-  // Google OAuth — optional so the app runs without them configured
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.string().optional(),
   BACKEND_URL: z.string().optional(),
-  // Unused (no express-session wired up — OAuth uses stateless JWTs).
   SESSION_SECRET: z.string().optional(),
-
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.string().optional(),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
-  // Visible "From" address — separate from SMTP_USER, which for relays like
-  // Brevo is just the login credential, not a DKIM/SPF-aligned sender.
   EMAIL_FROM: z.string().optional(),
 });
 
-// Validate the environment variables
 const _env = envSchema.safeParse(process.env);
 
 if (!_env.success) {

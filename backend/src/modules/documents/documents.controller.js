@@ -5,11 +5,14 @@ class DocumentsController {
   async getForTenant(req, res) {
     try {
       const { tenantId } = req.params;
-      const data = await documentsService.getDocumentsForTenant(tenantId);
+      const data = await documentsService.getDocumentsForTenant(tenantId, req);
       return successResponse(res, 200, data, 'Documents retrieved successfully');
     } catch (error) {
       if (error.message === 'Tenant not found') {
         return errorResponse(res, 404, error.message);
+      }
+      if (error.message.startsWith('Access denied')) {
+        return errorResponse(res, 403, error.message);
       }
       console.error(error);
       return errorResponse(res, 500, 'Internal Server Error');
@@ -31,7 +34,7 @@ class DocumentsController {
         'aadhar_path', 'pan_path', 'cheque_path', 
         'electricity_bill_path', 'tenant_photo_path', 'scooty_photo_path',
         'rent_agreement_path', 'scooty_insurance_path', 'rider_insurance_path',
-        'invoice_doc_path', 'amc_doc_path'
+        'invoice_doc_path', 'verification_doc'
       ];
 
       if (!allowedDocTypes.includes(doc_type)) {

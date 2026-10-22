@@ -2,6 +2,7 @@ const express = require('express');
 const { z } = require('zod');
 const modelsController = require('./models.controller');
 const requireAuth = require('../../middleware/auth');
+const { requireRole } = require('../../middleware/roleGuard');
 const requestLogger = require('../../middleware/requestLogger');
 
 const router = express.Router();
@@ -13,22 +14,27 @@ const createModelSchema = z.object({
   company: z.string().min(1),
   total_price: z.number().positive(),
   stock_count: z.number().min(0).default(0),
+  kilometres: z.number().min(0).default(0),
   initial_stock_date: z.string().optional(),
   // ward is extracted from payload and stored only in the initial stock log — not on the model row
   ward: z.string().optional(),
 });
 
 const stockLogSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().optional(),
   date: z.string(),
   stock_added: z.number(),
-  ward_area: z.string()
+  ward_area: z.string().optional(),
+  branch_id: z.string().nullable().optional(),
+  ward_no: z.number().nullable().optional(),
 });
 
 const addStockSchema = z.object({
   date: z.string(),
   stock_added: z.number().int().positive(),
-  ward_area: z.string().min(1)
+  ward_area: z.string().optional(),
+  branch_id: z.string().nullable().optional(),
+  ward_no: z.number().nullable().optional(),
 });
 
 const updateModelSchema = z.object({
@@ -36,6 +42,7 @@ const updateModelSchema = z.object({
   company: z.string().min(1).optional(),
   total_price: z.number().positive().optional(),
   stock_count: z.number().min(0).optional(),
+  kilometres: z.number().min(0).optional(),
   is_active: z.boolean().optional(),
   stock_logs: z.array(stockLogSchema).optional(),
 });
@@ -58,6 +65,20 @@ const validateBody = (schema) => (req, res, next) => {
  *         description: Full list of models
  */
 router.get('/dropdown', modelsController.getAllForDropdown.bind(modelsController));
+
+/**
+ * @openapi
+ * /api/models/ward-breakdown:
+ *   get:
+ *     summary: List stock distribution matrix across all Delhi municipal wards
+ *     tags: [Models]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Full breakdown of stock per ward and per model
+ */
+router.get('/ward-breakdown', modelsController.getWardBreakdown.bind(modelsController));
 
 /**
  * @openapi
@@ -153,6 +174,7 @@ router.get('/:id', modelsController.getById.bind(modelsController));
  */
 router.post(
   '/', 
+  requireRole('super_admin', 'ho_admin', 'admin'),
   validateBody(createModelSchema), 
   requestLogger('ev_models', 'CREATE_MODEL'), 
   modelsController.create.bind(modelsController)
@@ -211,6 +233,7 @@ router.post(
  */
 router.patch(
   '/:id', 
+  requireRole('super_admin', 'ho_admin', 'admin'),
   validateBody(updateModelSchema), 
   requestLogger('ev_models', 'UPDATE_MODEL'), 
   modelsController.update.bind(modelsController)
@@ -247,9 +270,24 @@ router.patch(
  */
 router.post(
   '/:id/stock',
+  requireRole('super_admin', 'ho_admin', 'admin'),
   validateBody(addStockSchema),
   requestLogger('ev_models', 'ADD_STOCK'),
   modelsController.addStock.bind(modelsController)
+);
+
+router.delete(
+  '/:id',
+  requireRole('super_admin', 'admin'),
+  requestLogger('ev_models', 'DELETE_MODEL'),
+  modelsController.delete.bind(modelsController)
+);
+
+router.post(
+  '/:id/reset-stock',
+  requireRole('super_admin', 'admin'),
+  requestLogger('ev_models', 'RESET_STOCK'),
+  modelsController.resetStock.bind(modelsController)
 );
 
 module.exports = router;

@@ -36,6 +36,8 @@ import Select from '../../../../components/ui/Select';
 import Spinner from '../../../../components/ui/Spinner';
 import FileUpload from '../../../../components/ui/FileUpload';
 import api from '../../../../lib/api';
+import { useAuthStore } from '../../../../store/authStore';
+import AddPenaltyModal from '../../../../components/penalties/AddPenaltyModal';
 import {
   formatCurrency,
   formatDate,
@@ -50,17 +52,20 @@ export default function TenantDetailPage() {
   const router = useRouter();
   const tenantId = params.id;
 
+  const { user } = useAuthStore();
+  const isSuperAdmin = user?.role === 'super_admin' || (user?.role === 'admin' && !user?.ward_area);
+  const todayStr = new Date().toISOString().split('T')[0];
+
   const [tenant, setTenant] = useState(null);
   const [payments, setPayments] = useState([]);
   const [signedDocs, setSignedDocs] = useState({});
   const [loading, setLoading] = useState(true);
+  const [isPenaltyModalOpen, setIsPenaltyModalOpen] = useState(false);
 
-  // Edit Mode
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editData, setEditData] = useState({});
 
-  // Record Payment Modal
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('250');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
@@ -70,11 +75,9 @@ export default function TenantDetailPage() {
   const [paymentError, setPaymentError] = useState('');
   const [autoCompleteNotice, setAutoCompleteNotice] = useState(false);
 
-  // Cancel Rental Modal
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
 
-  // Document Viewer Modal
   const [viewingDoc, setViewingDoc] = useState(null);
 
   useEffect(() => {
@@ -101,7 +104,9 @@ export default function TenantDetailPage() {
           phone: t.phone || '',
           address: t.address || '',
           chassis_no: t.chassis_no || '',
-          motor_ctrl_no: t.motor_ctrl_no || '',
+          motor_no: t.motor_no || '',
+          controller_no: t.controller_no || '',
+          charger_no: t.charger_no || '',
           battery_no: t.battery_no || '',
           date_of_purchase: t.date_of_purchase ? t.date_of_purchase.split('T')[0] : '',
           rto_type: t.rto_type || '',
@@ -143,7 +148,6 @@ export default function TenantDetailPage() {
         setSignedDocs(docsRes.data.data || {});
       }
     } catch (err) {
-      console.error('Error loading tenant details:', err);
     } finally {
       setLoading(false);
     }
@@ -233,6 +237,69 @@ export default function TenantDetailPage() {
       toast.error('All guarantor phone numbers must be exactly 10 digits');
       return;
     }
+
+    if (editData.start_date) {
+      const origStartDate = tenant?.start_date ? tenant.start_date.split('T')[0] : null;
+      if (editData.start_date !== origStartDate && editData.start_date < todayStr) {
+        toast.error('Contract Start Date cannot be set to a past date (no back date allowed).');
+        return;
+      }
+    }
+
+    if (editData.scooty_insurance_start) {
+      const origScootyStart = tenant?.scooty_insurance_start ? tenant.scooty_insurance_start.split('T')[0] : null;
+      if (editData.scooty_insurance_start !== origScootyStart && editData.scooty_insurance_start < todayStr) {
+        toast.error('Scooty Insurance Start Date cannot be set to a past date.');
+        return;
+      }
+    }
+    if (editData.scooty_insurance_start && editData.scooty_policy_expiry) {
+      if (editData.scooty_policy_expiry <= editData.scooty_insurance_start) {
+        toast.error('Scooty Policy Expiry must be strictly after Scooty Insurance Start Date.');
+        return;
+      }
+    }
+
+    if (editData.rider_insurance_start) {
+      const origRiderStart = tenant?.rider_insurance_start ? tenant.rider_insurance_start.split('T')[0] : null;
+      if (editData.rider_insurance_start !== origRiderStart && editData.rider_insurance_start < todayStr) {
+        toast.error('Rider Insurance Start Date cannot be set to a past date.');
+        return;
+      }
+    }
+    if (editData.rider_insurance_start && editData.rider_policy_expiry) {
+      if (editData.rider_policy_expiry <= editData.rider_insurance_start) {
+        toast.error('Rider Policy Expiry must be strictly after Rider Insurance Start Date.');
+        return;
+      }
+    }
+
+    if (editData.amc_start_date) {
+      const origAmcStart = tenant?.amc_start_date ? tenant.amc_start_date.split('T')[0] : null;
+      if (editData.amc_start_date !== origAmcStart && editData.amc_start_date < todayStr) {
+        toast.error('AMC Start Date cannot be set to a past date (no back date allowed).');
+        return;
+      }
+    }
+    if (editData.amc_start_date && editData.amc_expire_date) {
+      if (editData.amc_expire_date <= editData.amc_start_date) {
+        toast.error('AMC Expire Date must be strictly after AMC Start Date.');
+        return;
+      }
+    }
+    if (editData.amc_service_log?.length > 0) {
+      const origLogs = Array.isArray(tenant?.amc_service_log) ? tenant.amc_service_log : [];
+      const hasInvalidNewPastLog = editData.amc_service_log.some((log, idx) => {
+        if (!log.date) return false;
+        const origDate = origLogs[idx]?.date;
+        if (origDate === log.date) return false;
+        return log.date < todayStr;
+      });
+      if (hasInvalidNewPastLog) {
+        toast.error('AMC Service Log Date cannot be set to a past date (no back date allowed).');
+        return;
+      }
+    }
     try {
       setIsSaving(true);
       const { hp_financer_other, ...restEditData } = editData;
@@ -257,7 +324,6 @@ export default function TenantDetailPage() {
     }
   };
 
-  // Edit Array Helpers
   const updateReference = (index, field, value) => {
     const newRefs = [...editData.references];
     newRefs[index] = { ...newRefs[index], [field]: value };
@@ -367,6 +433,19 @@ export default function TenantDetailPage() {
                     )}
                   </>
                 )}
+                {isSuperAdmin && (
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    icon={ShieldAlert}
+                    onClick={() => setIsPenaltyModalOpen(true)}
+                    className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-2.5 xs:py-1.5"
+                    title="Add Custom Penalty"
+                  >
+                    <span className="hidden sm:inline">Add Penalty</span>
+                    <span className="hidden xs:inline sm:hidden">Penalty</span>
+                  </Button>
+                )}
                 {tenant.status !== 'cancelled' && (
                   <Button
                     variant="danger"
@@ -386,8 +465,7 @@ export default function TenantDetailPage() {
         }
       />
 
-      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
-        {/* Auto Complete Success Banner */}
+      <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {autoCompleteNotice && !isEditMode && (
           <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-800 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -409,7 +487,6 @@ export default function TenantDetailPage() {
           </div>
         )}
 
-        {/* Financial KPI Grid (Hidden in Edit Mode for focus) */}
         {!isEditMode && (
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <Card className="text-center p-4">
@@ -458,13 +535,8 @@ export default function TenantDetailPage() {
           </div>
         )}
 
-        {/* Details & Documents Tabs/Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Main Details (Personal, Hardware, Contract) */}
           <Card title={isEditMode ? "Edit Profile & Contract" : "Vehicle & Contract Profile"} className="lg:col-span-2">
-            
-            {/* PERSONAL INFO (Only shown as editable in Edit Mode) */}
             {isEditMode && (
               <>
                 <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Personal Details</h4>
@@ -536,14 +608,44 @@ export default function TenantDetailPage() {
               <div>
                 {isEditMode ? (
                   <Input
-                    label="Motor Controller"
-                    value={editData.motor_ctrl_no}
-                    onChange={(e) => setEditData({ ...editData, motor_ctrl_no: e.target.value })}
+                    label="Motor Number"
+                    value={editData.motor_no}
+                    onChange={(e) => setEditData({ ...editData, motor_no: e.target.value })}
                   />
                 ) : (
                   <>
-                    <p className="font-bold text-slate-400 uppercase text-[10px]">Motor Controller</p>
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.motor_ctrl_no || '—'}</p>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Motor Number</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.motor_no || '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Controller Number"
+                    value={editData.controller_no}
+                    onChange={(e) => setEditData({ ...editData, controller_no: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Controller Number</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.controller_no || '—'}</p>
+                  </>
+                )}
+              </div>
+
+              <div>
+                {isEditMode ? (
+                  <Input
+                    label="Charger Number"
+                    value={editData.charger_no}
+                    onChange={(e) => setEditData({ ...editData, charger_no: e.target.value })}
+                  />
+                ) : (
+                  <>
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">Charger Number</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{tenant.charger_no || '—'}</p>
                   </>
                 )}
               </div>
@@ -607,7 +709,6 @@ export default function TenantDetailPage() {
                 )}
               </div>
 
-              {/* Scooty Insurance */}
               <div>
                 {isEditMode ? (
                   <Input
@@ -643,6 +744,7 @@ export default function TenantDetailPage() {
                   <Input
                     label="Scooty Policy Expiry"
                     type="date"
+                    min={editData.scooty_insurance_start || todayStr}
                     value={editData.scooty_policy_expiry}
                     onChange={(e) => setEditData({ ...editData, scooty_policy_expiry: e.target.value })}
                   />
@@ -691,6 +793,7 @@ export default function TenantDetailPage() {
                   <Input
                     label="Scooty Ins. Start Date"
                     type="date"
+                    min={tenant?.scooty_insurance_start && tenant.scooty_insurance_start.split('T')[0] < todayStr ? tenant.scooty_insurance_start.split('T')[0] : todayStr}
                     value={editData.scooty_insurance_start}
                     onChange={(e) => setEditData({ ...editData, scooty_insurance_start: e.target.value })}
                   />
@@ -702,7 +805,6 @@ export default function TenantDetailPage() {
                 )}
               </div>
               
-              {/* Rider Insurance */}
               <div>
                 {isEditMode ? (
                   <Input
@@ -738,6 +840,7 @@ export default function TenantDetailPage() {
                   <Input
                     label="Rider Policy Expiry"
                     type="date"
+                    min={editData.rider_insurance_start || todayStr}
                     value={editData.rider_policy_expiry}
                     onChange={(e) => setEditData({ ...editData, rider_policy_expiry: e.target.value })}
                   />
@@ -786,6 +889,7 @@ export default function TenantDetailPage() {
                   <Input
                     label="Rider Ins. Start Date"
                     type="date"
+                    min={tenant?.rider_insurance_start && tenant.rider_insurance_start.split('T')[0] < todayStr ? tenant.rider_insurance_start.split('T')[0] : todayStr}
                     value={editData.rider_insurance_start}
                     onChange={(e) => setEditData({ ...editData, rider_insurance_start: e.target.value })}
                   />
@@ -860,6 +964,7 @@ export default function TenantDetailPage() {
                   <Input
                     label="AMC Start Date"
                     type="date"
+                    min={tenant?.amc_start_date && tenant.amc_start_date.split('T')[0] < todayStr ? tenant.amc_start_date.split('T')[0] : todayStr}
                     value={editData.amc_start_date}
                     onChange={(e) => setEditData({ ...editData, amc_start_date: e.target.value })}
                   />
@@ -876,6 +981,7 @@ export default function TenantDetailPage() {
                   <Input
                     label="AMC Expire Date"
                     type="date"
+                    min={editData.amc_start_date || todayStr}
                     value={editData.amc_expire_date}
                     onChange={(e) => setEditData({ ...editData, amc_expire_date: e.target.value })}
                   />
@@ -899,6 +1005,7 @@ export default function TenantDetailPage() {
                         <Input
                           type="date"
                           label="Start Date"
+                          min={tenant?.start_date && tenant.start_date.split('T')[0] < todayStr ? tenant.start_date.split('T')[0] : todayStr}
                           value={editData.start_date}
                           onChange={(e) => setEditData({ ...editData, start_date: e.target.value })}
                         />
@@ -1026,7 +1133,6 @@ export default function TenantDetailPage() {
               </>
             )}
 
-            {/* Reference & Guarantors summary */}
             {tenant.status !== 'direct_purchase' && (
               <div className="mt-6 pt-5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                 <div>
@@ -1163,7 +1269,7 @@ export default function TenantDetailPage() {
                             {editData.amc_service_log.map((log, i) => (
                               <tr key={i} className="bg-white dark:bg-slate-900/40 hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
                                 <td className="px-3 py-2">
-                                  <input type="date" className="w-full bg-transparent border border-slate-200 dark:border-white/10 rounded px-2 py-1 focus:outline-none focus:border-blue-500" value={log.date || ''} onChange={(e) => { const logs = [...editData.amc_service_log]; logs[i].date = e.target.value; setEditData({ ...editData, amc_service_log: logs }); }} />
+                                  <input type="date" min={log.date && log.date < todayStr ? log.date : todayStr} className="w-full bg-transparent border border-slate-200 dark:border-white/10 rounded px-2 py-1 focus:outline-none focus:border-blue-500" value={log.date || ''} onChange={(e) => { const logs = [...editData.amc_service_log]; logs[i].date = e.target.value; setEditData({ ...editData, amc_service_log: logs }); }} />
                                 </td>
                                 <td className="px-3 py-2">
                                   <input type="text" className="w-full bg-transparent border border-slate-200 dark:border-white/10 rounded px-2 py-1 focus:outline-none focus:border-blue-500" value={log.what_change || ''} onChange={(e) => { const logs = [...editData.amc_service_log]; logs[i].what_change = e.target.value; setEditData({ ...editData, amc_service_log: logs }); }} placeholder="e.g. Battery" />
@@ -1221,7 +1327,6 @@ export default function TenantDetailPage() {
                 </div>
           </Card>
 
-          {/* Documents Vault */}
           <Card title={isEditMode ? "Edit Documents" : "Secured Documents"}>
             <div className="space-y-3">
               {[
@@ -1237,7 +1342,6 @@ export default function TenantDetailPage() {
                 { label: 'Scooty Insurance', url: signedDocs.scooty_insurance_url, path: tenant.scooty_insurance_path, docType: 'scooty_insurance_path' },
                 { label: 'Rider Insurance', url: signedDocs.rider_insurance_url, path: tenant.rider_insurance_path, docType: 'rider_insurance_path' },
                 { label: 'Rider License', url: signedDocs.rider_license_url, path: tenant.rider_license_path, docType: 'rider_license_path' },
-                { label: 'AMC Document', url: signedDocs.amc_doc_url, path: tenant.amc_doc_path, docType: 'amc_doc_path' },
               ].map((item, idx) => (
                 isEditMode ? (
                   <div key={idx} className="mb-4">
@@ -1280,7 +1384,6 @@ export default function TenantDetailPage() {
           </Card>
         </div>
 
-        {/* Payment History Timeline (Hidden in edit mode) */}
         {!isEditMode && (
           <Card
             title="Payment Ledger & Collection Timeline"
@@ -1344,7 +1447,6 @@ export default function TenantDetailPage() {
         )}
       </div>
 
-      {/* Record Payment Modal */}
       <Modal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
@@ -1422,7 +1524,6 @@ export default function TenantDetailPage() {
         </form>
       </Modal>
 
-      {/* Cancel Rental/Purchase Confirmation Modal */}
       <Modal
         isOpen={isCancelModalOpen}
         onClose={() => setIsCancelModalOpen(false)}
@@ -1431,8 +1532,8 @@ export default function TenantDetailPage() {
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-700 dark:text-slate-300">
-            Are you sure you want to cancel the {tenant.status === 'direct_purchase' ? 'purchase' : 'rental'} contract for <span className="font-bold">{tenant.name}</span>?
-            The EV model stock will automatically increase by 1 in the inventory.
+            Are you sure you want to cancel the {tenant.status === 'direct_purchase' ? 'purchase' : 'rental'} contract for <span className="font-bold">{tenant.name}</span>? 
+            This vehicle will be moved to the Returned / Refurbished EVs pool and become available for future rentals or purchases.
           </p>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
@@ -1455,8 +1556,6 @@ export default function TenantDetailPage() {
         </div>
       </Modal>
 
-
-      {/* View Document Modal */}
       <Modal
         isOpen={Boolean(viewingDoc)}
         onClose={() => setViewingDoc(null)}
@@ -1471,6 +1570,22 @@ export default function TenantDetailPage() {
           />
         </div>
       </Modal>
+
+      {isPenaltyModalOpen && tenant && (
+        <AddPenaltyModal
+          isOpen={isPenaltyModalOpen}
+          target={{
+            id: tenant.id,
+            name: tenant.name,
+            phone: tenant.phone,
+            vehicle_number: tenant.vehicle_number,
+            outstanding: balance.outstanding,
+            days_overdue: balance.daysOverdue
+          }}
+          onClose={() => setIsPenaltyModalOpen(false)}
+          onSuccess={() => loadAllData()}
+        />
+      )}
     </div>
   );
 }

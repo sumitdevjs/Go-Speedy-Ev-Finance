@@ -2,14 +2,19 @@ const supabase = require('../../config/db');
 const { calcBalance } = require('../../utils/balanceCalc');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
 const { buildSearchFilter, buildEqOrFilter } = require('../../utils/searchFilter');
+const { applyScope, resolveCreateScope } = require('../../middleware/scope');
 
 class RentalsService {
-  async getRentals(query = {}) {
+  async getRentals(query = {}, req = null) {
     const { page, limit, offset } = getPaginationOptions(query);
-    
+
     let queryBuilder = supabase
       .from('tenants')
-      .select('*, ev_models(name, company, total_price), users!tenants_created_by_fkey(name)', { count: 'exact' });
+      .select('*, ev_models(name, company, total_price, kilometres), users!tenants_created_by_fkey(name)', { count: 'exact' });
+
+    if (req) {
+      queryBuilder = applyScope(queryBuilder, req);
+    }
 
     if (query.status) {
       queryBuilder = queryBuilder.eq('status', query.status);
@@ -18,7 +23,7 @@ class RentalsService {
       queryBuilder = queryBuilder.neq('status', 'completed');
       queryBuilder = queryBuilder.neq('status', 'direct_purchase');
     }
-    
+
     if (query.search) {
       queryBuilder = queryBuilder.or(buildSearchFilter(['name', 'phone'], query.search));
     }
@@ -27,7 +32,6 @@ class RentalsService {
       queryBuilder = queryBuilder.eq('has_pending_docs', query.has_pending_docs === 'true');
     }
 
-    // Insurance status filter
     if (query.insurance_status) {
       const today = new Date().toISOString().split('T')[0];
       if (query.insurance_status === 'scooty_expired') {
@@ -47,7 +51,17 @@ class RentalsService {
 
     if (error) throw error;
 
-    // Fetch total paid for all these tenants to compute balance
+    if (tenants && tenants.some(t => t.branch_id)) {
+      try {
+        const branchIds = [...new Set(tenants.map(t => t.branch_id).filter(Boolean))];
+        if (branchIds.length > 0) {
+          const { data: bList } = await supabase.from('branches').select('id, name, code, ward_no').in('id', branchIds);
+          const bMap = new Map((bList || []).map(b => [b.id, b]));
+          tenants.forEach(t => { if (t.branch_id) t.branch = bMap.get(t.branch_id) || null; });
+        }
+      } catch (e) { }
+    }
+
     const tenantIds = tenants.map(t => t.id);
     const { data: payments, error: paymentsError } = await supabase
       .from('payments')
@@ -56,7 +70,6 @@ class RentalsService {
 
     if (paymentsError) throw paymentsError;
 
-    // Group payments by tenant
     const paymentsByTenant = payments.reduce((acc, p) => {
       acc[p.tenant_id] = (acc[p.tenant_id] || 0) + Number(p.amount);
       return acc;
@@ -71,7 +84,6 @@ class RentalsService {
       };
     });
 
-    // Optionally filter by overdue_days if requested (done in-memory for now)
     let finalData = enrichedData;
     if (query.overdue_days) {
       const minOverdue = parseInt(query.overdue_days);
@@ -82,15 +94,28 @@ class RentalsService {
     return { data: finalData, meta };
   }
 
-  async getRentalById(id) {
+  async getRentalById(id, req = null) {
     const { data: tenant, error } = await supabase
       .from('tenants')
-      .select('*, ev_models(name, company)')
+      .select('*, ev_models(name, company, kilometres)')
       .eq('id', id)
       .single();
 
     if (error) throw error;
     if (!tenant) throw new Error('Rental not found');
+
+    if (req?.user) {
+      const user = req.user;
+      if (user.role === 'branch_admin' || user.role === 'staff') {
+        if (tenant.branch_id && user.branch_id && tenant.branch_id !== user.branch_id) {
+          throw new Error('Access denied: Rental belongs to another branch');
+        }
+      } else if (user.role === 'ho_admin') {
+        if (tenant.head_office_id && user.head_office_id && tenant.head_office_id !== user.head_office_id) {
+          throw new Error('Access denied: Rental belongs to another Head Office');
+        }
+      }
+    }
 
     const { data: payments, error: paymentsError } = await supabase
       .from('payments')
@@ -105,15 +130,13 @@ class RentalsService {
     return { ...tenant, computed_balance: balance, total_paid: totalPaid };
   }
 
-  async createRental(tenantData, createdBy) {
-    // Sanitize empty strings to undefined so they are inserted as NULL in DB
+  async createRental(tenantData, createdBy, req = null) {
     Object.keys(tenantData).forEach(key => {
       if (tenantData[key] === '') {
         delete tenantData[key];
       }
     });
 
-    // Remove fields not in DB schema to prevent PostgREST errors
     delete tenantData.include_gst;
     delete tenantData.gst_percent;
 
@@ -129,14 +152,21 @@ class RentalsService {
       }
     }
 
-    // Prevent new rental if an active one exists for this phone
+    let assignedBranchId = tenantData.branch_id || null;
+    let assignedHoId = tenantData.head_office_id || null;
+
+    if (req) {
+      const scope = resolveCreateScope(req, tenantData);
+      assignedBranchId = scope.branch_id;
+      assignedHoId = scope.head_office_id;
+    }
+
     if (tenantData.phone) {
       const { data: existingActive } = await supabase
         .from('tenants')
         .select('id')
         .eq('phone', tenantData.phone)
         .eq('status', 'rented')
-        .limit(1)
         .maybeSingle();
 
       if (existingActive) {
@@ -144,32 +174,75 @@ class RentalsService {
       }
     }
 
-    // 1. Fetch Model to get price and check stock
-    const { data: model, error: modelError } = await supabase
-      .from('ev_models')
-      .select('total_price, stock_count')
-      .eq('id', tenantData.ev_model_id)
-      .single();
-      
-    if (modelError || !model) throw new Error('EV Model not found');
-    if (model.stock_count <= 0) throw new Error('EV Model out of stock');
+    let modelTotalPrice = 0;
+    let originalStockCount = 0;
+    const isOldEv = Boolean(tenantData.old_ev_id);
 
-    // 2. Decrement stock
-    const { error: stockError } = await supabase
-      .from('ev_models')
-      .update({ stock_count: model.stock_count - 1 })
-      .eq('id', tenantData.ev_model_id)
-      .gt('stock_count', 0); // Safety net for concurrent access
+    if (isOldEv) {
+      const { data: oldEv, error: oldEvErr } = await supabase
+        .from('old_evs')
+        .select('*')
+        .eq('id', tenantData.old_ev_id)
+        .single();
 
-    if (stockError) throw new Error('Failed to reserve stock. It might be exhausted.');
+      if (oldEvErr || !oldEv) throw new Error('Selected used EV not found');
+      if (oldEv.status !== 'available') throw new Error('Selected used EV is no longer available');
 
-    // 3. Compute dates
+      modelTotalPrice = Number(oldEv.price) || 0;
+
+      await supabase
+        .from('old_evs')
+        .update({ status: tenantData.status === 'direct_purchase' ? 'sold' : 'rented' })
+        .eq('id', tenantData.old_ev_id);
+    } else {
+      const { data: model, error: modelError } = await supabase
+        .from('ev_models')
+        .select('total_price, stock_count')
+        .eq('id', tenantData.ev_model_id)
+        .single();
+
+      if (modelError || !model) throw new Error('EV Model not found');
+      if (model.stock_count <= 0) throw new Error('EV Model out of stock');
+
+      originalStockCount = model.stock_count;
+
+      const { error: stockError } = await supabase
+        .from('ev_models')
+        .update({ stock_count: model.stock_count - 1 })
+        .eq('id', tenantData.ev_model_id)
+        .gt('stock_count', 0);
+
+      if (stockError) throw new Error('Failed to reserve stock. It might be exhausted.');
+      modelTotalPrice = model.total_price;
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    if (tenantData.status !== 'direct_purchase' && tenantData.start_date) {
+      const sDate = tenantData.start_date.split('T')[0];
+      if (sDate < todayStr) {
+        throw new Error('Contract Start Date cannot be in the past (back date not allowed).');
+      }
+    }
+
+    if (tenantData.amc_start_date) {
+      const amcStart = tenantData.amc_start_date.split('T')[0];
+      if (amcStart < todayStr) {
+        throw new Error('AMC Start Date cannot be in the past (back date not allowed).');
+      }
+      if (tenantData.amc_expire_date) {
+        const amcExpire = tenantData.amc_expire_date.split('T')[0];
+        if (amcExpire <= amcStart) {
+          throw new Error('AMC Expire Date must be strictly after AMC Start Date.');
+        }
+      }
+    }
+
     const startDate = tenantData.start_date ? new Date(tenantData.start_date) : new Date();
     const totalMonths = Number(tenantData.total_months) || 24;
     const expectedEndDate = new Date(startDate);
     expectedEndDate.setMonth(expectedEndDate.getMonth() + totalMonths);
 
-    // Ensure NOT NULL fields are never null for direct_purchase
     if (tenantData.status === 'direct_purchase') {
       tenantData.installment_daily_rate = 0;
       tenantData.installment_frequency = tenantData.installment_frequency || 'daily';
@@ -180,15 +253,17 @@ class RentalsService {
       tenantData.installment_frequency = tenantData.installment_frequency || 'daily';
     }
 
-    // 4. Insert Tenant
     try {
       const { data, error } = await supabase
         .from('tenants')
         .insert([{
           ...tenantData,
+          branch_id: assignedBranchId,
+          head_office_id: assignedHoId,
+          late_fee_daily_rate: tenantData.late_fee_daily_rate || 50.00,
           references: tenantData.references || [],
           guarantors: tenantData.guarantors || [],
-          total_price: model.total_price, // snapshot price
+          total_price: tenantData.total_price || modelTotalPrice,
           start_date: tenantData.status === 'direct_purchase' ? null : startDate.toISOString().split('T')[0],
           expected_end_date: tenantData.status === 'direct_purchase' ? null : expectedEndDate.toISOString().split('T')[0],
           created_by: createdBy
@@ -199,12 +274,18 @@ class RentalsService {
       if (error) throw error;
       return data;
     } catch (error) {
-      // Rollback stock
-      await supabase
-        .from('ev_models')
-        .update({ stock_count: model.stock_count })
-        .eq('id', tenantData.ev_model_id);
-      
+      if (!isOldEv && tenantData.ev_model_id) {
+        await supabase
+          .from('ev_models')
+          .update({ stock_count: originalStockCount })
+          .eq('id', tenantData.ev_model_id);
+      } else if (isOldEv && tenantData.old_ev_id) {
+        await supabase
+          .from('old_evs')
+          .update({ status: 'available' })
+          .eq('id', tenantData.old_ev_id);
+      }
+
       if (error.code === '23505') {
         console.error('[createRental] Unique constraint violation:', error);
         throw new Error('Unique constraint violation: a record with this value already exists.');
@@ -213,15 +294,81 @@ class RentalsService {
     }
   }
 
-  async updateRental(id, updates) {
-    // Sanitize empty strings to undefined so they are updated as NULL in DB
+  async updateRental(id, updates, req = null) {
+    if (req?.user) {
+      const user = req.user;
+      const { data: existing } = await supabase
+        .from('tenants')
+        .select('branch_id, head_office_id')
+        .eq('id', id)
+        .single();
+
+      if (existing) {
+        if (user.role === 'branch_admin' || user.role === 'staff') {
+          if (existing.branch_id && user.branch_id && existing.branch_id !== user.branch_id) {
+            throw new Error('Access denied: Rental belongs to another branch');
+          }
+        } else if (user.role === 'ho_admin') {
+          if (existing.head_office_id && user.head_office_id && existing.head_office_id !== user.head_office_id) {
+            throw new Error('Access denied: Rental belongs to another Head Office');
+          }
+        }
+      }
+    }
+
     Object.keys(updates).forEach(key => {
       if (updates[key] === '') {
-        updates[key] = null; // Use null for update to explicitly clear it
+        updates[key] = null;
       }
     });
 
-    // Handle expected_end_date recalculation if start_date changes
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const needsExistingCheck = updates.amc_start_date !== undefined || updates.amc_expire_date !== undefined || updates.start_date !== undefined || updates.scooty_policy_expiry !== undefined || updates.rider_policy_expiry !== undefined;
+    let existingTenant = null;
+    if (needsExistingCheck) {
+      const { data: ex } = await supabase
+        .from('tenants')
+        .select('start_date, amc_start_date, amc_expire_date, scooty_insurance_start, scooty_policy_expiry, rider_insurance_start, rider_policy_expiry, status')
+        .eq('id', id)
+        .maybeSingle();
+      existingTenant = ex;
+    }
+
+    if (updates.amc_start_date) {
+      const s = String(updates.amc_start_date).split('T')[0];
+      const origS = existingTenant?.amc_start_date ? String(existingTenant.amc_start_date).split('T')[0] : null;
+      if (s !== origS && s < todayStr) {
+        throw new Error('AMC Start Date cannot be set to a past date (no back date allowed).');
+      }
+    }
+
+    const effectiveAmcStart = updates.amc_start_date !== undefined ? (updates.amc_start_date ? String(updates.amc_start_date).split('T')[0] : null) : (existingTenant?.amc_start_date ? String(existingTenant.amc_start_date).split('T')[0] : null);
+    const effectiveAmcExpire = updates.amc_expire_date !== undefined ? (updates.amc_expire_date ? String(updates.amc_expire_date).split('T')[0] : null) : (existingTenant?.amc_expire_date ? String(existingTenant.amc_expire_date).split('T')[0] : null);
+    if (effectiveAmcStart && effectiveAmcExpire && effectiveAmcExpire <= effectiveAmcStart) {
+      throw new Error('AMC Expire Date must be strictly after AMC Start Date.');
+    }
+
+    if (updates.start_date && existingTenant?.status !== 'direct_purchase') {
+      const sDate = String(updates.start_date).split('T')[0];
+      const origSDate = existingTenant?.start_date ? String(existingTenant.start_date).split('T')[0] : null;
+      if (sDate !== origSDate && sDate < todayStr) {
+        throw new Error('Contract Start Date cannot be set to a past date (no back date allowed).');
+      }
+    }
+
+    const effectiveScootyStart = updates.scooty_insurance_start !== undefined ? updates.scooty_insurance_start : existingTenant?.scooty_insurance_start;
+    const effectiveScootyExpire = updates.scooty_policy_expiry !== undefined ? updates.scooty_policy_expiry : existingTenant?.scooty_policy_expiry;
+    if (effectiveScootyStart && effectiveScootyExpire && effectiveScootyExpire <= effectiveScootyStart) {
+      throw new Error('Scooty Policy Expiry must be strictly after Scooty Insurance Start Date.');
+    }
+
+    const effectiveRiderStart = updates.rider_insurance_start !== undefined ? updates.rider_insurance_start : existingTenant?.rider_insurance_start;
+    const effectiveRiderExpire = updates.rider_policy_expiry !== undefined ? updates.rider_policy_expiry : existingTenant?.rider_policy_expiry;
+    if (effectiveRiderStart && effectiveRiderExpire && effectiveRiderExpire <= effectiveRiderStart) {
+      throw new Error('Rider Policy Expiry must be strictly after Rider Insurance Start Date.');
+    }
+
     if (updates.start_date || updates.total_months) {
       const { data: existing, error: err } = await supabase.from('tenants').select('start_date, total_months').eq('id', id).single();
       if (!err && existing) {
@@ -250,20 +397,33 @@ class RentalsService {
     return data;
   }
 
-  async cancelRental(id) {
+  async cancelRental(id, req = null) {
     const { data: tenant, error: fetchError } = await supabase
       .from('tenants')
-      .select('status, ev_model_id')
+      .select('status, ev_model_id, branch_id, head_office_id')
       .eq('id', id)
       .single();
 
     if (fetchError) throw fetchError;
+
+    if (req?.user) {
+      const user = req.user;
+      if (user.role === 'branch_admin' || user.role === 'staff') {
+        if (tenant.branch_id && user.branch_id && tenant.branch_id !== user.branch_id) {
+          throw new Error('Access denied: Rental belongs to another branch');
+        }
+      } else if (user.role === 'ho_admin') {
+        if (tenant.head_office_id && user.head_office_id && tenant.head_office_id !== user.head_office_id) {
+          throw new Error('Access denied: Rental belongs to another Head Office');
+        }
+      }
+    }
+
     if (tenant.status === 'cancelled') throw new Error('This contract is already cancelled');
     if (tenant.status !== 'rented' && tenant.status !== 'direct_purchase' && tenant.status !== 'completed') {
       throw new Error('Only active rentals, direct purchases, or completed purchases can be cancelled');
     }
 
-    // 1. Update status
     const { error: cancelError } = await supabase
       .from('tenants')
       .update({ status: 'cancelled' })
@@ -271,32 +431,40 @@ class RentalsService {
 
     if (cancelError) throw cancelError;
 
-    // 2. Restore stock
-    const { data: model } = await supabase
-      .from('ev_models')
-      .select('stock_count')
-      .eq('id', tenant.ev_model_id)
+    const { data: tenantDetails } = await supabase
+      .from('tenants')
+      .select('chassis_no, motor_no, controller_no, battery_no, charger_no, ev_model_id, branch_id, head_office_id')
+      .eq('id', id)
       .single();
 
-    if (model) {
+    if (tenantDetails) {
       await supabase
-        .from('ev_models')
-        .update({ stock_count: model.stock_count + 1 })
-        .eq('id', tenant.ev_model_id);
+        .from('old_evs')
+        .insert([{
+          original_ev_model_id: tenantDetails.ev_model_id,
+          returned_from_tenant_id: id,
+          chassis_no: tenantDetails.chassis_no,
+          motor_no: tenantDetails.motor_no,
+          controller_no: tenantDetails.controller_no,
+          battery_no: tenantDetails.battery_no,
+          charger_no: tenantDetails.charger_no,
+          branch_id: tenantDetails.branch_id,
+          head_office_id: tenantDetails.head_office_id,
+          price: 0,
+          status: 'available'
+        }]);
     }
-    
+
     return { success: true };
   }
 
-  async completeRental(id) {
-    // Verify it can be completed (outstanding = 0, dp cleared)
-    const rental = await this.getRentalById(id);
-    
+  async completeRental(id, req = null) {
+    const rental = await this.getRentalById(id, req);
+
     if (rental.status !== 'rented') throw new Error('Rental is not currently active');
-    
+
     const dpOwed = (rental.total_price - (rental.booking_amount || 0)) - (rental.downpayment_paid || 0);
-    // Actually the calculation logic in balanceCalc handles downpayment properly via contractAmount
-    
+
     if (rental.computed_balance.outstanding > 0) {
       throw new Error(`Cannot complete: Outstanding balance is ₹${rental.computed_balance.outstanding}`);
     }
@@ -313,12 +481,10 @@ class RentalsService {
   }
 
   async checkUniqueHardwareOrPolicy(fields) {
-    const { chassis_no, motor_ctrl_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number } = fields;
+    const { chassis_no, motor_no, controller_no, charger_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number } = fields;
 
-    // buildEqOrFilter escapes values so a comma/parenthesis can't inject
-    // extra filter clauses into the query.
     const orFilter = buildEqOrFilter({
-      chassis_no, motor_ctrl_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number,
+      chassis_no, motor_no, controller_no, charger_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number,
     });
 
     if (!orFilter) {
@@ -327,21 +493,22 @@ class RentalsService {
 
     const { data, error } = await supabase
       .from('tenants')
-      .select('chassis_no, motor_ctrl_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number')
+      .select('chassis_no, motor_no, controller_no, charger_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number')
       .or(orFilter);
 
     if (error) throw error;
 
     if (data && data.length > 0) {
-      // Find which one matched to give a specific error message
       const conflict = data[0];
       if (chassis_no && conflict.chassis_no === chassis_no) return { exists: true, message: 'Chassis number already exists in the system.' };
-      if (motor_ctrl_no && conflict.motor_ctrl_no === motor_ctrl_no) return { exists: true, message: 'Motor controller number already exists in the system.' };
+      if (motor_no && conflict.motor_no === motor_no) return { exists: true, message: 'Motor number already exists in the system.' };
+      if (controller_no && conflict.controller_no === controller_no) return { exists: true, message: 'Controller number already exists in the system.' };
+      if (charger_no && conflict.charger_no === charger_no) return { exists: true, message: 'Charger number already exists in the system.' };
       if (battery_no && conflict.battery_no === battery_no) return { exists: true, message: 'Battery serial number already exists in the system.' };
       if (vehicle_number && conflict.vehicle_number === vehicle_number) return { exists: true, message: 'Vehicle number already exists in the system.' };
       if (scooty_policy_number && conflict.scooty_policy_number === scooty_policy_number) return { exists: true, message: 'Scooty policy number already exists in the system.' };
       if (rider_policy_number && conflict.rider_policy_number === rider_policy_number) return { exists: true, message: 'Rider policy number already exists in the system.' };
-      
+
       return { exists: true, message: 'One of the provided unique identifiers already exists in the system.' };
     }
 

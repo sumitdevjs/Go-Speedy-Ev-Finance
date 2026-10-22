@@ -6,14 +6,27 @@ const BUCKET_NAME = 'ev-documents';
 const SIGNED_URL_EXPIRY = 900; // 15 minutes
 
 class DocumentsService {
-  async getDocumentsForTenant(tenantId) {
+  async getDocumentsForTenant(tenantId, req = null) {
     const { data: tenant, error: fetchError } = await supabase
       .from('tenants')
-      .select('aadhar_path, pan_path, cheque_path, electricity_bill_path, tenant_photo_path, scooty_photo_path, rent_agreement_path, scooty_insurance_path, rider_insurance_path, rider_license_path, invoice_doc_path, amc_doc_path')
+      .select('branch_id, head_office_id, aadhar_path, pan_path, cheque_path, electricity_bill_path, tenant_photo_path, scooty_photo_path, rent_agreement_path, scooty_insurance_path, rider_insurance_path, rider_license_path, invoice_doc_path')
       .eq('id', tenantId)
       .single();
 
     if (fetchError || !tenant) throw new Error('Tenant not found');
+
+    if (req?.user) {
+      const user = req.user;
+      if (user.role === 'branch_admin' || user.role === 'staff') {
+        if (tenant.branch_id && user.branch_id && tenant.branch_id !== user.branch_id) {
+          throw new Error('Access denied: Unauthorized access to tenant documents');
+        }
+      } else if (user.role === 'ho_admin') {
+        if (tenant.head_office_id && user.head_office_id && tenant.head_office_id !== user.head_office_id) {
+          throw new Error('Access denied: Tenant documents belong to another Head Office');
+        }
+      }
+    }
 
     const result = {};
 

@@ -14,7 +14,7 @@ import Button from './Button';
 export default function ConfirmDialog() {
   const confirmState = useUIStore((s) => s.confirmState);
   const resolveConfirm = useUIStore((s) => s.resolveConfirm);
-  const [rendered, setRendered] = useState(null); // keeps content mounted during exit animation
+  const [rendered, setRendered] = useState(null);
   const [busy, setBusy] = useState(false);
   const modalRef = useRef(null);
   const backdropRef = useRef(null);
@@ -36,11 +36,6 @@ export default function ConfirmDialog() {
   }, [confirmState]);
 
   const close = (result) => {
-    // Resolve the caller's promise immediately — never make `await confirmDialog(...)`
-    // hang on an animation. The GSAP exit tween below is a best-effort visual only;
-    // a plain setTimeout (not GSAP's onComplete, which needs requestAnimationFrame and
-    // won't fire while the tab is backgrounded) unmounts the dialog a beat later so the
-    // animation gets a chance to play when the tab *is* visible.
     resolveConfirm(result);
     if (modalRef.current) animateModalOut(modalRef.current, () => {});
     if (backdropRef.current) gsap.to(backdropRef.current, { opacity: 0, duration: 0.2 });

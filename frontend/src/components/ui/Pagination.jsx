@@ -12,14 +12,12 @@ export default function Pagination({
 
   return (
     <div className={`flex items-center justify-between border-t border-slate-200/80 dark:border-white/10 bg-white/90 dark:bg-slate-900/60 px-3 sm:px-6 py-3 rounded-b-2xl gap-2 backdrop-blur-xl transition-colors ${className}`}>
-      {/* Desktop/Tablet text */}
       <div className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
         Showing page <span className="font-semibold text-slate-700 dark:text-slate-200">{currentPage}</span> of{' '}
         <span className="font-semibold text-slate-700 dark:text-slate-200">{totalPages}</span>
         {totalItems > 0 && <span> ({totalItems} total records)</span>}
       </div>
 
-      {/* Mobile compact count */}
       <div className="text-xs text-slate-600 dark:text-slate-400 font-medium sm:hidden">
         <span className="font-bold text-slate-900 dark:text-white">{currentPage}</span> / {totalPages}
       </div>

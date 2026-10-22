@@ -31,7 +31,6 @@ export function ThemeProvider({ children }) {
       } else if (theme === 'light') {
         isDark = false;
       } else {
-        // system
         isDark = media.matches;
       }
 

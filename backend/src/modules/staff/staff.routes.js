@@ -2,13 +2,13 @@ const express = require('express');
 const { z } = require('zod');
 const staffController = require('./staff.controller');
 const requireAuth = require('../../middleware/auth');
-const { requireAdmin } = require('../../middleware/roleGuard');
+const { requireBranchAdmin } = require('../../middleware/roleGuard');
 const requestLogger = require('../../middleware/requestLogger');
 const router = express.Router();
 
-// Apply auth and admin guard to all staff routes
+// Apply auth and branch/ho/super admin guard to staff routes
 router.use(requireAuth);
-router.use(requireAdmin);
+router.use(requireBranchAdmin);
 
 // Validation Schemas
 const passwordSchema = z.string()
@@ -29,21 +29,37 @@ const createStaffSchema = z.object({
   phone: phoneSchema,
   email: emailSchema,
   password: passwordSchema,
-  role: z.enum(['admin', 'staff']),
-  ward_area: z.string().optional(),
+  role: z.enum(['admin', 'staff', 'super_admin', 'ho_admin', 'branch_admin']).optional().default('staff'),
+  ward_area: z.string().optional().nullable(),
+  branch_id: z.string().optional().nullable(),
+  head_office_id: z.string().optional().nullable(),
+  verification_doc: z.string().optional().nullable(),
 });
 
 const updateStaffSchema = z.object({
   name: z.string().min(1).optional(),
   phone: phoneSchema.optional(),
   email: emailSchema,
-  role: z.enum(['admin', 'staff']).optional(),
-  ward_area: z.string().optional(),
+  role: z.enum(['admin', 'staff', 'super_admin', 'ho_admin', 'branch_admin']).optional(),
+  ward_area: z.string().optional().nullable(),
+  branch_id: z.string().optional().nullable(),
+  head_office_id: z.string().optional().nullable(),
+  verification_doc: z.string().optional().nullable(),
 });
 
 const validateBody = (schema) => (req, res, next) => {
-  schema.parse(req.body);
-  next();
+  try {
+    req.body = schema.parse(req.body);
+    next();
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: err.errors.map(e => e.message).join(', '),
+      });
+    }
+    next(err);
+  }
 };
 
 /**

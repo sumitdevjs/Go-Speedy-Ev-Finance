@@ -1,25 +1,60 @@
 import axios from 'axios';
 
+if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+  const noop = () => {};
+  const methods = ['log', 'debug', 'info', 'warn', 'error', 'table', 'trace', 'dir', 'dirxml', 'group', 'groupCollapsed', 'groupEnd', 'time', 'timeEnd', 'timeLog', 'count', 'countReset', 'assert', 'clear'];
+  methods.forEach((m) => {
+    try {
+      Object.defineProperty(window.console, m, {
+        get: () => noop,
+        set: () => {},
+        configurable: true,
+        enumerable: true,
+      });
+    } catch (e) {
+      try { window.console[m] = noop; } catch (e2) {}
+    }
+  });
+}
+
 const api = axios.create({
-  baseURL: '', // Always hit the Next.js proxy (/api/...) to avoid CORS and cross-site cookie issues
+  baseURL: '',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Flag to prevent recursive refresh loops
 let isRefreshing = false;
 let failedQueue = [];
 
-// Next.js proxy rewrites strip the body from PATCH requests.
-// Work around this by sending as PUT with an override header,
-// which the backend middleware converts back to PATCH before routing.
 api.interceptors.request.use((config) => {
   if (config.method && config.method.toLowerCase() === 'patch') {
     config.method = 'put';
     config.headers['X-HTTP-Method-Override'] = 'PATCH';
   }
+
+  if (typeof window !== 'undefined') {
+    try {
+      const rawBranch = localStorage.getItem('gospeedy_selected_branch');
+      if (rawBranch) {
+        const parsed = JSON.parse(rawBranch);
+        if (parsed?.id) {
+          config.headers['x-branch-id'] = parsed.id;
+        }
+      }
+    } catch (e) {
+    }
+
+    try {
+      const token = localStorage.getItem('gospeedy_token');
+      if (token && !config.headers['Authorization']) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
+    } catch (e) {
+    }
+  }
+
   return config;
 });
 
@@ -39,7 +74,6 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // If unauthorized and not already retrying
     if (error.response?.status === 401 && !originalRequest?._retry) {
       if (originalRequest?.url?.includes('/api/auth/login') || originalRequest?.url?.includes('/api/auth/refresh')) {
         return Promise.reject(error);

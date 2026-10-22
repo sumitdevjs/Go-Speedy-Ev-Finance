@@ -27,7 +27,6 @@ export default function SearchBar({
     return () => clearTimeout(handler);
   }, [innerValue, debounceMs]);
 
-  // Pop the clear (X) button in the moment it appears, instead of a hard cut.
   useEffect(() => {
     if (innerValue && clearBtnRef.current) {
       gsap.fromTo(
@@ -42,7 +41,6 @@ export default function SearchBar({
     setInnerValue('');
     if (onChange) onChange('');
     if (wrapperRef.current) {
-      // A quick, reassuring "cleared" nudge on the whole field.
       gsap.fromTo(wrapperRef.current, { x: -3 }, { x: 0, duration: 0.25, ease: 'elastic.out(1, 0.5)' });
     }
   };

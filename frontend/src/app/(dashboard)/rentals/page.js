@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Users, Plus, Phone, AlertTriangle, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Users, Plus, Phone, AlertTriangle, ArrowRight, CheckCircle2, Download } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
 import Button from '../../../components/ui/Button';
@@ -14,6 +14,10 @@ import Pagination from '../../../components/ui/Pagination';
 import api from '../../../lib/api';
 import { formatCurrency, formatDate } from '../../../lib/constants';
 import { staggerFadeIn } from '../../../lib/gsap';
+import { useAuthStore } from '../../../store/authStore';
+import { exportToExcel, fetchAllForExport } from '../../../lib/exportToExcel';
+import { toast } from '../../../lib/toast';
+import CustomExportModal from '../../../components/ui/CustomExportModal';
 
 export default function RentalsListPage() {
   const router = useRouter();
@@ -29,12 +33,25 @@ export default function RentalsListPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
+  const { selectedBranch } = useAuthStore();
 
   useEffect(() => {
     fetchRentals();
-  }, [search, statusFilter, overdueFilter, insuranceFilter, page, showCancelled]);
+  }, [search, statusFilter, overdueFilter, insuranceFilter, page, showCancelled, selectedBranch]);
 
-  // One-time entrance for the header/filter chrome when the page first mounts.
+  useEffect(() => {
+    setPage(1);
+  }, [selectedBranch]);
+
+  useEffect(() => {
+    const handleBranchChange = () => {
+      fetchRentals();
+    };
+    window.addEventListener('branchChange', handleBranchChange);
+    return () => window.removeEventListener('branchChange', handleBranchChange);
+  }, [search, statusFilter, overdueFilter, insuranceFilter, page, showCancelled, selectedBranch]);
+
   useEffect(() => {
     staggerFadeIn('.gsap-filter-bar', { y: 14, duration: 0.45, stagger: 0 });
   }, []);
@@ -42,7 +59,7 @@ export default function RentalsListPage() {
   const fetchRentals = async () => {
     try {
       setLoading(true);
-      let query = `/api/rentals?page=${page}&limit=15&_t=${Date.now()}`;
+      let query = `/api/rentals?page=${page}&limit=15`;
       if (search) query += `&search=${encodeURIComponent(search)}`;
       if (showCancelled) {
         query += `&status=cancelled`;
@@ -55,6 +72,9 @@ export default function RentalsListPage() {
       if (overdueFilter) query += `&overdue_days=${overdueFilter}`;
       if (insuranceFilter) query += `&insurance_status=${insuranceFilter}`;
 
+      const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
+      query += `&branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`;
+
       const res = await api.get(query);
       if (res.data?.success) {
         setTenants(res.data.data || []);
@@ -62,10 +82,105 @@ export default function RentalsListPage() {
         setTotalRecords(res.data.pagination?.totalItems || 0);
       }
     } catch (err) {
-      console.error('Failed to load rentals:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const [exporting, setExporting] = useState(false);
+
+  const RENTAL_EXPORT_COLUMNS = [
+    'Customer Name',
+    'Phone Number',
+    'Ward / Branch',
+    'Vehicle / Reg No',
+    'Chassis No',
+    'Battery No',
+    'Motor No',
+    'Charger No',
+    'EV Model',
+    'Company',
+    'Contract Status',
+    'Start Date',
+    'Expected End Date',
+    'Tenure (Months)',
+    'Monthly / Daily Rate',
+    'Total Contract Price (₹)',
+    'Downpayment Paid (₹)',
+    'Downpayment Mode',
+    'Total Amount Paid (₹)',
+    'Outstanding Balance (₹)',
+    'Days Overdue',
+    'Guarantor Name',
+    'Guarantor Phone',
+    'Customer Address',
+    'Scooty Insurance Expiry',
+    'Rider Insurance Expiry',
+    'AMC Amount (₹)',
+    'AMC Start Date',
+    'AMC Expire Date',
+    'Pending Docs',
+    'Agreement Signed',
+    'Created Date'
+  ];
+
+  const fetchRentalsForExport = async () => {
+    const params = {};
+    if (search) params.search = search;
+    if (showCancelled) {
+      params.status = 'cancelled';
+    }
+    if (statusFilter === 'pending_docs') {
+      params.has_pending_docs = 'true';
+    } else if (statusFilter === 'completed_docs') {
+      params.has_pending_docs = 'false';
+    }
+    if (overdueFilter) params.overdue_days = overdueFilter;
+    if (insuranceFilter) params.insurance_status = insuranceFilter;
+
+    const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
+    params.branch_id = branchParam;
+
+    return await fetchAllForExport(api, '/api/rentals', params, 250);
+  };
+
+  const transformRentalRow = (row) => ({
+    'Customer Name': row.name,
+    'Phone Number': row.phone,
+    'Ward / Branch': row.branch ? (row.branch.ward_no ? `Ward ${row.branch.ward_no}: ${row.branch.name}` : row.branch.name) : 'Central Fleet',
+    'Vehicle / Reg No': row.vehicle_number || 'N/A',
+    'Chassis No': row.chassis_no || 'N/A',
+    'Battery No': row.battery_no || 'N/A',
+    'Motor No': row.motor_no || 'N/A',
+    'Charger No': row.charger_no || 'N/A',
+    'EV Model': row.ev_models?.name || 'EV Scooter',
+    'Company': row.ev_models?.company || 'GoSpeedy',
+    'Contract Status': row.status,
+    'Start Date': row.start_date ? formatDate(row.start_date) : 'N/A',
+    'Expected End Date': row.expected_end_date ? formatDate(row.expected_end_date) : 'N/A',
+    'Tenure (Months)': row.total_months || 'N/A',
+    'Monthly / Daily Rate': row.installment_daily_rate ? `₹${row.installment_daily_rate}/${row.installment_frequency || 'day'}` : (row.monthly_rent ? `₹${row.monthly_rent}/mo` : 'N/A'),
+    'Total Contract Price (₹)': row.total_price || 0,
+    'Downpayment Paid (₹)': row.downpayment_paid || 0,
+    'Downpayment Mode': row.downpayment_mode || 'Cash',
+    'Total Amount Paid (₹)': row.computed_balance?.totalPaid || 0,
+    'Outstanding Balance (₹)': row.computed_balance?.outstanding || 0,
+    'Days Overdue': row.computed_balance?.daysOverdue || 0,
+    'Guarantor Name': row.guarantors?.[0]?.name || row.guarantor_name || 'N/A',
+    'Guarantor Phone': row.guarantors?.[0]?.phone || row.guarantor_phone || 'N/A',
+    'Customer Address': row.address || 'N/A',
+    'Scooty Insurance Expiry': row.scooty_policy_expiry ? formatDate(row.scooty_policy_expiry) : 'N/A',
+    'Rider Insurance Expiry': row.rider_policy_expiry ? formatDate(row.rider_policy_expiry) : 'N/A',
+    'AMC Amount (₹)': row.amc_amount || 0,
+    'AMC Start Date': row.amc_start_date ? formatDate(row.amc_start_date) : 'N/A',
+    'AMC Expire Date': row.amc_expire_date ? formatDate(row.amc_expire_date) : 'N/A',
+    'Pending Docs': row.has_pending_docs ? 'Yes' : 'No',
+    'Agreement Signed': row.rent_agreement_signed ? 'Yes' : 'No',
+    'Created Date': formatDate(row.created_at)
+  });
+
+  const handleDownloadData = () => {
+    setIsCustomExportOpen(true);
   };
 
   const columns = [
@@ -91,7 +206,11 @@ export default function RentalsListPage() {
       key: 'model',
       render: (row) => (
         <div>
-          <p className="font-semibold text-slate-800 dark:text-slate-200">{row.ev_models?.name || 'EV Scooter'}</p>
+          <p className="font-semibold text-slate-800 dark:text-slate-200">
+            {row.ev_models?.name
+              ? `${row.ev_models.name}${row.ev_models.kilometres !== undefined && row.ev_models.kilometres !== null ? ` (${row.ev_models.kilometres} KM)` : ''}`
+              : 'EV Scooter'}
+          </p>
           <p className="text-[11px] text-slate-400">Total: {formatCurrency(row.total_price)}</p>
         </div>
       ),
@@ -143,16 +262,21 @@ export default function RentalsListPage() {
     {
       header: 'Contract Status',
       key: 'status',
+      cellClassName: 'whitespace-nowrap',
       render: (row) => <Badge status={row.status} size="sm" />,
     },
     {
       header: 'Pending Docs',
       key: 'has_pending_docs',
+      cellClassName: 'whitespace-nowrap',
       render: (row) =>
         row.has_pending_docs ? (
           <Badge status="Docs Pending" variant="amber" size="sm" />
         ) : (
-          <span className="text-xs text-emerald-600 font-medium">Verified</span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold tracking-wider uppercase text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.6)] shrink-0" />
+            Verified
+          </span>
         ),
     },
     {
@@ -179,7 +303,7 @@ export default function RentalsListPage() {
   ];
 
   return (
-    <div>
+    <div className="flex-1 flex flex-col min-w-0 w-full">
       <Header
         title="EV Rentals & Tenants"
         subtitle="Live registry of active contracts, daily collections, and overdue accounts"
@@ -189,34 +313,46 @@ export default function RentalsListPage() {
               variant="primary"
               size="sm"
               icon={Plus}
-              className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-3 xs:py-1.5"
+              className="h-9 px-3 sm:px-3.5 text-xs font-bold shrink-0 shadow-xs"
               title="Issue New Rental"
             >
               <span className="hidden sm:inline">Issue New Rental</span>
-              <span className="hidden xs:inline sm:hidden">New</span>
+              <span className="sm:hidden">New Rental</span>
             </Button>
           </Link>
         }
       />
 
-      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
-        {/* Filters and Search Bar */}
-        <div className="gsap-filter-bar flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 md:gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
-          <SearchBar
-            value={search}
-            onChange={(val) => {
-              setSearch(val);
-              setPage(1);
-            }}
-            placeholder="Search tenant name or phone..."
-            className="w-full sm:max-w-md md:flex-1 md:min-w-0"
-          />
+      <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+        <div className="gsap-filter-bar flex flex-col xl:flex-row flex-wrap items-stretch xl:items-center justify-between gap-3 sm:gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
+          <div className="flex w-full xl:max-w-md xl:flex-1 min-w-0 gap-2 items-center">
+            <SearchBar
+              value={search}
+              onChange={(val) => {
+                setSearch(val);
+                setPage(1);
+              }}
+              placeholder="Search tenant name or phone..."
+              className="flex-1"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Download}
+              loading={exporting}
+              className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+              onClick={handleDownloadData}
+              title="Download Complete Data as Excel"
+            >
+              <span className="hidden sm:inline">{exporting ? 'Exporting...' : 'Export Excel'}</span>
+            </Button>
+          </div>
 
-          <div className="grid grid-cols-2 md:flex md:flex-wrap md:shrink-0 items-center gap-2 md:gap-3 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full xl:w-auto shrink-0">
             <Button
               variant={showCancelled ? 'primary' : 'outline'}
               size="sm"
-              className="col-span-2 md:col-span-1 w-full md:w-auto justify-center"
+              className="flex-1 sm:flex-initial justify-center"
               onClick={() => {
                 setShowCancelled(!showCancelled);
                 setPage(1);
@@ -231,7 +367,7 @@ export default function RentalsListPage() {
                 setStatusFilter(e.target.value);
                 setPage(1);
               }}
-              className="w-full md:w-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
+              className="flex-1 sm:flex-initial rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
             >
               <option value="" className="dark:bg-slate-900">All Document Statuses</option>
               <option value="pending_docs" className="dark:bg-slate-900">Pending Documents</option>
@@ -244,7 +380,7 @@ export default function RentalsListPage() {
                 setInsuranceFilter(e.target.value);
                 setPage(1);
               }}
-              className="w-full md:w-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
+              className="flex-1 sm:flex-initial rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
             >
               <option value="" className="dark:bg-slate-900">All Insurance</option>
               <option value="scooty_expired" className="dark:bg-slate-900">Scooty Ins. Expired</option>
@@ -259,7 +395,7 @@ export default function RentalsListPage() {
                 setOverdueFilter(e.target.value);
                 setPage(1);
               }}
-              className={`w-full md:w-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors ${showCancelled ? 'col-span-2 md:col-span-1' : 'col-span-1'}`}
+              className="flex-1 sm:flex-initial rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800/80 py-2 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40 transition-colors"
             >
               <option value="" className="dark:bg-slate-900">Overdue Filter: All</option>
               <option value="1" className="dark:bg-slate-900">1+ Days Overdue</option>
@@ -269,12 +405,12 @@ export default function RentalsListPage() {
           </div>
         </div>
 
-        {/* Tenant Table */}
         <Table
           columns={columns}
           data={tenants}
           loading={loading}
           emptyText="No rental records match your filter criteria."
+          minWidth="min-w-[960px]"
         />
 
         <Pagination
@@ -284,6 +420,18 @@ export default function RentalsListPage() {
           onPageChange={setPage}
         />
       </div>
+
+      <CustomExportModal
+        isOpen={isCustomExportOpen}
+        onClose={() => setIsCustomExportOpen(false)}
+        title="Export EV Rentals & Tenants Data"
+        subtitle="Download customer rental agreements, payment balances, and AMC schedule records (Excel / CSV)"
+        defaultFilename="GoSpeedy_Rentals_Data"
+        columns={RENTAL_EXPORT_COLUMNS}
+        dateAccessor="created_at"
+        onFetchData={fetchRentalsForExport}
+        transformRow={transformRentalRow}
+      />
     </div>
   );
 }

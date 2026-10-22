@@ -1,18 +1,12 @@
-/**
- * Financial calculation logic for tenant balances
- */
 function calcBalance(tenant, totalPaid = 0) {
-  // EV sticker price snapshot minus the booking amount
   const bookingAmount = tenant.booking_amount ? Number(tenant.booking_amount) : 0;
   const totalPrice = tenant.total_price ? Number(tenant.total_price) : 0;
   
   const contractAmount = totalPrice - bookingAmount;
   
-  // What is paid off in installments
   const downpaymentPaid = tenant.downpayment_paid ? Number(tenant.downpayment_paid) : 0;
   const installmentTotal = contractAmount - downpaymentPaid;
   
-  // Calculate outstanding and overpaid
   const outstanding = Math.max(0, installmentTotal - totalPaid);
   const overpaid = Math.max(0, totalPaid - installmentTotal);
   
@@ -20,9 +14,8 @@ function calcBalance(tenant, totalPaid = 0) {
   const frequency = tenant.installment_frequency || 'daily';
   
   const today = new Date();
-  today.setHours(0, 0, 0, 0); // Start of day today
+  today.setHours(0, 0, 0, 0);
 
-  // Calculate how much should have been collected by today
   const hasStartDate = Boolean(tenant.start_date || tenant.created_at);
   let expectedCollection = 0;
 
@@ -30,9 +23,8 @@ function calcBalance(tenant, totalPaid = 0) {
     const rawDate = tenant.start_date || tenant.created_at;
     const startDate = new Date(rawDate);
     if (!isNaN(startDate.getTime())) {
-      startDate.setHours(0, 0, 0, 0); // Start of day
+      startDate.setHours(0, 0, 0, 0);
 
-      // Calculate full days elapsed since start date
       const msPerDay = 24 * 60 * 60 * 1000;
       const daysElapsed = Math.max(0, Math.floor((today - startDate) / msPerDay));
 
@@ -42,12 +34,10 @@ function calcBalance(tenant, totalPaid = 0) {
         const weeksElapsed = Math.floor(daysElapsed / 7);
         expectedCollection = weeksElapsed * (dailyRate * 7);
       } else if (frequency === 'monthly') {
-        // Approx 30 days for financial calculation
         const monthsElapsed = Math.floor(daysElapsed / 30);
         expectedCollection = monthsElapsed * (dailyRate * 30);
       }
 
-      // Cap expected collection at the max possible remaining
       expectedCollection = Math.min(expectedCollection, installmentTotal);
     } else {
       expectedCollection = installmentTotal;
@@ -67,6 +57,13 @@ function calcBalance(tenant, totalPaid = 0) {
     daysAdvance = dailyRate > 0 ? Math.floor(Math.abs(shortfall) / dailyRate) : 0;
   }
 
+  const lateFeeDailyRate = tenant.late_fee_daily_rate !== undefined && tenant.late_fee_daily_rate !== null
+    ? Number(tenant.late_fee_daily_rate)
+    : 50;
+
+  const totalLateFee = daysOverdue > 0 ? daysOverdue * lateFeeDailyRate : 0;
+  const netTotalDue = outstanding + totalLateFee;
+
   let contractExpired = false;
   if (tenant.expected_end_date) {
     const endDate = new Date(tenant.expected_end_date);
@@ -82,6 +79,9 @@ function calcBalance(tenant, totalPaid = 0) {
       daysOverdue: 0,
       daysAdvance: 0,
       contractExpired: false,
+      lateFeeDailyRate: 0,
+      totalLateFee: 0,
+      netTotalDue: outstanding,
     };
   }
 
@@ -92,6 +92,9 @@ function calcBalance(tenant, totalPaid = 0) {
     daysOverdue,
     daysAdvance,
     contractExpired,
+    lateFeeDailyRate,
+    totalLateFee,
+    netTotalDue,
   };
 }
 

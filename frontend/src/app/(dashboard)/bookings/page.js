@@ -3,7 +3,24 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { CalendarCheck, Plus, ArrowRight, XCircle, AlertCircle, Edit, Phone, ChevronDown, Home, ShoppingBag } from 'lucide-react';
+import {
+  CalendarCheck,
+  Plus,
+  ArrowRight,
+  XCircle,
+  AlertCircle,
+  Edit,
+  Phone,
+  ChevronDown,
+  Home,
+  ShoppingBag,
+  Bike,
+  IndianRupee,
+  Calendar,
+  Sparkles,
+  CheckCircle2,
+  Download
+} from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
 import Button from '../../../components/ui/Button';
@@ -13,11 +30,15 @@ import Modal from '../../../components/ui/Modal';
 import Badge from '../../../components/ui/Badge';
 import SearchBar from '../../../components/ui/SearchBar';
 import Pagination from '../../../components/ui/Pagination';
+import Spinner from '../../../components/ui/Spinner';
 import api from '../../../lib/api';
 import { formatCurrency, formatDate } from '../../../lib/constants';
 import { staggerFadeIn } from '../../../lib/gsap';
 import { toast } from '../../../lib/toast';
 import { confirmDialog } from '../../../lib/confirmDialog';
+import { useAuthStore } from '../../../store/authStore';
+import { exportToExcel, fetchAllForExport } from '../../../lib/exportToExcel';
+import CustomExportModal from '../../../components/ui/CustomExportModal';
 
 export default function BookingsPage() {
   const router = useRouter();
@@ -28,11 +49,12 @@ export default function BookingsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
 
-  // Form fields
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [modelId, setModelId] = useState('');
@@ -40,17 +62,37 @@ export default function BookingsPage() {
   const [bookingAmount, setBookingAmount] = useState('2000');
   const [notes, setNotes] = useState('');
 
-  // Edit Modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editData, setEditData] = useState({ id: '', name: '', phone: '', booking_amount: '', notes: '', modelId: '', customModel: '' });
+  const [editData, setEditData] = useState({
+    id: '',
+    name: '',
+    phone: '',
+    booking_amount: '',
+    notes: '',
+    modelId: '',
+    customModel: '',
+  });
   const [isEditing, setIsEditing] = useState(false);
-  const [showConvertMenu, setShowConvertMenu] = useState(null);
+
+  const [convertBookingData, setConvertBookingData] = useState(null);
+  const { selectedBranch } = useAuthStore();
 
   useEffect(() => {
     fetchData();
-  }, [search, page]);
+  }, [search, page, statusFilter, selectedBranch]);
 
-  // One-time entrance for the header/filter chrome when the page first mounts.
+  useEffect(() => {
+    setPage(1);
+  }, [selectedBranch]);
+
+  useEffect(() => {
+    const handleBranchChange = () => {
+      fetchData();
+    };
+    window.addEventListener('branchChange', handleBranchChange);
+    return () => window.removeEventListener('branchChange', handleBranchChange);
+  }, [search, page, statusFilter, selectedBranch]);
+
   useEffect(() => {
     staggerFadeIn('.gsap-filter-bar', { y: 14, duration: 0.45, stagger: 0 });
   }, []);
@@ -60,10 +102,18 @@ export default function BookingsPage() {
       setLoading(true);
       let bookingsQuery = `/api/bookings?page=${page}&limit=15`;
       if (search) bookingsQuery += `&search=${encodeURIComponent(search)}`;
+      if (statusFilter && statusFilter !== 'all') {
+        bookingsQuery += `&status=${statusFilter}`;
+      } else if (statusFilter === 'all') {
+        bookingsQuery += `&status=all`;
+      }
+
+      const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
+      bookingsQuery += `&branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`;
 
       const [bookingsRes, modelsRes] = await Promise.all([
         api.get(bookingsQuery),
-        api.get('/api/models/dropdown'),
+        api.get(`/api/models/dropdown?branch_id=${encodeURIComponent(branchParam)}&_t=${Date.now()}`),
       ]);
 
       if (bookingsRes.data?.success) {
@@ -75,11 +125,58 @@ export default function BookingsPage() {
         setModels(modelsRes.data.data || []);
       }
     } catch (err) {
-      console.error('Error fetching bookings:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  const BOOKING_EXPORT_COLUMNS = [
+    'Customer Name',
+    'Phone Number',
+    'Ward / Branch',
+    'EV Model Requested',
+    'Manufacturer / Company',
+    'Booking Amount (₹)',
+    'Booking Status',
+    'Conversion Details',
+    'Booked By Staff',
+    'Booking Date',
+    'Aadhaar Provided',
+    'Special Notes',
+    'Created Timestamp'
+  ];
+
+  const fetchBookingsForExport = async () => {
+    const params = {};
+    if (search) params.search = search;
+    if (statusFilter && statusFilter !== 'all') {
+      params.status = statusFilter;
+    } else if (statusFilter === 'all') {
+      params.status = 'all';
+    }
+
+    const branchParam = selectedBranch ? (selectedBranch.id || selectedBranch.code || selectedBranch.name) : 'all';
+    params.branch_id = branchParam;
+
+    return await fetchAllForExport(api, '/api/bookings', params, 250);
+  };
+
+  const transformBookingRow = (b) => ({
+    'Customer Name': b.name || '—',
+    'Phone Number': b.phone || '—',
+    'Ward / Branch': b.branch ? (b.branch.ward_no ? `Ward ${b.branch.ward_no}: ${b.branch.name}` : b.branch.name) : 'Central Fleet',
+    'EV Model Requested': b.ev_models?.name || b.model_name_raw || b.custom_model_name || 'N/A',
+    'Manufacturer / Company': b.ev_models?.company || 'GoSpeedy',
+    'Booking Amount (₹)': b.booking_amount || 0,
+    'Booking Status': b.status || 'pending',
+    'Conversion Details': b.converted_to ? `Converted to ${b.converted_type || 'Rental'} (#${b.converted_to})` : 'Pending Delivery',
+    'Booked By Staff': b.users?.name || 'Staff',
+    'Booking Date': b.booking_date ? formatDate(b.booking_date) : formatDate(b.created_at),
+    'Aadhaar Provided': b.aadhar_path ? 'Yes' : 'No',
+    'Special Notes': b.notes || 'None',
+    'Created Timestamp': formatDate(b.created_at),
+    created_at: b.booking_date || b.created_at || new Date().toISOString(),
+  });
 
   const handleCreateBooking = async (e) => {
     e.preventDefault();
@@ -102,15 +199,19 @@ export default function BookingsPage() {
         phone: phone.trim(),
         ev_model_id: modelId !== 'other' ? (modelId || null) : null,
         model_name_raw: modelId === 'other' ? customModel.trim() : null,
-        booking_amount: Number(bookingAmount || 0),
-        notes: notes.trim() || null,
+        booking_amount: Number(bookingAmount),
+        notes: notes.trim(),
       });
 
       if (res.data?.success) {
         setIsAddModalOpen(false);
         setName('');
         setPhone('');
+        setModelId('');
+        setCustomModel('');
+        setBookingAmount('2000');
         setNotes('');
+        toast.success('Walk-in booking recorded successfully!');
         fetchData();
       }
     } catch (err) {
@@ -177,9 +278,13 @@ export default function BookingsPage() {
       render: (row) => (
         <div>
           <p className="font-bold text-slate-900 dark:text-white">{row.name}</p>
-          <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+          <a
+            href={`tel:${row.phone}`}
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 mt-0.5"
+            onClick={(e) => e.stopPropagation()}
+          >
             <Phone className="h-3 w-3" /> {row.phone}
-          </span>
+          </a>
         </div>
       ),
     },
@@ -187,8 +292,9 @@ export default function BookingsPage() {
       header: 'Reserved EV Model',
       key: 'model',
       render: (row) => (
-        <span className="font-medium text-slate-800 dark:text-slate-200">
-          {row.ev_models?.name || row.model_name_raw || 'Unspecified'}
+        <span className="font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+          <Bike className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+          <span>{row.ev_models?.name || row.model_name_raw || 'Unspecified'}</span>
         </span>
       ),
     },
@@ -196,83 +302,68 @@ export default function BookingsPage() {
       header: 'Advance Token',
       key: 'booking_amount',
       render: (row) => (
-        <span className="font-bold text-emerald-600">{formatCurrency(row.booking_amount)}</span>
+        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+          {formatCurrency(row.booking_amount)}
+        </span>
       ),
     },
     {
       header: 'Booking Date',
       key: 'booking_date',
-      render: (row) => <span className="text-xs text-slate-500">{formatDate(row.booking_date)}</span>,
-    },
-    {
-      header: 'Updated Date',
-      key: 'updated_at',
-      render: (row) => <span className="text-xs text-slate-500">{formatDate(row.updated_at)}</span>,
+      cellClassName: 'whitespace-nowrap',
+      render: (row) => <span className="text-xs text-slate-500 dark:text-slate-400">{formatDate(row.booking_date)}</span>,
     },
     {
       header: 'Status',
       key: 'status',
+      cellClassName: 'whitespace-nowrap',
       render: (row) => <Badge status={row.status} size="sm" />,
     },
     {
       header: 'Actions',
       key: 'actions',
+      cellClassName: 'whitespace-nowrap',
       render: (row) => {
         if (row.status === 'pending') {
           return (
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => setShowConvertMenu(showConvertMenu === row.id ? null : row.id)}
-                >
-                  Convert <ChevronDown className="w-3.5 h-3.5 ml-1" />
-                </Button>
-                {showConvertMenu === row.id && (
-                  <div className="absolute right-0 md:left-0 top-full mt-1 w-48 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg py-1 z-10 flex flex-col">
-                    <Link
-                      href={`/rentals/new?booking_id=${row.id}&name=${encodeURIComponent(row.name)}&phone=${encodeURIComponent(row.phone)}&model_id=${row.ev_model_id || ''}&amount=${row.booking_amount || 0}`}
-                      className="px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2 transition-colors"
-                      onClick={() => setShowConvertMenu(null)}
-                    >
-                      <Home className="w-4 h-4 text-blue-600" /> Convert to Rental
-                    </Link>
-                    <Link
-                      href={`/purchases/new?booking_id=${row.id}&name=${encodeURIComponent(row.name)}&phone=${encodeURIComponent(row.phone)}&model_id=${row.ev_model_id || ''}&amount=${row.booking_amount || 0}`}
-                      className="px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2 transition-colors"
-                      onClick={() => setShowConvertMenu(null)}
-                    >
-                      <ShoppingBag className="w-4 h-4 text-emerald-600" /> Direct Purchase
-                    </Link>
-                  </div>
-                )}
-              </div>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setConvertBookingData(row)}
+                className="font-bold text-xs flex items-center gap-1 shadow-2xs py-1.5 px-3"
+              >
+                <span>Convert</span>
+                <ChevronDown className="w-3.5 h-3.5" />
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
+                className="p-1.5 text-slate-600 dark:text-slate-300"
                 onClick={() => {
-                  setEditData({ 
-                    id: row.id, 
-                    name: row.name, 
-                    phone: row.phone, 
-                    booking_amount: row.booking_amount, 
+                  setEditData({
+                    id: row.id,
+                    name: row.name,
+                    phone: row.phone,
+                    booking_amount: row.booking_amount,
                     notes: row.notes || '',
                     modelId: row.ev_model_id || (row.model_name_raw ? 'other' : ''),
-                    customModel: row.model_name_raw || ''
+                    customModel: row.model_name_raw || '',
                   });
                   setIsEditModalOpen(true);
                 }}
+                title="Edit booking"
               >
-                <Edit className="w-4 h-4" />
+                <Edit className="w-3.5 h-3.5" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-rose-600 hover:bg-rose-50"
+                className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
                 onClick={() => handleCancelBooking(row.id)}
+                title="Cancel booking"
               >
-                <XCircle className="w-4 h-4" />
+                <XCircle className="w-3.5 h-3.5" />
               </Button>
             </div>
           );
@@ -281,57 +372,229 @@ export default function BookingsPage() {
           return (
             <Link
               href={`/rentals/${row.converted_to}`}
-              className="text-xs font-semibold text-blue-600 hover:underline"
+              className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
             >
-              View Rental →
+              View Rental <ArrowRight className="w-3 h-3" />
             </Link>
           );
         }
-        return <span className="text-xs text-slate-400">No actions</span>;
+        return <span className="text-xs text-slate-400 italic">Cancelled</span>;
       },
     },
   ];
 
   return (
-    <div>
+    <div className="flex-1 flex flex-col min-w-0 w-full">
       <Header
         title="Walk-in Bookings"
-        subtitle="Manage token amounts and convert bookings to active rentals"
+        subtitle="Manage token amounts and convert bookings to active rentals or direct sales"
         action={
           <Button
             variant="primary"
             size="sm"
             icon={Plus}
             onClick={() => setIsAddModalOpen(true)}
-            className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-3 xs:py-1.5"
+            className="h-9 px-3 sm:px-4 text-xs font-bold shrink-0 shadow-xs"
             title="New Booking"
           >
-            <span className="hidden sm:inline">New Booking</span>
-            <span className="hidden xs:inline sm:hidden">New</span>
+            <span className="hidden sm:inline">+ New Booking</span>
+            <span className="sm:hidden">+ Booking</span>
           </Button>
         }
       />
 
-      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
-        {/* Search Bar */}
-        <div className="gsap-filter-bar flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/90 dark:bg-slate-900/60 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs dark:shadow-[0_8px_30px_rgb(0,0,0,0.35)] transition-colors">
-          <SearchBar
-            value={search}
-            onChange={(val) => {
-              setSearch(val);
-              setPage(1);
-            }}
-            placeholder="Search customer name or phone..."
-            className="w-full sm:max-w-md sm:flex-1 sm:min-w-0"
+      <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+        <div className="gsap-filter-bar flex flex-col md:flex-row flex-wrap items-stretch md:items-center justify-between gap-3 bg-white/95 dark:bg-slate-900/80 backdrop-blur-xl p-3 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 card-elevation shadow-xs transition-colors">
+          <div className="flex w-full md:max-w-sm md:flex-1 min-w-0 gap-2 items-center">
+            <SearchBar
+              value={search}
+              onChange={(val) => {
+                setSearch(val);
+                setPage(1);
+              }}
+              placeholder="Search customer name or phone..."
+              className="flex-1"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Download}
+              className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+              onClick={() => setIsCustomExportOpen(true)}
+              title="Download Bookings Data (Excel / CSV)"
+            >
+              <span className="hidden sm:inline">Export</span>
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 md:pb-0 scrollbar-thin shrink-0">
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'pending', label: 'Pending' },
+              { id: 'converted', label: 'Converted' },
+              { id: 'cancelled', label: 'Cancelled' },
+            ].map((tab) => {
+              const active = statusFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setStatusFilter(tab.id);
+                    setPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                    active
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="hidden md:block">
+          <Table
+            columns={columns}
+            data={bookings}
+            loading={loading}
+            emptyText="No bookings found. Click '+ New Booking' to record a reservation."
+            minWidth="min-w-[860px]"
           />
         </div>
 
-        <Table
-          columns={columns}
-          data={bookings}
-          loading={loading}
-          emptyText="No bookings found. Click 'New Booking' to record a reservation."
-        />
+        <div className="block md:hidden space-y-3.5">
+          {loading ? (
+            <div className="p-10 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
+              <Spinner size="lg" className="text-blue-600 dark:text-blue-400 mx-auto" />
+              <p className="mt-2.5 text-xs font-semibold text-slate-500 dark:text-slate-400">Loading bookings...</p>
+            </div>
+          ) : bookings.length === 0 ? (
+            <div className="p-8 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400">
+              <CalendarCheck className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-200">No bookings found</p>
+              <p className="text-xs text-slate-500 mt-1">Click '+ New Booking' above to record a customer reservation.</p>
+            </div>
+          ) : (
+            bookings.map((row) => {
+              const firstLetter = (row.name || 'C').charAt(0).toUpperCase();
+              const isPending = row.status === 'pending';
+              const isConverted = row.status === 'converted';
+
+              return (
+                <div
+                  key={row.id}
+                  className="p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-slate-900/90 backdrop-blur-xl shadow-xs space-y-3 transition-all"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 font-black text-sm flex items-center justify-center shrink-0 border border-blue-500/20">
+                        {firstLetter}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-900 dark:text-white text-sm truncate">{row.name}</p>
+                        <a
+                          href={`tel:${row.phone}`}
+                          className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-1 mt-0.5"
+                        >
+                          <Phone className="w-3 h-3" /> {row.phone}
+                        </a>
+                      </div>
+                    </div>
+                    <Badge status={row.status} size="sm" />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs">
+                      <Bike className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                      <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
+                        {row.ev_models?.name
+                          ? `${row.ev_models.name}${row.ev_models.kilometres !== undefined && row.ev_models.kilometres !== null ? ` — ${row.ev_models.kilometres} KM` : ''}`
+                          : (row.model_name_raw || 'Model N/A')}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/20 text-xs font-black text-emerald-700 dark:text-emerald-400">
+                      <IndianRupee className="w-3.5 h-3.5 shrink-0" />
+                      <span>{formatCurrency(row.booking_amount)} Token</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 px-0.5">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" /> Booked: {formatDate(row.booking_date)}
+                    </span>
+                    {row.notes && (
+                      <span className="truncate max-w-[150px] italic">"{row.notes}"</span>
+                    )}
+                  </div>
+
+                  <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
+                    {isPending ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => setConvertBookingData(row)}
+                          className="flex-1 font-bold text-xs py-2 shadow-xs flex items-center justify-center gap-1.5"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Convert Booking</span>
+                          <ChevronDown className="w-3.5 h-3.5" />
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditData({
+                              id: row.id,
+                              name: row.name,
+                              phone: row.phone,
+                              booking_amount: row.booking_amount,
+                              notes: row.notes || '',
+                              modelId: row.ev_model_id || (row.model_name_raw ? 'other' : ''),
+                              customModel: row.model_name_raw || '',
+                            });
+                            setIsEditModalOpen(true);
+                          }}
+                          className="p-2 text-slate-600 dark:text-slate-300"
+                          title="Edit"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCancelBooking(row.id)}
+                          className="p-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                          title="Cancel"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : isConverted ? (
+                      <Link
+                        href={`/rentals/${row.converted_to}`}
+                        className="w-full py-2 px-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-500/20 text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center justify-center gap-1.5 hover:bg-blue-100/60 transition-colors"
+                      >
+                        <span>View Rental Agreement</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    ) : (
+                      <div className="text-center py-1">
+                        <span className="text-xs text-slate-400 italic">Booking Cancelled</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
 
         <Pagination
           currentPage={page}
@@ -341,7 +604,103 @@ export default function BookingsPage() {
         />
       </div>
 
-      {/* New Booking Modal */}
+      <Modal
+        isOpen={!!convertBookingData}
+        onClose={() => setConvertBookingData(null)}
+        title="Convert Walk-in Booking"
+        subtitle={`Select fulfillment path for ${convertBookingData?.name || 'Customer'}`}
+      >
+        {convertBookingData && (
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Customer
+                </p>
+                <p className="text-sm font-black text-slate-900 dark:text-white">
+                  {convertBookingData.name}
+                </p>
+                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  {convertBookingData.phone}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Advance Paid
+                </p>
+                <p className="text-base font-black text-emerald-600 dark:text-emerald-400">
+                  {formatCurrency(convertBookingData.booking_amount || 0)}
+                </p>
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <CheckCircle2 className="w-3 h-3" /> Auto-credited
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              Choose how you want to convert this booking:
+            </p>
+
+            <Link
+              href={`/rentals/new?booking_id=${convertBookingData.id}&name=${encodeURIComponent(convertBookingData.name)}&phone=${encodeURIComponent(convertBookingData.phone)}&model_id=${convertBookingData.ev_model_id || ''}&amount=${convertBookingData.booking_amount || 0}`}
+              onClick={() => setConvertBookingData(null)}
+              className="group block p-4 rounded-2xl border-2 border-blue-500/30 hover:border-blue-600 bg-blue-50/30 hover:bg-blue-50/70 dark:bg-blue-950/20 dark:hover:bg-blue-950/40 transition-all cursor-pointer shadow-xs"
+            >
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform">
+                  <Home className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-slate-900 dark:text-white text-sm">
+                      Convert to EV Rental
+                    </p>
+                    <ArrowRight className="w-4 h-4 text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    24-Month contract with daily / monthly installment schedule
+                  </p>
+                </div>
+              </div>
+            </Link>
+
+            <Link
+              href={`/purchases/new?booking_id=${convertBookingData.id}&name=${encodeURIComponent(convertBookingData.name)}&phone=${encodeURIComponent(convertBookingData.phone)}&model_id=${convertBookingData.ev_model_id || ''}&amount=${convertBookingData.booking_amount || 0}`}
+              onClick={() => setConvertBookingData(null)}
+              className="group block p-4 rounded-2xl border-2 border-emerald-500/30 hover:border-emerald-600 bg-emerald-50/30 hover:bg-emerald-50/70 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/40 transition-all cursor-pointer shadow-xs"
+            >
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform">
+                  <ShoppingBag className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-slate-900 dark:text-white text-sm">
+                      Direct Purchase (Full Sale)
+                    </p>
+                    <ArrowRight className="w-4 h-4 text-emerald-600 dark:text-emerald-400 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Full upfront payment, 0 installments, generate sale invoice
+                  </p>
+                </div>
+              </div>
+            </Link>
+
+            <div className="pt-2 flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConvertBookingData(null)}
+                className="text-slate-500 hover:text-slate-700"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       <Modal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -379,11 +738,11 @@ export default function BookingsPage() {
             value={modelId}
             onChange={(e) => setModelId(e.target.value)}
             options={[
-              ...models.filter(m => m.is_active).map((m) => ({
+              ...models.filter((m) => m.is_active).map((m) => ({
                 value: m.id,
-                label: `${m.name} (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
+                label: `${m.name} (${m.company || 'GoSpeedy'}) — ${m.kilometres ?? 0} KM (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
               })),
-              { value: 'other', label: 'Other / Future Model' }
+              { value: 'other', label: 'Other / Future Model' },
             ]}
             placeholder="Select EV model..."
           />
@@ -414,10 +773,11 @@ export default function BookingsPage() {
             onChange={(e) => setNotes(e.target.value)}
           />
 
-          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
             <Button
               variant="outline"
               size="md"
+              type="button"
               onClick={() => setIsAddModalOpen(false)}
             >
               Cancel
@@ -434,7 +794,6 @@ export default function BookingsPage() {
         </form>
       </Modal>
 
-      {/* Edit Booking Modal */}
       <Modal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
@@ -451,7 +810,9 @@ export default function BookingsPage() {
             label="Contact Phone Number"
             placeholder="10-digit mobile number"
             value={editData.phone}
-            onChange={(e) => setEditData({ ...editData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+            onChange={(e) =>
+              setEditData({ ...editData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })
+            }
             maxLength={10}
             inputMode="numeric"
             required
@@ -461,11 +822,11 @@ export default function BookingsPage() {
             value={editData.modelId}
             onChange={(e) => setEditData({ ...editData, modelId: e.target.value })}
             options={[
-              ...models.filter(m => m.is_active || editData.modelId === m.id).map((m) => ({
+              ...models.filter((m) => m.is_active || editData.modelId === m.id).map((m) => ({
                 value: m.id,
-                label: `${m.name} (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
+                label: `${m.name} (${m.company || 'GoSpeedy'}) — ${m.kilometres ?? 0} KM (${formatCurrency(m.total_price)} — Stock: ${m.stock_count})`,
               })),
-              { value: 'other', label: 'Other / Future Model' }
+              { value: 'other', label: 'Other / Future Model' },
             ]}
             placeholder="Select EV model..."
           />
@@ -492,7 +853,7 @@ export default function BookingsPage() {
             onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
           />
 
-          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
             <Button
               variant="outline"
               size="md"
@@ -512,6 +873,18 @@ export default function BookingsPage() {
           </div>
         </form>
       </Modal>
+
+      <CustomExportModal
+        isOpen={isCustomExportOpen}
+        onClose={() => setIsCustomExportOpen(false)}
+        title="Export Walk-in Bookings"
+        subtitle="Download customer token reservations, model requests, and conversion statuses (Excel / CSV)"
+        defaultFilename="GoSpeedy_Walkin_Bookings"
+        columns={BOOKING_EXPORT_COLUMNS}
+        dateAccessor="created_at"
+        onFetchData={fetchBookingsForExport}
+        transformRow={transformBookingRow}
+      />
     </div>
   );
 }

@@ -8,17 +8,21 @@ const Select = forwardRef(function Select(
     options = [],
     placeholder = 'Select an option',
     className = '',
+    containerClassName = '',
     id,
     name,
     required = false,
+    children,
     ...props
   },
   ref
 ) {
   const selectId = id || name;
 
+  const hasEmptyOption = options.some((opt) => opt.value === '');
+
   return (
-    <div className="w-full">
+    <div className={containerClassName || "w-full"}>
       {label && (
         <label
           htmlFor={selectId}
@@ -39,16 +43,22 @@ const Select = forwardRef(function Select(
           } ${className}`}
           {...props}
         >
-          {placeholder && (
-            <option value="" disabled className="dark:bg-slate-900">
-              {placeholder}
-            </option>
+          {children ? (
+            children
+          ) : (
+            <>
+              {placeholder && !hasEmptyOption && (
+                <option value="" disabled className="dark:bg-slate-900">
+                  {placeholder}
+                </option>
+              )}
+              {options.map((opt) => (
+                <option key={opt.value} value={opt.value} className="dark:bg-slate-900 text-slate-900 dark:text-white">
+                  {opt.label}
+                </option>
+              ))}
+            </>
           )}
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value} className="dark:bg-slate-900 text-slate-900 dark:text-white">
-              {opt.label}
-            </option>
-          ))}
         </select>
       </div>
       {error && <p className="mt-1 text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</p>}

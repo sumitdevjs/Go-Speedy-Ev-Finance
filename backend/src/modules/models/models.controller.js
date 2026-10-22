@@ -4,7 +4,7 @@ const { successResponse, errorResponse } = require('../../utils/response');
 class ModelsController {
   async getAll(req, res) {
     try {
-      const { data, meta } = await modelsService.getAllModels(req.query);
+      const { data, meta } = await modelsService.getAllModels(req.query, req);
       return successResponse(res, 200, data, 'Models retrieved successfully', meta);
     } catch (error) {
       console.error(error);
@@ -14,7 +14,7 @@ class ModelsController {
 
   async getAllForDropdown(req, res) {
     try {
-      const data = await modelsService.getAllModelsForDropdown();
+      const data = await modelsService.getAllModelsForDropdown(req);
       return successResponse(res, 200, data, 'Models retrieved successfully');
     } catch (error) {
       console.error(error);
@@ -22,10 +22,20 @@ class ModelsController {
     }
   }
 
+  async getWardBreakdown(req, res) {
+    try {
+      const data = await modelsService.getWardStockBreakdown(req.query, req.user);
+      return successResponse(res, 200, data, 'Ward stock breakdown retrieved successfully');
+    } catch (error) {
+      console.error('[ModelsController.getWardBreakdown]', error);
+      return errorResponse(res, 500, error.message || 'Internal Server Error');
+    }
+  }
+
   async getById(req, res) {
     try {
       const { id } = req.params;
-      const data = await modelsService.getModelById(id);
+      const data = await modelsService.getModelById(id, req);
       return successResponse(res, 200, data, 'Model retrieved successfully');
     } catch (error) {
       if (error.message === 'Model not found') {
@@ -38,11 +48,18 @@ class ModelsController {
 
   async create(req, res) {
     try {
-      const data = await modelsService.createModel(req.body, req.user.id);
+      const data = await modelsService.createModel(req.body, req.user.id, req);
       return successResponse(res, 201, data, 'Model created successfully');
     } catch (error) {
+      if (
+        error.message?.includes('already exists') ||
+        error.code === '23505' ||
+        error.message?.includes('unique')
+      ) {
+        return errorResponse(res, 400, error.message || 'An active EV model with this name and kilometre reading already exists.');
+      }
       console.error(error);
-      return errorResponse(res, 500, 'Internal Server Error');
+      return errorResponse(res, 500, error.message || 'Internal Server Error');
     }
   }
 
@@ -52,22 +69,48 @@ class ModelsController {
       const data = await modelsService.updateModel(id, req.body);
       return successResponse(res, 200, data, 'Model updated successfully');
     } catch (error) {
-      if (error.message.startsWith('Cannot change price') || error.message.startsWith('Cannot deactivate')) {
+      if (
+        error.message?.startsWith('Cannot change price') || 
+        error.message?.startsWith('Cannot deactivate') ||
+        error.message?.includes('already exists') ||
+        error.code === '23505'
+      ) {
         return errorResponse(res, 400, error.message);
       }
       console.error(error);
-      return errorResponse(res, 500, 'Internal Server Error');
+      return errorResponse(res, 500, error.message || 'Internal Server Error');
     }
   }
 
   async addStock(req, res) {
     try {
       const { id } = req.params;
-      const data = await modelsService.addStock(id, req.body);
+      const data = await modelsService.addStock(id, req.body, req);
       return successResponse(res, 200, data, 'Stock added successfully');
     } catch (error) {
       console.error(error);
-      return errorResponse(res, 500, 'Internal Server Error');
+      return errorResponse(res, 500, error.message || 'Internal Server Error');
+    }
+  }
+
+  async delete(req, res) {
+    try {
+      const { id } = req.params;
+      await modelsService.deleteModel(id);
+      return successResponse(res, 200, null, 'Model deleted successfully');
+    } catch (error) {
+      const status = error.message?.includes('active') ? 400 : 500;
+      return errorResponse(res, status, error.message || 'Failed to delete model');
+    }
+  }
+
+  async resetStock(req, res) {
+    try {
+      const { id } = req.params;
+      const data = await modelsService.resetModelStock(id);
+      return successResponse(res, 200, data, 'Model stock reset to zero successfully');
+    } catch (error) {
+      return errorResponse(res, 500, error.message || 'Failed to reset stock');
     }
   }
 }

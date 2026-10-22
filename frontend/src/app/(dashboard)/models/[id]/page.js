@@ -9,12 +9,14 @@ import {
 import Header from '../../../../components/layout/Header';
 import Button from '../../../../components/ui/Button';
 import Input from '../../../../components/ui/Input';
+import Select from '../../../../components/ui/Select';
 import Table from '../../../../components/ui/Table';
 import Card from '../../../../components/ui/Card';
 import Modal from '../../../../components/ui/Modal';
 import Badge from '../../../../components/ui/Badge';
 import Spinner from '../../../../components/ui/Spinner';
 import api from '../../../../lib/api';
+import { useAuthStore } from '../../../../store/authStore';
 import { toast } from '../../../../lib/toast';
 import { confirmDialog } from '../../../../lib/confirmDialog';
 import { formatCurrency, formatDate } from '../../../../lib/constants';
@@ -22,6 +24,7 @@ import { formatCurrency, formatDate } from '../../../../lib/constants';
 export default function ModelViewPage({ params }) {
   const router = useRouter();
   const { id } = params;
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const [model, setModel] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -29,25 +32,33 @@ export default function ModelViewPage({ params }) {
   const [savingLogs, setSavingLogs] = useState(false);
   const [error, setError] = useState('');
 
-  // Edit Mode for details
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState({});
 
-  // Logs states
   const [logs, setLogs] = useState([]);
   const [isEditingLogs, setIsEditingLogs] = useState(false);
   const [editableLogs, setEditableLogs] = useState([]);
 
-  // Add Stock state
   const [isAddStockOpen, setIsAddStockOpen] = useState(false);
   const [stockDate, setStockDate] = useState(new Date().toISOString().split('T')[0]);
   const [stockAdded, setStockAdded] = useState('');
   const [stockWard, setStockWard] = useState('');
+  const [stockBranchId, setStockBranchId] = useState('');
+  const [branches, setBranches] = useState([]);
   const [isStockSubmitting, setIsStockSubmitting] = useState(false);
+  const { selectedBranch } = useAuthStore();
+
+  useEffect(() => {
+    api.get('/api/branches/dropdown')
+      .then((res) => {
+        if (res.data?.success) setBranches(res.data.data || []);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchModel();
-  }, [id]);
+  }, [id, selectedBranch]);
 
   const fetchModel = async () => {
     try {
@@ -60,10 +71,10 @@ export default function ModelViewPage({ params }) {
           name: data.name || '',
           company: data.company || '',
           total_price: data.total_price?.toString() || '',
-          stock_count: data.stock_count?.toString() || ''
+          stock_count: data.stock_count?.toString() || '',
+          kilometres: data.kilometres?.toString() || '0'
         });
         const fetchedLogs = data.stock_logs || [];
-        // Sort logs descending by date
         fetchedLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
         setLogs(fetchedLogs);
         setEditableLogs(JSON.parse(JSON.stringify(fetchedLogs)));
@@ -81,7 +92,8 @@ export default function ModelViewPage({ params }) {
       await api.patch(`/api/models/${id}`, {
         name: formData.name,
         company: formData.company,
-        total_price: Number(formData.total_price)
+        total_price: Number(formData.total_price),
+        kilometres: Number(formData.kilometres) || 0,
       });
       toast.success('Model details updated successfully');
       setIsEditMode(false);
@@ -116,6 +128,48 @@ export default function ModelViewPage({ params }) {
     }
   };
 
+  const handleDeleteModel = async () => {
+    if (!model) return;
+    const ok = await confirmDialog({
+      title: `Delete Model: ${model.name}?`,
+      message: 'This will permanently remove this EV model from the fleet catalog. This cannot be undone.',
+      tone: 'danger',
+      confirmLabel: 'Delete Model',
+    });
+    if (!ok) return;
+
+    try {
+      const res = await api.delete(`/api/models/${model.id}`);
+      if (res.data?.success) {
+        toast.success(`${model.name} deleted successfully.`);
+        router.push('/models');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete model');
+    }
+  };
+
+  const handleResetStock = async () => {
+    if (!model) return;
+    const ok = await confirmDialog({
+      title: `Reset All Stock for ${model.name}?`,
+      message: 'This will clear all allocated stock logs and set the stock count to 0.',
+      tone: 'danger',
+      confirmLabel: 'Reset Stock',
+    });
+    if (!ok) return;
+
+    try {
+      const res = await api.post(`/api/models/${model.id}/reset-stock`);
+      if (res.data?.success) {
+        toast.success(`Stock for ${model.name} reset to 0.`);
+        fetchModel();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to reset stock');
+    }
+  };
+
   const handleLogChange = (index, field, value) => {
     const newLogs = [...editableLogs];
     newLogs[index][field] = field === 'stock_added' ? Number(value) : value;
@@ -129,6 +183,17 @@ export default function ModelViewPage({ params }) {
   };
 
   const handleSaveLogs = async () => {
+    const hasInvalidPastLog = editableLogs.some((l) => {
+      if (!l.date) return false;
+      const orig = l.id ? logs.find(item => item.id === l.id) : null;
+      if (orig && orig.date === l.date) return false;
+      return l.date < todayStr;
+    });
+    if (hasInvalidPastLog) {
+      toast.error('Stock log date cannot be set to a past date (back date not allowed).');
+      return;
+    }
+
     try {
       setSavingLogs(true);
       await api.patch(`/api/models/${id}`, {
@@ -155,18 +220,25 @@ export default function ModelViewPage({ params }) {
       toast.error('Please enter a valid stock quantity');
       return;
     }
-    if (!stockWard.trim()) {
-      toast.error('Ward/Area is required');
+    if (!stockBranchId) {
+      toast.error('Please select the target Ward / Branch');
       return;
     }
+    if (stockDate && stockDate < todayStr) {
+      toast.error('Date received cannot be in the past (back date not allowed).');
+      return;
+    }
+    const chosenBranch = branches.find((b) => b.id === stockBranchId);
     try {
       setIsStockSubmitting(true);
       await api.post(`/api/models/${id}/stock`, {
         date: stockDate,
         stock_added: Number(stockAdded),
-        ward_area: stockWard.trim(),
+        branch_id: chosenBranch?.id || stockBranchId,
+        ward_no: chosenBranch?.ward_no || null,
+        ward_area: chosenBranch ? (chosenBranch.ward_no ? `Ward ${chosenBranch.ward_no}: ${chosenBranch.name}` : chosenBranch.name) : 'General',
       });
-      toast.success(`Successfully added ${stockAdded} stock`);
+      toast.success(`Successfully allocated ${stockAdded} EVs to ${chosenBranch?.name || 'selected ward'}`);
       setIsAddStockOpen(false);
       setStockAdded('');
       fetchModel();
@@ -204,6 +276,7 @@ export default function ModelViewPage({ params }) {
         isEditingLogs ? (
           <Input 
             type="date" 
+            min={logs[idx]?.date && logs[idx].date < todayStr ? logs[idx].date : todayStr}
             value={editableLogs[idx].date} 
             onChange={(e) => handleLogChange(idx, 'date', e.target.value)}
             className="w-full min-w-[140px]"
@@ -283,6 +356,17 @@ export default function ModelViewPage({ params }) {
               <span className="hidden md:inline">{model.is_active ? 'Deactivate Model' : 'Reactivate Model'}</span>
               <span className="hidden xs:inline md:hidden">{model.is_active ? 'Deactivate' : 'Reactivate'}</span>
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Trash2}
+              onClick={handleDeleteModel}
+              className="h-8 w-8 p-0 xs:h-auto xs:w-auto xs:px-2.5 xs:py-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/50"
+              title="Delete Model"
+            >
+              <span className="hidden md:inline">Delete Model</span>
+              <span className="hidden xs:inline md:hidden">Delete</span>
+            </Button>
             {!isEditMode ? (
               <Button
                 variant="primary"
@@ -325,7 +409,7 @@ export default function ModelViewPage({ params }) {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-6 mt-6">
             <div>
               {isEditMode ? (
                 <Input
@@ -356,6 +440,24 @@ export default function ModelViewPage({ params }) {
               )}
             </div>
 
+            <div>
+              {isEditMode ? (
+                <Input
+                  label="Kilometres"
+                  type="number"
+                  min={0}
+                  value={formData.kilometres}
+                  onChange={(e) => setFormData({ ...formData, kilometres: e.target.value })}
+                />
+              ) : (
+                <>
+                  <p className="font-bold text-slate-400 uppercase text-[10px]">Kilometres</p>
+                  <p className="text-sm font-bold font-mono text-slate-800 dark:text-slate-200 mt-0.5">
+                    {model.kilometres !== undefined && model.kilometres !== null ? `${model.kilometres} km` : '0 km'}
+                  </p>
+                </>
+              )}
+            </div>
 
             <div>
               {isEditMode ? (
@@ -398,6 +500,7 @@ export default function ModelViewPage({ params }) {
                   setStockDate(new Date().toISOString().split('T')[0]);
                   setStockAdded('');
                   setStockWard(model.ward || 'Delhi Central');
+                  setStockBranchId(selectedBranch?.id || (branches.length === 1 ? branches[0].id : ''));
                   setIsAddStockOpen(true);
                 }}>
                   Add New Stock
@@ -434,33 +537,52 @@ export default function ModelViewPage({ params }) {
         isOpen={isAddStockOpen}
         onClose={() => setIsAddStockOpen(false)}
         title={`Add Stock to ${model?.name}`}
-        subtitle="Log new incoming stock for this EV model"
+        subtitle="Log new incoming stock and allocate it strictly to a specific municipal ward"
       >
         <form onSubmit={handleStockSubmit} className="space-y-4" autoComplete="off">
+          <Select
+            label="Target Ward / Branch"
+            value={stockBranchId}
+            onChange={(e) => setStockBranchId(e.target.value)}
+            disabled={branches.length === 1}
+            required
+          >
+            <option value="" disabled>-- Select Municipal Ward / Branch --</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.ward_no ? `Ward ${b.ward_no}: ${b.name}` : b.name} {b.ward_area ? `(${b.ward_area})` : ''}
+              </option>
+            ))}
+          </Select>
+
           <Input
             label="Date Received"
             type="date"
+            min={todayStr}
             value={stockDate}
             onChange={(e) => setStockDate(e.target.value)}
             required
           />
           <Input
-            label="Quantity Added"
+            label="Quantity Added (EV Scooters)"
             type="number"
             min={1}
-            placeholder="e.g. 5"
+            placeholder="e.g. 10"
             value={stockAdded}
             onChange={(e) => setStockAdded(e.target.value)}
             required
           />
-          <Input
-            label="Ward / Area"
-            placeholder="e.g. Okhla Depot"
-            value={stockWard}
-            onChange={(e) => setStockWard(e.target.value)}
-            required
-          />
-          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+
+          {stockBranchId && (
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 flex items-start gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+              <span>
+                These <strong>{stockAdded || '0'} EV scooters</strong> will be allocated <strong>strictly to {branches.find((b) => b.id === stockBranchId)?.name || 'this ward'}</strong>. Other wards will not share or deplete this inventory.
+              </span>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
             <Button
               variant="outline"
               size="md"

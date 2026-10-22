@@ -1,15 +1,19 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, ChevronDown, ChevronUp, User, Clock } from 'lucide-react';
+import { ShieldCheck, ChevronDown, ChevronUp, User, Clock, Download } from 'lucide-react';
 import Header from '../../../components/layout/Header';
 import Table from '../../../components/ui/Table';
 import Pagination from '../../../components/ui/Pagination';
 import Badge from '../../../components/ui/Badge';
 import ProtectedRoute from '../../../components/layout/ProtectedRoute';
 import api from '../../../lib/api';
+import Button from '../../../components/ui/Button';
+import { exportToExcel, fetchAllForExport } from '../../../lib/exportToExcel';
+import CustomExportModal from '../../../components/ui/CustomExportModal';
+import { useAuthStore } from '../../../store/authStore';
+import { toast } from '../../../lib/toast';
 
-// ── Human-readable action descriptions ──────────────────────────────────────
 const ACTION_LABELS = {
   CREATE_STAFF:      'Added a new staff member',
   UPDATE_STAFF:      'Updated staff details',
@@ -41,7 +45,6 @@ const ACTION_LABELS = {
   LOGOUT:            'User logged out',
 };
 
-// ── Human-readable entity names ──────────────────────────────────────────────
 const ENTITY_LABELS = {
   USERS:       'Staff / Users',
   PAYMENTS:    'Payments',
@@ -51,7 +54,6 @@ const ENTITY_LABELS = {
   EV_MODELS:   'EV Models',
 };
 
-// ── Format a single change field label ──────────────────────────────────────
 const FIELD_LABELS = {
   name:               'Name',
   email:              'Email',
@@ -108,20 +110,35 @@ function formatValue(val, key) {
   }
 
   if (typeof val === 'object') return JSON.stringify(val);
-  // Try to detect ISO date strings
   if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(val)) {
     return new Date(val).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
-  // role / status are stored lowercase (admin, staff, active...) — capitalize for readability
   if ((key === 'role' || key === 'status') && typeof val === 'string') {
     return val.charAt(0).toUpperCase() + val.slice(1);
   }
   return String(val);
 }
 
-// ── Change diff renderer ─────────────────────────────────────────────────────
-// Shown expanded by default (admin should see "who changed what" without an
-// extra click) — the toggle only lets them collapse a noisy row if they want.
+function formatChangesForExport(changes) {
+  if (!changes || typeof changes !== 'object') return '—';
+  const parts = [];
+  for (const [key, val] of Object.entries(changes)) {
+    const label = FIELD_LABELS[key] || key;
+    if (val && typeof val === 'object' && ('from' in val || 'to' in val)) {
+      const fromStr = val.from !== null && val.from !== undefined ? String(val.from) : 'None';
+      const toStr = val.to !== null && val.to !== undefined ? String(val.to) : 'None';
+      parts.push(`${label}: ${fromStr} -> ${toStr}`);
+    } else if (val !== null && val !== undefined) {
+      if (typeof val === 'object') {
+        parts.push(`${label}: ${JSON.stringify(val)}`);
+      } else {
+        parts.push(`${label}: ${val}`);
+      }
+    }
+  }
+  return parts.length > 0 ? parts.join(' | ') : 'No details recorded';
+}
+
 function ChangeDiff({ changes, isExpanded, onToggle, targetName }) {
   if (!changes || Object.keys(changes).length === 0) {
     return <span className="text-xs text-slate-400">No changes recorded</span>;
@@ -203,14 +220,15 @@ function ChangeDiff({ changes, isExpanded, onToggle, targetName }) {
   );
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
 export default function AuditPage() {
+  const { role } = useAuthStore();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
-  // Track only rows the admin has *manually expanded* — everything starts collapsed.
+  const [isExporting, setIsExporting] = useState(false);
+  const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   const toggleRow = (id) => {
     setExpandedIds(prev => {
@@ -232,11 +250,50 @@ export default function AuditPage() {
         setTotalRecords(res.data.pagination?.totalItems || 0);
       }
     } catch (err) {
-      console.error('Failed to load audit logs:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  const AUDIT_EXPORT_COLUMNS = [
+    'Timestamp',
+    'Done By Staff',
+    'Staff Email',
+    'Staff Role',
+    'Staff Ward / Area',
+    'Action Performed',
+    'Action Code',
+    'Section / Entity',
+    'Target Subject / ID',
+    'Detailed Changes',
+    'IP Address'
+  ];
+
+  const fetchAuditForExport = async () => {
+    return await fetchAllForExport(api, '/api/audit', {}, 250);
+  };
+
+  const transformAuditRow = (log) => ({
+    'Timestamp': new Date(log.created_at).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }),
+    'Done By Staff': log.users?.name || 'System / Automated',
+    'Staff Email': log.users?.email || '—',
+    'Staff Role': log.user_role || '—',
+    'Staff Ward / Area': log.users?.ward_area || '—',
+    'Action Performed': ACTION_LABELS[log.action] || log.action?.replace(/_/g, ' ') || '—',
+    'Action Code': log.action || '—',
+    'Section / Entity': ENTITY_LABELS[log.entity_type] || log.entity_type?.replace(/_/g, ' ') || '—',
+    'Target Subject / ID': log.entity_name || log.entity_id || '—',
+    'Detailed Changes': formatChangesForExport(log.changes),
+    'IP Address': log.ip_address || '—',
+    created_at: log.created_at,
+  });
 
   const columns = [
     {
@@ -285,9 +342,6 @@ export default function AuditPage() {
       key: 'action',
       className: 'w-[45%] min-w-[350px]',
       render: (row) => {
-        // Skip the " — name" suffix when the actor acted on themselves (e.g. a
-        // self-service forgot-password reset) — "Done By" already shows that name,
-        // repeating it right next to it would just be noise.
         const targetName = row.entity_type === 'users' && row.entity_id !== row.user_id
           ? row.entity_name
           : null;
@@ -323,18 +377,32 @@ export default function AuditPage() {
 
   return (
     <ProtectedRoute adminOnly={true}>
-      <div>
+      <div className="flex-1 flex flex-col min-w-0 w-full">
         <Header
-          title="Activity Log"
-          subtitle="A clear record of every action taken in the system"
+          title={role === 'ho_admin' ? "Department Activity Log" : "Activity Log"}
+          subtitle={role === 'ho_admin' ? "Audit trail of actions taken by and on staff under your Head Office" : "A clear record of every action taken in the system"}
         />
 
-        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+        <div className="w-full px-3.5 sm:px-5 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Download}
+              className="shrink-0 h-[42px] px-3 font-semibold border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+              onClick={() => setIsCustomExportOpen(true)}
+              title="Download Audit Trail (Excel / CSV)"
+            >
+              <span className="hidden sm:inline">Export Audit Log</span>
+            </Button>
+          </div>
           <Table
             columns={columns}
             data={logs}
             loading={loading}
             emptyText="No activity recorded yet."
+            minWidth="min-w-[760px]"
+            tableLayout="table-fixed"
           />
 
           <Pagination
@@ -344,6 +412,18 @@ export default function AuditPage() {
             onPageChange={setPage}
           />
         </div>
+
+        <CustomExportModal
+          isOpen={isCustomExportOpen}
+          onClose={() => setIsCustomExportOpen(false)}
+          title="Export Audit Trail Logs"
+          subtitle="Download system activity audit trail, staff actions, and security logs (Excel / CSV)"
+          defaultFilename="GoSpeedy_Audit_Trail_Logs"
+          columns={AUDIT_EXPORT_COLUMNS}
+          dateAccessor="created_at"
+          onFetchData={fetchAuditForExport}
+          transformRow={transformAuditRow}
+        />
       </div>
     </ProtectedRoute>
   );
