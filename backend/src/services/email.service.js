@@ -129,15 +129,21 @@ class EmailService {
           subject,
           html: htmlContent,
         });
-        console.log(`[EmailService] OTP email delivered to ${toEmail} (MessageId: ${info.messageId})`);
+        if (env.NODE_ENV !== 'production') {
+          console.log(`[EmailService] OTP email delivered (MessageId: ${info.messageId})`);
+        }
         return { success: true, messageId: info.messageId };
       } catch (err) {
-        console.error(`[EmailService Error] Failed to send email to ${toEmail}:`, err);
+        console.error('[EmailService Error] Failed to send email:', err.message || err);
         throw new Error('Failed to send verification email. Please try again later.');
       }
     } else {
+      if (env.NODE_ENV === 'production') {
+        console.error('[EmailService Error] Cannot send password reset email: SMTP is not configured in production.');
+        throw new Error('Email service is not configured on this server. Please contact administrator.');
+      }
       console.log(`\n=============================================================`);
-      console.log(`[DEV MOCK EMAIL] To: ${toEmail}`);
+      console.log(`[DEV MOCK EMAIL] Reset requested for user`);
       console.log(`[RESET OTP CODE]: >>> ${otp} <<< (Valid for 10 minutes)`);
       console.log(`Configure SMTP_PASS in backend/.env to send real emails.`);
       console.log(`=============================================================\n`);

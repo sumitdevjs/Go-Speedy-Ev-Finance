@@ -847,7 +847,7 @@ export default function StaffPage() {
           <Input
             label="Email Address (Required for Google Sign-In)"
             type="email"
-            placeholder="e.g. staff@gmail.com"
+            placeholder="staff@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -1009,7 +1009,7 @@ export default function StaffPage() {
           <Input
             label="Email Address"
             type="email"
-            placeholder="e.g. staff@gmail.com"
+            placeholder="staff@example.com"
             value={editEmail}
             onChange={(e) => setEditEmail(e.target.value)}
             disabled={isEditingSelf && isBranchAdmin}

@@ -91,7 +91,6 @@ export default function BranchesPage() {
         window.dispatchEvent(new CustomEvent('branchListUpdated'));
       }
     } catch (err) {
-      console.error('Delete branch error:', err);
       toast.error(err.response?.data?.message || err.message || 'Failed to delete branch');
     } finally {
       setDeletingId(null);
@@ -1105,7 +1104,7 @@ export default function BranchesPage() {
 
             <Input
               label="Branch Code *"
-              placeholder="e.g. DEL-WD-47"
+              placeholder="e.g. HO-BR-123"
               value={formData.code}
               onChange={(e) => setFormData({ ...formData, code: e.target.value })}
               required
@@ -1114,7 +1113,7 @@ export default function BranchesPage() {
 
           <Input
             label="Ward / Branch Name *"
-            placeholder="e.g. Vikaspuri"
+            placeholder="e.g. Branch Name"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             required
@@ -1123,7 +1122,7 @@ export default function BranchesPage() {
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="Candidate / In-Charge Name"
-              placeholder="e.g. S. Harpreet Singh"
+              placeholder="e.g. Name"
               value={formData.contact_person}
               onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
             />
@@ -1138,7 +1137,7 @@ export default function BranchesPage() {
 
           <Input
             label="Ward Area / Municipal Zone"
-            placeholder="e.g. West Delhi"
+            placeholder="e.g. Ward Area"
             value={formData.ward_area}
             onChange={(e) => setFormData({ ...formData, ward_area: e.target.value })}
           />
@@ -1171,7 +1170,7 @@ export default function BranchesPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <Input
                   label="Ward Admin Email *"
-                  placeholder="e.g. ward@gospeedy.in"
+                  placeholder="admin@example.com"
                   type="email"
                   value={formData.admin_email}
                   onChange={(e) => setFormData({ ...formData, admin_email: e.target.value })}
@@ -1179,7 +1178,7 @@ export default function BranchesPage() {
                 />
                 <Input
                   label="Initial Password *"
-                  placeholder="e.g. Ward@123"
+                  placeholder="Enter initial password"
                   type="password"
                   value={formData.admin_password}
                   onChange={(e) => setFormData({ ...formData, admin_password: e.target.value })}
@@ -1353,14 +1352,14 @@ export default function BranchesPage() {
         <form onSubmit={handleCreateHeadOffice} className="space-y-4">
           <Input
             label="Head Office Name"
-            placeholder="e.g. Faridabad Head Office"
+            placeholder="e.g. HO"
             value={hoFormData.name}
             onChange={(e) => setHoFormData({ ...hoFormData, name: e.target.value })}
             required
           />
           <Input
             label="Zonal Code (Short ID)"
-            placeholder="e.g. FAR-HO"
+            placeholder="e.g. HO"
             value={hoFormData.code}
             onChange={(e) => setHoFormData({ ...hoFormData, code: e.target.value.toUpperCase() })}
             required
@@ -1368,14 +1367,14 @@ export default function BranchesPage() {
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="City"
-              placeholder="e.g. Faridabad"
+              placeholder="e.g. City"
               value={hoFormData.city}
               onChange={(e) => setHoFormData({ ...hoFormData, city: e.target.value })}
               required
             />
             <Input
               label="State"
-              placeholder="e.g. Haryana"
+              placeholder="e.g. City"
               value={hoFormData.state}
               onChange={(e) => setHoFormData({ ...hoFormData, state: e.target.value })}
               required
@@ -1404,7 +1403,7 @@ export default function BranchesPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <Input
                     label="Admin Name"
-                    placeholder="e.g. Faridabad Admin"
+                    placeholder="e.g. Ward Admin"
                     value={hoFormData.admin_name}
                     onChange={(e) => setHoFormData({ ...hoFormData, admin_name: e.target.value })}
                   />
@@ -1418,7 +1417,7 @@ export default function BranchesPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <Input
                     label="Admin Email *"
-                    placeholder="e.g. faridabad.ho@gospeedy.in"
+                    placeholder="admin@example.com"
                     type="email"
                     value={hoFormData.admin_email}
                     onChange={(e) => setHoFormData({ ...hoFormData, admin_email: e.target.value })}
@@ -1426,7 +1425,7 @@ export default function BranchesPage() {
                   />
                   <Input
                     label="Initial Password *"
-                    placeholder="e.g. Admin@123"
+                    placeholder="Enter initial password"
                     type="password"
                     value={hoFormData.admin_password}
                     onChange={(e) => setHoFormData({ ...hoFormData, admin_password: e.target.value })}
@@ -1495,7 +1494,7 @@ export default function BranchesPage() {
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="Admin Full Name"
-              placeholder="e.g. S. Sarvjit Singh Virk"
+              placeholder="e.g. Ward Admin"
               value={credentialsForm.name}
               onChange={(e) => setCredentialsForm({ ...credentialsForm, name: e.target.value })}
               required
@@ -1510,7 +1509,7 @@ export default function BranchesPage() {
 
           <Input
             label="Login Email Address *"
-            placeholder="e.g. rohiniward@gospeedy.in"
+            placeholder="admin@example.com"
             type="email"
             value={credentialsForm.email}
             onChange={(e) => setCredentialsForm({ ...credentialsForm, email: e.target.value })}

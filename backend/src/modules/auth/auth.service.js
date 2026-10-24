@@ -340,8 +340,6 @@ class AuthService {
       ip,
     });
 
-    console.log(`Password successfully reset for user: ${cleanEmail}`);
-
     return {
       success: true,
       message: 'Your password has been reset successfully! You can now log in.',

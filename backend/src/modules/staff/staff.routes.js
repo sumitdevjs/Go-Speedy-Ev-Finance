@@ -102,11 +102,11 @@ router.get('/', staffController.getAll.bind(staffController));
  *               email:
  *                 type: string
  *                 format: email
- *                 example: ravi@gospeedy.in
+ *                 example: staff@example.com
  *               password:
  *                 type: string
  *                 description: "Min 6 chars, must include an uppercase letter, a number, and a special character"
- *                 example: Secure@123
+ *                 example: "••••••••"
  *               role:
  *                 type: string
  *                 enum: [admin, staff]
@@ -162,7 +162,7 @@ router.post(
  *               email:
  *                 type: string
  *                 format: email
- *                 example: ravi@gospeedy.in
+ *                 example: staff@example.com
  *               role:
  *                 type: string
  *                 enum: [admin, staff]
