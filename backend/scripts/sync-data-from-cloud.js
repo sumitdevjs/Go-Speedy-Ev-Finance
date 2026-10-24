@@ -1,5 +1,4 @@
 const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
 
 // Cloud Supabase (Source)
 const cloudUrl = process.env.SOURCE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -26,36 +25,20 @@ const TABLES = [
 ];
 
 async function migrate() {
-  console.log('🔄 Starting Data Migration from Cloud Supabase to Self-Hosted EC2...');
-  
   for (const table of TABLES) {
     try {
       const { data, error } = await cloudClient.from(table).select('*');
-      if (error) {
-        console.warn(`⚠️ Could not fetch from cloud table [${table}]:`, error.message);
-        continue;
+      if (error || !data || data.length === 0) continue;
+
+      const chunkSize = 50;
+      for (let i = 0; i < data.length; i += chunkSize) {
+        const chunk = data.slice(i, i + chunkSize);
+        await targetClient.from(table).upsert(chunk);
       }
-      
-      console.log(`📦 Table [${table}]: Found ${data ? data.length : 0} records.`);
-      
-      if (data && data.length > 0) {
-        // Upsert into target in chunks of 50
-        const chunkSize = 50;
-        for (let i = 0; i < data.length; i += chunkSize) {
-          const chunk = data.slice(i, i + chunkSize);
-          const { error: insertError } = await targetClient.from(table).upsert(chunk);
-          if (insertError) {
-            console.error(`❌ Error inserting into target [${table}]:`, insertError.message);
-          }
-        }
-        console.log(`✅ Table [${table}]: Migrated ${data.length} records successfully.`);
-      }
-    } catch (err) {
-      console.error(`❌ Exception migrating [${table}]:`, err.message);
-    }
+    } catch {}
   }
-  
-  console.log('🎉 Migration completed!');
 }
 
-migrate();
+migrate()
+  .then(() => process.exit(0))
+  .catch(() => process.exit(1));

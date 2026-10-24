@@ -535,8 +535,8 @@ export default function BranchesPage() {
                 {row.status_label && (
                   <span
                     className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase ${row.status_label.toLowerCase() === 'won'
-                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
-                        : 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700'
+                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                      : 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700'
                       }`}
                   >
                     {row.status_label}
@@ -629,8 +629,8 @@ export default function BranchesPage() {
       cellClassName: 'whitespace-nowrap text-center',
       render: (row) => (
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${row.is_active
-            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
-            : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25'
+          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
+          : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25'
           }`}>
           <span className={`h-1.5 w-1.5 rounded-full ${row.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
           <span>{row.is_active ? 'ACTIVE' : 'INACTIVE'}</span>
@@ -974,10 +974,10 @@ export default function BranchesPage() {
 
                     {b.status_label && (
                       <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 ${isWon
-                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
-                          : isLost
-                            ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25'
-                            : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
+                        : isLost
+                          ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25'
+                          : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/25'
                         }`}>
                         {b.status_label}
                       </span>

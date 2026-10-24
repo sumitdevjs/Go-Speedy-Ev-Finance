@@ -4,7 +4,7 @@
 # ==============================================================================
 set -e
 
-echo "🚀 Starting Supabase Installation on AWS EC2..."
+echo " Starting Supabase Installation on AWS EC2..."
 
 # 1. Update system & install prerequisites
 sudo apt-get update -y
@@ -12,7 +12,7 @@ sudo apt-get install -y ca-certificates curl gnupg lsb-release git openssl pwgen
 
 # 2. Install Docker & Docker Compose Plugin
 if ! command -v docker &> /dev/null; then
-  echo "📦 Installing Docker Engine..."
+  echo " Installing Docker Engine..."
   sudo install -m 0755 -d /etc/apt/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
   sudo chmod a+r /etc/apt/keyrings/docker.gpg
@@ -29,7 +29,7 @@ if ! command -v docker &> /dev/null; then
   sudo usermod -aG docker "$USER"
 fi
 
-echo "✅ Docker installed successfully."
+echo "Docker installed successfully."
 
 # 3. Setup Supabase Directory
 INSTALL_DIR="/home/ubuntu/supabase-docker"
@@ -37,14 +37,14 @@ mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 
 if [ ! -d "supabase" ]; then
-  echo "📥 Cloning Supabase Docker configuration..."
+  echo " Cloning Supabase Docker configuration..."
   git clone --depth 1 https://github.com/supabase/supabase
 fi
 
 cd supabase/docker
 
 # 4. Generate Production Secrets
-echo "🔐 Generating strong production secrets..."
+echo " Generating strong production secrets..."
 POSTGRES_PASSWORD=$(openssl rand -hex 16)
 JWT_SECRET=$(openssl rand -hex 32)
 DASHBOARD_PASSWORD=$(openssl rand -hex 12)
@@ -113,18 +113,18 @@ sed -i "s|API_EXTERNAL_URL=.*|API_EXTERNAL_URL=http://${PRIVATE_IP}:8000|g" .env
 sed -i "s|SUPABASE_PUBLIC_URL=.*|SUPABASE_PUBLIC_URL=http://${PRIVATE_IP}:8000|g" .env
 
 # 5. Pull & Start Containers
-echo "🐳 Starting Supabase Docker containers..."
+echo "Starting Supabase Docker containers..."
 sudo docker compose pull
 sudo docker compose up -d
 
-echo "⏳ Waiting for PostgreSQL to be ready..."
+echo "Waiting for PostgreSQL to be ready..."
 sleep 15
 
 # Save credentials to a secure file
 CRED_FILE="/home/ubuntu/supabase-credentials.txt"
 cat << EOF > "$CRED_FILE"
 ================================================================================
-🎉 GOSPEEDY SUPABASE SETUP COMPLETE!
+ GOSPEEDY SUPABASE SETUP COMPLETE!
 ================================================================================
 
 Private IP: ${PRIVATE_IP}
@@ -150,6 +150,6 @@ Dashboard Password: ${DASHBOARD_PASSWORD}
 ================================================================================
 EOF
 
-cat "$CRED_FILE"
+chmod 600 "$CRED_FILE"
 echo ""
-echo "✅ Credentials also saved at: $CRED_FILE"
+echo "✅ Supabase setup complete! Credentials securely stored with restricted permissions (chmod 600) at: $CRED_FILE"
