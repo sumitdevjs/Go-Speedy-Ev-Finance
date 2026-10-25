@@ -31,6 +31,10 @@ const requireAuth = async (req, res, next) => {
       return errorResponse(res, 401, 'Unauthorized - Account is deactivated');
     }
 
+    if ((decoded.auth_version || 0) !== (user.auth_version || 0)) {
+      return errorResponse(res, 401, 'Session revoked. Please log in again.');
+    }
+
     // Prevent ambiguous escalation: legacy 'admin' with head_office_id or branch_id is never super_admin
     const hasBranch = Boolean(user.branch_id || (user.ward_area && !['ALL', 'HQ', 'Delhi / Ncr', 'Delhi/NCR', 'Delhi'].includes(user.ward_area)));
     const hasHO = Boolean(user.head_office_id);

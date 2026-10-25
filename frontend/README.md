@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Next.js](https://img.shields.io/badge/Next.js-14.2-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.4-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Zustand](https://img.shields.io/badge/Zustand-4.5-443E38?style=for-the-badge&logo=redux&logoColor=white)](https://github.com/pmndrs/zustand)
@@ -10,7 +10,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 <p align="center">
-  <b>The interactive, responsive web application for Go Speedy EV Finance Scheme. Built with Next.js 14 App Router, dynamic GSAP animations, OGL 3D WebGL shaders, Zustand state management, and role-tailored operational dashboards.</b>
+  <b>The interactive, responsive web application for Go Speedy EV Finance Scheme. Built with Next.js 16 App Router, dynamic GSAP animations, OGL 3D WebGL shaders, Zustand state management, and role-tailored operational dashboards.</b>
 </p>
 
 </div>
@@ -27,7 +27,7 @@ The Go Speedy Frontend provides administrative personnel, zonal managers, branch
 
 | Category | Technology | Version | Purpose & Implementation Details |
 | :--- | :--- | :--- | :--- |
-| **Framework** | [Next.js](https://nextjs.org/) | `14.2.35` | React framework with App Router, server-side route proxy rewrites, and fast compilation. |
+| **Framework** | [Next.js](https://nextjs.org/) | `16.4.3` | React framework with App Router, server-side route proxy rewrites, and fast compilation. |
 | **Core UI Library** | [React](https://react.dev/) / [React DOM](https://react.dev/) | `18.3.1` | Declarative component UI engine with modern hooks and concurrent rendering. |
 | **Styling & CSS** | [Tailwind CSS](https://tailwindcss.com/) | `3.4.4` | Utility-first CSS framework with dynamic dark/light mode theming and custom extensions. |
 | **CSS Processing** | [PostCSS](https://postcss.org/) / [Autoprefixer](https://github.com/postcss/autoprefixer) | `8.4.39` / `10.4.19` | Automated CSS prefixing, optimization, and Tailwind AST compilation. |
@@ -36,11 +36,11 @@ The Go Speedy Frontend provides administrative personnel, zonal managers, branch
 | **Smooth Scrolling** | [Lenis](https://lenis.darkroom.engineering/) | `1.3.26` | Butter-smooth inertial scrolling physics across all dashboard interfaces. |
 | **State Management** | [Zustand](https://github.com/pmndrs/zustand) | `4.5.4` | Lightweight, scalable state management for authentication, modals, branch switching, and UI state. |
 | **Forms & Validation** | [React Hook Form](https://react-hook-form.com/) | `7.52.1` | High-speed, un-controlled form state manager minimizing unnecessary re-renders. |
-| **Schema Validation** | [Zod](https://zod.dev/) & [@hookform/resolvers](https://github.com/react-hook-form/resolvers) | `3.23.8` / `3.9.0` | Strict schema validation sharing identical rules between frontend forms and backend controllers. |
+| **Schema Validation** | [Zod](https://zod.dev/) & [@hookform/resolvers](https://github.com/react-hook-form/resolvers) | `4.6.7` / `5.x` | Strict schema validation sharing identical rules between frontend forms and backend controllers. |
 | **Icons** | [Lucide React](https://lucide.dev/) | `0.400.0` | Clean, modern iconography system covering financial, vehicular, and administrative actions. |
 | **HTTP Client** | [Axios](https://axios-http.com/) | `1.7.2` | Intercepted HTTP client handling automated token refreshes, queue retries, and `X-HTTP-Method-Override: PATCH`. |
 | **Image Compression** | [browser-image-compression](https://github.com/Donaldcwl/browser-image-compression) | `2.0.2` | Client-side compression of customer KYC photos, PAN, Aadhaar, and vehicle images before upload. |
-| **Report Exporting** | [XLSX (SheetJS)](https://sheetjs.com/) | `0.18.5` | Client-side generation and instant export of detailed Excel spreadsheets for fleet and collections audits. |
+| **Report Exporting** | [XLSX (SheetJS)](https://sheetjs.com/) | `0.20.3` | Client-side generation and instant export of detailed Excel spreadsheets for fleet and collections audits. |
 
 ---
 
@@ -92,7 +92,6 @@ frontend/
 │   │   │   │   ├── [id]/             # Rental Details, Ledger, & Return Modal
 │   │   │   │   └── new/              # Multi-step Rental Onboarding Wizard
 │   │   │   └── staff/                # Staff & Personnel Management
-│   │   ├── oauth-callback/           # OAuth Token Handshake Receiver
 │   │   ├── globals.css               # Tailwind CSS Base & Theme Directives
 │   │   ├── layout.js                 # Global Root HTML & Theme Wrapper
 │   │   └── page.js                   # Landing Page (Interactive 3D Molten Metal Shader)
@@ -130,7 +129,6 @@ frontend/
 | Route | Role Access | Purpose |
 | :--- | :--- | :--- |
 | `/` | Public | Landing page with interactive 3D shader, staff login, and password reset OTP modal. |
-| `/oauth-callback` | Public | Receives OAuth redirect credentials and initializes session cookies. |
 | `/dashboard` | Authenticated | Dynamic role dashboard (`HoDashboard`, `BranchDashboard`, or `StaffDashboard`). |
 | `/branches` | Admin / HO / Branch | Ward branch directory, contact persons, and operational status management. |
 | `/staff` | Admin / HO / Branch | Staff roster, role creation (`branch_admin`, `staff`), and branch attribution. |
@@ -150,7 +148,7 @@ frontend/
 ## Local Setup & Getting Started
 
 ### 1. Prerequisites
-- **Node.js**: `v18.x` or `v20.x` LTS
+- **Node.js**: `v20.9+` (Node 24 verified)
 - **Backend API**: The Express API server must be running on `http://localhost:5000`.
 
 ### 2. Configure Environment (`.env.local`)
@@ -180,7 +178,7 @@ The application will be accessible at:
 | `npm run dev` | Starts the Next.js development server on port 3001 with Fast Refresh. |
 | `npm run build` | Compiles and builds the production Next.js bundle. |
 | `npm start` | Starts the built production server on port 3001. |
-| `npm run lint` | Runs Next.js ESLint checks across all pages and components. |
+| `npm run lint` | Runs standalone Next.js and React Hooks ESLint checks across all pages and components. |
 
 ---
 

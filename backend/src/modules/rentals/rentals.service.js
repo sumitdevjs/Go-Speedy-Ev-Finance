@@ -107,11 +107,11 @@ class RentalsService {
     if (req?.user) {
       const user = req.user;
       if (user.role === 'branch_admin' || user.role === 'staff') {
-        if (tenant.branch_id && user.branch_id && tenant.branch_id !== user.branch_id) {
+        if (!tenant.branch_id || !user.branch_id || tenant.branch_id !== user.branch_id) {
           throw new Error('Access denied: Rental belongs to another branch');
         }
       } else if (user.role === 'ho_admin') {
-        if (tenant.head_office_id && user.head_office_id && tenant.head_office_id !== user.head_office_id) {
+        if (!tenant.head_office_id || !user.head_office_id || tenant.head_office_id !== user.head_office_id) {
           throw new Error('Access denied: Rental belongs to another Head Office');
         }
       }
@@ -196,68 +196,6 @@ class RentalsService {
       }
     }
 
-    let modelTotalPrice = 0;
-    let originalStockCount = 0;
-    const isOldEv = Boolean(tenantData.old_ev_id);
-
-    if (isOldEv) {
-      const { data: oldEv, error: oldEvErr } = await supabase
-        .from('old_evs')
-        .select('*')
-        .eq('id', tenantData.old_ev_id)
-        .single();
-
-      if (oldEvErr || !oldEv) throw new Error('Selected used EV not found');
-      if (oldEv.status !== 'available') throw new Error('Selected used EV is no longer available');
-
-      modelTotalPrice = Number(oldEv.price) || 0;
-
-      const { data: updatedOldEv, error: oldEvUpdateErr } = await supabase
-        .from('old_evs')
-        .update({ status: tenantData.status === 'direct_purchase' ? 'sold' : 'rented' })
-        .eq('id', tenantData.old_ev_id)
-        .eq('status', 'available')
-        .select('id');
-
-      if (oldEvUpdateErr || !updatedOldEv || updatedOldEv.length === 0) {
-        throw new Error('Selected used EV is no longer available');
-      }
-    } else {
-      let reserved = false;
-      let attempts = 0;
-      while (!reserved && attempts < 5) {
-        attempts++;
-        const { data: model, error: modelError } = await supabase
-          .from('ev_models')
-          .select('total_price, stock_count')
-          .eq('id', tenantData.ev_model_id)
-          .single();
-
-        if (modelError || !model) throw new Error('EV Model not found');
-        if (model.stock_count <= 0) throw new Error('EV Model out of stock');
-
-        const currentStock = model.stock_count;
-
-        const { data: updatedStock, error: stockError } = await supabase
-          .from('ev_models')
-          .update({ stock_count: currentStock - 1 })
-          .eq('id', tenantData.ev_model_id)
-          .eq('stock_count', currentStock)
-          .gt('stock_count', 0)
-          .select('id, stock_count');
-
-        if (!stockError && updatedStock && updatedStock.length > 0) {
-          reserved = true;
-          modelTotalPrice = model.total_price;
-          break;
-        }
-      }
-
-      if (!reserved) {
-        throw new Error('EV Model out of stock');
-      }
-    }
-
     const startDate = tenantData.start_date ? new Date(tenantData.start_date) : new Date();
     const totalMonths = Number(tenantData.total_months) || 24;
     const expectedEndDate = new Date(startDate);
@@ -273,58 +211,19 @@ class RentalsService {
       tenantData.installment_frequency = tenantData.installment_frequency || 'daily';
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('tenants')
-        .insert([{
-          ...tenantData,
-          branch_id: assignedBranchId,
-          head_office_id: assignedHoId,
-          late_fee_daily_rate: tenantData.late_fee_daily_rate || 50.00,
-          references: tenantData.references || [],
-          guarantors: tenantData.guarantors || [],
-          total_price: tenantData.total_price || modelTotalPrice,
-          start_date: tenantData.status === 'direct_purchase' ? null : startDate.toISOString().split('T')[0],
-          expected_end_date: tenantData.status === 'direct_purchase' ? null : expectedEndDate.toISOString().split('T')[0],
-          created_by: createdBy
-        }])
-        .select('*')
-        .single();
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      if (!isOldEv && tenantData.ev_model_id) {
-        for (let r = 0; r < 5; r++) {
-          const { data: freshModel } = await supabase
-            .from('ev_models')
-            .select('stock_count')
-            .eq('id', tenantData.ev_model_id)
-            .single();
-          if (freshModel) {
-            const currentStock = freshModel.stock_count;
-            const { data: rb } = await supabase
-              .from('ev_models')
-              .update({ stock_count: currentStock + 1 })
-              .eq('id', tenantData.ev_model_id)
-              .eq('stock_count', currentStock)
-              .select('id');
-            if (rb && rb.length > 0) break;
-          }
-        }
-      } else if (isOldEv && tenantData.old_ev_id) {
-        await supabase
-          .from('old_evs')
-          .update({ status: 'available' })
-          .eq('id', tenantData.old_ev_id);
-      }
-
-      if (error.code === '23505') {
-        console.error('[createRental] Unique constraint violation:', error);
-        throw new Error('Unique constraint violation: a record with this value already exists.');
-      }
-      throw error;
-    }
+    const { data, error } = await supabase.rpc('create_contract', {
+      p_actor: createdBy,
+      p_tenant: {
+        ...tenantData, branch_id: assignedBranchId, head_office_id: assignedHoId,
+        late_fee_daily_rate: tenantData.late_fee_daily_rate ?? 50,
+        references: tenantData.references || [], guarantors: tenantData.guarantors || [],
+        start_date: tenantData.status === 'direct_purchase' ? null : startDate.toISOString().split('T')[0],
+        expected_end_date: tenantData.status === 'direct_purchase' ? null : expectedEndDate.toISOString().split('T')[0],
+      },
+    });
+    if (error?.code === '23505') throw new Error('Unique constraint violation: an active contract already uses this phone or hardware.');
+    if (error) throw error;
+    return data;
   }
 
   async updateRental(id, updates, req = null) {
@@ -338,11 +237,11 @@ class RentalsService {
 
       if (existing) {
         if (user.role === 'branch_admin' || user.role === 'staff') {
-          if (existing.branch_id && user.branch_id && existing.branch_id !== user.branch_id) {
+          if (!existing.branch_id || !user.branch_id || existing.branch_id !== user.branch_id) {
             throw new Error('Access denied: Rental belongs to another branch');
           }
         } else if (user.role === 'ho_admin') {
-          if (existing.head_office_id && user.head_office_id && existing.head_office_id !== user.head_office_id) {
+          if (!existing.head_office_id || !user.head_office_id || existing.head_office_id !== user.head_office_id) {
             throw new Error('Access denied: Rental belongs to another Head Office');
           }
         }
@@ -448,64 +347,9 @@ class RentalsService {
   }
 
   async cancelRental(id, req = null) {
-    const { data: tenant, error: fetchError } = await supabase
-      .from('tenants')
-      .select('status, ev_model_id, branch_id, head_office_id')
-      .eq('id', id)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    if (req?.user) {
-      const user = req.user;
-      if (user.role === 'branch_admin' || user.role === 'staff') {
-        if (tenant.branch_id && user.branch_id && tenant.branch_id !== user.branch_id) {
-          throw new Error('Access denied: Rental belongs to another branch');
-        }
-      } else if (user.role === 'ho_admin') {
-        if (tenant.head_office_id && user.head_office_id && tenant.head_office_id !== user.head_office_id) {
-          throw new Error('Access denied: Rental belongs to another Head Office');
-        }
-      }
-    }
-
-    if (tenant.status === 'cancelled') throw new Error('This contract is already cancelled');
-    if (tenant.status !== 'rented' && tenant.status !== 'direct_purchase' && tenant.status !== 'completed') {
-      throw new Error('Only active rentals, direct purchases, or completed purchases can be cancelled');
-    }
-
-    const { error: cancelError } = await supabase
-      .from('tenants')
-      .update({ status: 'cancelled' })
-      .eq('id', id);
-
-    if (cancelError) throw cancelError;
-
-    const { data: tenantDetails } = await supabase
-      .from('tenants')
-      .select('chassis_no, motor_no, controller_no, battery_no, charger_no, ev_model_id, branch_id, head_office_id')
-      .eq('id', id)
-      .single();
-
-    if (tenantDetails) {
-      await supabase
-        .from('old_evs')
-        .insert([{
-          original_ev_model_id: tenantDetails.ev_model_id,
-          returned_from_tenant_id: id,
-          chassis_no: tenantDetails.chassis_no,
-          motor_no: tenantDetails.motor_no,
-          controller_no: tenantDetails.controller_no,
-          battery_no: tenantDetails.battery_no,
-          charger_no: tenantDetails.charger_no,
-          branch_id: tenantDetails.branch_id,
-          head_office_id: tenantDetails.head_office_id,
-          price: 0,
-          status: 'available'
-        }]);
-    }
-
-    return { success: true };
+    const { data, error } = await supabase.rpc('cancel_contract', { p_tenant: id, p_actor: req?.user?.id });
+    if (error) throw error;
+    return data;
   }
 
   async completeRental(id, req = null) {
@@ -544,6 +388,7 @@ class RentalsService {
     const { data, error } = await supabase
       .from('tenants')
       .select('chassis_no, motor_no, controller_no, charger_no, battery_no, vehicle_number, scooty_policy_number, rider_policy_number')
+      .in('status', ['rented', 'direct_purchase'])
       .or(orFilter);
 
     if (error) throw error;

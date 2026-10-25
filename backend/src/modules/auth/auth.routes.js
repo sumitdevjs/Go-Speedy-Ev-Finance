@@ -2,7 +2,6 @@ const express = require('express');
 const { z } = require('zod');
 const authController = require('./auth.controller');
 const requireAuth = require('../../middleware/auth');
-const requestLogger = require('../../middleware/requestLogger');
 
 const router = express.Router();
 

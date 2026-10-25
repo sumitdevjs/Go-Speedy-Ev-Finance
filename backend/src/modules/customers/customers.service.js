@@ -2,49 +2,28 @@ const supabase = require('../../config/db');
 const { calcBalance } = require('../../utils/balanceCalc');
 const { applyScope } = require('../../middleware/scope');
 const penaltiesService = require('../penalties/penalties.service');
+const { fetchAll } = require('../../utils/fetchAll');
 
 class CustomersService {
   async getCustomers(query = {}, req = null) {
-    // 1. Fetch tenants with models & branch
-    let tenantsQuery = supabase
-      .from('tenants')
-      .select('*, ev_models(name, company)');
-
-    if (req) {
-      tenantsQuery = applyScope(tenantsQuery, req);
-    }
-
-    const { data: tenants, error: tenantsError } = await tenantsQuery;
-    if (tenantsError) throw tenantsError;
-
-    // 2. Fetch payments for balance computation
-    const { data: payments, error: paymentsError } = await supabase
-      .from('payments')
-      .select('tenant_id, amount, payment_date, mode');
-
-    if (paymentsError) throw paymentsError;
+    const tenants = await fetchAll(() => {
+      let q = supabase.from('tenants').select('*, ev_models(name, company)');
+      return req ? applyScope(q, req) : q;
+    });
+    const payments = await fetchAll(() => {
+      let q = supabase.from('payments').select('tenant_id, amount, payment_date, mode');
+      return req ? applyScope(q, req) : q;
+    });
 
     const paymentsByTenant = (payments || []).reduce((acc, p) => {
       acc[p.tenant_id] = (acc[p.tenant_id] || 0) + Number(p.amount);
       return acc;
     }, {});
 
-    // 3. Fetch all active penalties
-    let penaltiesByTenant = {};
-    try {
-      const { data: pLogs } = await supabase
-        .from('audit_logs')
-        .select('*')
-        .eq('entity_type', 'penalty');
-
-      (pLogs || []).forEach(l => {
-        const p = l.changes;
-        if (p && p.tenant_id && p.status === 'unpaid') {
-          penaltiesByTenant[p.tenant_id] = (penaltiesByTenant[p.tenant_id] || 0) + Number(p.amount);
-        }
-      });
-    } catch (e) {
-      console.error('Error fetching penalties:', e);
+    const penaltiesByTenant = {};
+    const { data: penalties } = await penaltiesService.getPenalties({ status: 'unpaid' }, req);
+    for (const p of penalties) {
+      penaltiesByTenant[p.tenant_id] = (penaltiesByTenant[p.tenant_id] || 0) + Number(p.amount);
     }
 
     // 4. Fetch branches for lookup
@@ -174,90 +153,46 @@ class CustomersService {
   }
 
   async getCustomerDetails(idOrPhone, req = null) {
-    // Look up by ID or Phone
-    let tenantQuery = supabase
-      .from('tenants')
-      .select('*, ev_models(*), branches(id, name, code)')
-      .or(`id.eq.${idOrPhone.length === 36 ? idOrPhone : '00000000-0000-0000-0000-000000000000'},phone.eq.${idOrPhone}`);
+    if (!/^(?:[0-9]{10}|[0-9a-fA-F-]{36})$/.test(idOrPhone)) throw new Error('Invalid customer identifier');
+    let tenantQuery = supabase.from('tenants').select('*, ev_models(*), branches(id, name, code)');
+    tenantQuery = idOrPhone.length === 36 ? tenantQuery.eq('id', idOrPhone) : tenantQuery.eq('phone', idOrPhone);
+    if (req) tenantQuery = applyScope(tenantQuery, req);
+    const { data: authorizedTenants, error } = await tenantQuery;
+    if (error) throw error;
+    if (!authorizedTenants?.length) throw new Error('Customer not found or access denied');
 
-    const { data: tenants, error } = await tenantQuery;
-    if (error || !tenants || tenants.length === 0) {
-      throw new Error('Customer not found');
-    }
-
-    let authorizedTenants = tenants;
-    if (req?.user) {
-      const user = req.user;
-      const isSuper = user.role === 'super_admin' || (user.role === 'admin' && !user.ward_area);
-      if (!isSuper) {
-        if (user.role === 'branch_admin' || user.role === 'staff') {
-          if (!user.branch_id) {
-            throw new Error('Access denied: Staff has no assigned branch');
-          }
-          authorizedTenants = tenants.filter(t => t.branch_id === user.branch_id || t.ward_area === user.ward_area);
-          if (authorizedTenants.length === 0) {
-            throw new Error('Access denied: Customer does not belong to your assigned branch');
-          }
-        } else if (user.role === 'ho_admin') {
-          if (!user.head_office_id) {
-            throw new Error('Access denied: HO admin has no assigned Head Office');
-          }
-          authorizedTenants = tenants.filter(t => t.head_office_id === user.head_office_id);
-          if (authorizedTenants.length === 0) {
-            throw new Error('Access denied: Customer does not belong to your assigned Head Office');
-          }
-        }
-      }
-    }
-
-    // Select primaryTenant ONLY from authorizedTenants
     const primaryTenant = authorizedTenants.find(t => t.status === 'rented') || authorizedTenants[0];
     const customerPhone = primaryTenant.phone;
 
-    // Fetch all contracts for this phone scoped to the caller's authorized boundary
-    let contractsQuery = supabase
-      .from('tenants')
-      .select('*, ev_models(name, company), branches(id, name, code)')
-      .eq('phone', customerPhone);
-
-    if (req) {
-      contractsQuery = applyScope(contractsQuery, req);
-    }
-
-    const { data: allContracts, error: contractsError } = await contractsQuery;
-    if (contractsError) throw contractsError;
+    const allContracts = await fetchAll(() => {
+      let q = supabase.from('tenants').select('*, ev_models(name, company), branches(id, name, code)').eq('phone', customerPhone);
+      return req ? applyScope(q, req) : q;
+    });
 
     const contractIds = (allContracts && allContracts.length > 0 ? allContracts : [primaryTenant]).map(c => c.id);
 
-    // Fetch all payments across their contracts
-    const { data: allPayments, error: paymentsError } = await supabase
-      .from('payments')
-      .select('*, users(name)')
-      .in('tenant_id', contractIds)
-      .order('payment_date', { ascending: false });
-    if (paymentsError) throw paymentsError;
+    const allPayments = [];
+    for (let i = 0; i < contractIds.length; i += 100) {
+      allPayments.push(...await fetchAll(() => supabase.from('payments').select('*, users(name)').in('tenant_id', contractIds.slice(i, i + 100)).order('payment_date', { ascending: false })));
+    }
+    const { data: customerPenalties } = await penaltiesService.getPenalties({}, req);
+    const penalties = customerPenalties.filter(p => contractIds.includes(p.tenant_id));
 
-    // Fetch all penalties levied
-    const { data: pLogs, error: pLogsError } = await supabase
-      .from('audit_logs')
-      .select('*')
-      .eq('entity_type', 'penalty')
-      .in('entity_id', contractIds);
-    if (pLogsError) throw pLogsError;
-
-    const penalties = (pLogs || []).map(l => ({
-      ...l.changes,
-      audit_id: l.id,
-      created_at: l.created_at
-    }));
-
-    const totalPaid = (allPayments || []).reduce((acc, p) => acc + Number(p.amount), 0);
     const totalManualPenalties = penalties.filter(p => p.status === 'unpaid').reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
 
-    const balance = calcBalance(primaryTenant, totalPaid);
+    const paidByContract = {};
+    for (const p of allPayments) paidByContract[p.tenant_id] = (paidByContract[p.tenant_id] || 0) + Number(p.amount);
+    const balance = { contractAmount: 0, installmentTotal: 0, outstanding: 0, totalLateFee: 0, daysOverdue: 0, daysAdvance: 0, contractExpired: false };
+    for (const contract of allContracts) {
+      const computed = calcBalance(contract, paidByContract[contract.id] || 0);
+      for (const key of ['contractAmount','installmentTotal','outstanding','totalLateFee']) balance[key] += computed[key] || 0;
+      balance.daysOverdue = Math.max(balance.daysOverdue, computed.daysOverdue || 0);
+      balance.daysAdvance = Math.max(balance.daysAdvance, computed.daysAdvance || 0);
+      balance.contractExpired ||= computed.contractExpired;
+    }
     balance.manualPenalties = totalManualPenalties;
-    balance.totalLateFee = (balance.totalLateFee || 0) + totalManualPenalties;
-    balance.netTotalDue = (balance.outstanding || 0) + balance.totalLateFee;
+    balance.totalLateFee += totalManualPenalties;
+    balance.netTotalDue = balance.outstanding + balance.totalLateFee;
 
     return {
       profile: {

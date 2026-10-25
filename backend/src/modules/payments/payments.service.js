@@ -17,10 +17,10 @@ class PaymentsService {
 
       if (req?.user) {
         const u = req.user;
-        if ((u.role === 'branch_admin' || u.role === 'staff') && tenant.branch_id && u.branch_id && tenant.branch_id !== u.branch_id) {
+        if ((u.role === 'branch_admin' || u.role === 'staff') && (!tenant.branch_id || !u.branch_id || tenant.branch_id !== u.branch_id)) {
           throw new Error('Access denied: Unauthorized access to tenant payments');
         }
-        if (u.role === 'ho_admin' && tenant.head_office_id && u.head_office_id && tenant.head_office_id !== u.head_office_id) {
+        if (u.role === 'ho_admin' && (!tenant.head_office_id || !u.head_office_id || tenant.head_office_id !== u.head_office_id)) {
           throw new Error('Access denied: Tenant payments belong to another Head Office');
         }
       }
@@ -128,11 +128,11 @@ class PaymentsService {
     if (req?.user) {
       const user = req.user;
       if (user.role === 'branch_admin' || user.role === 'staff') {
-        if (tenant.branch_id && user.branch_id && tenant.branch_id !== user.branch_id) {
+        if (!tenant.branch_id || !user.branch_id || tenant.branch_id !== user.branch_id) {
           throw new Error('Access denied: Cannot record payment for tenant in another branch');
         }
       } else if (user.role === 'ho_admin') {
-        if (tenant.head_office_id && user.head_office_id && tenant.head_office_id !== user.head_office_id) {
+        if (!tenant.head_office_id || !user.head_office_id || tenant.head_office_id !== user.head_office_id) {
           throw new Error('Access denied: Cannot record payment for tenant in another Head Office');
         }
       }
