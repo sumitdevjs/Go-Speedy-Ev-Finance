@@ -46,7 +46,7 @@ class DocumentsService {
     return result;
   }
 
-  async uploadDocument(tenantId, docType, fileBuffer, fileMimetype) {
+  async uploadDocument(tenantId, docType, fileBuffer, fileMimetype, req = null) {
     // Content-Type is client-supplied and can't be trusted — verify by magic
     // bytes instead, and derive the extension/content-type from that.
     const verifiedType = detectFileType(fileBuffer);
@@ -61,20 +61,36 @@ class DocumentsService {
 
     const filename = `${crypto.randomUUID()}.${ext}`;
 
-    // 1. Check if an old file exists and delete it to save space
+    // 1. Authorize tenant access and check old document pointer
+    let oldDocPath = null;
     if (tenantId) {
-      const { data: tenant } = await supabase
+      const { data: tenant, error: fetchError } = await supabase
         .from('tenants')
-        .select(docType) // e.g. aadhar_path
+        .select(`id, branch_id, head_office_id, ${docType}`)
         .eq('id', tenantId)
         .single();
 
-      if (tenant && tenant[docType]) {
-        await supabase.storage.from(BUCKET_NAME).remove([tenant[docType]]);
+      if (fetchError || !tenant) {
+        throw new Error('Tenant not found');
       }
+
+      if (req?.user) {
+        const user = req.user;
+        if (user.role === 'branch_admin' || user.role === 'staff') {
+          if (tenant.branch_id && user.branch_id && tenant.branch_id !== user.branch_id) {
+            throw new Error('Access denied: Unauthorized access to tenant documents');
+          }
+        } else if (user.role === 'ho_admin') {
+          if (tenant.head_office_id && user.head_office_id && tenant.head_office_id !== user.head_office_id) {
+            throw new Error('Access denied: Tenant documents belong to another Head Office');
+          }
+        }
+      }
+
+      oldDocPath = tenant[docType];
     }
 
-    // 2. Upload new file
+    // 2. Upload new file FIRST before touching any existing documents
     const { data: uploadData, error: uploadError } = await supabase
       .storage
       .from(BUCKET_NAME)
@@ -90,14 +106,27 @@ class DocumentsService {
 
     const newPath = uploadData.path;
 
-    // 3. If tenantId is provided, save it directly to the database
+    // 3. If tenantId is provided, commit the pointer update to the database
     if (tenantId) {
       const { error: updateError } = await supabase
         .from('tenants')
         .update({ [docType]: newPath })
         .eq('id', tenantId);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        // Rollback uploaded object if DB update fails to avoid orphan leak
+        await supabase.storage.from(BUCKET_NAME).remove([newPath]);
+        throw updateError;
+      }
+
+      // 4. Safely remove the superseded old document ONLY after successful DB commit
+      if (oldDocPath && oldDocPath !== newPath) {
+        try {
+          await supabase.storage.from(BUCKET_NAME).remove([oldDocPath]);
+        } catch (cleanupErr) {
+          console.warn('[documents] Failed to remove superseded document:', cleanupErr);
+        }
+      }
     }
 
     return { path: newPath };

@@ -25,6 +25,16 @@ class PenaltiesService {
       throw new Error('Customer / Contract not found');
     }
 
+    if (user.role === 'branch_admin' || user.role === 'staff') {
+      if (tenant.branch_id && user.branch_id && tenant.branch_id !== user.branch_id) {
+        throw new Error('Access denied: Customer belongs to another branch');
+      }
+    } else if (user.role === 'ho_admin') {
+      if (tenant.head_office_id && user.head_office_id && tenant.head_office_id !== user.head_office_id) {
+        throw new Error('Access denied: Customer belongs to another Head Office');
+      }
+    }
+
     const penaltyId = `pen_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
     const payload = {
       penalty_id: penaltyId,
@@ -75,22 +85,34 @@ class PenaltiesService {
       .from('audit_logs')
       .select('*')
       .eq('entity_type', 'penalty')
-      .order('created_at', { ascending: false })
-      .limit(200);
+      .order('created_at', { ascending: false });
 
     const { data: logs, error } = await queryBuilder;
     if (error) throw error;
 
-    let penalties = (logs || [])
-      .map(l => {
-        const p = l.changes || {};
-        return {
-          ...p,
-          audit_log_id: l.id,
-          created_at: l.created_at || p.created_at
-        };
-      })
-      .filter(p => p && p.penalty_id);
+    // Deduplicate audit events by canonical penalty_id to prevent inflated metrics
+    const penaltyMap = new Map();
+    (logs || []).forEach(l => {
+      const p = l.changes;
+      if (p && p.penalty_id) {
+        if (!penaltyMap.has(p.penalty_id)) {
+          penaltyMap.set(p.penalty_id, {
+            ...p,
+            audit_log_id: l.id,
+            created_at: l.created_at || p.created_at
+          });
+        } else {
+          const existing = penaltyMap.get(p.penalty_id);
+          if (l.action === 'PENALTY_WAIVED' || p.status === 'waived') {
+            existing.status = 'waived';
+            existing.waived_reason = p.reason || p.waived_reason || existing.waived_reason;
+            existing.waived_by = p.waived_by || existing.waived_by;
+          }
+        }
+      }
+    });
+
+    let penalties = Array.from(penaltyMap.values());
 
     // Apply tenant filter
     if (query.tenant_id) {
@@ -164,6 +186,16 @@ class PenaltiesService {
       throw new Error('Penalty not found');
     }
 
+    if (user.role === 'branch_admin' || user.role === 'staff') {
+      if (targetLog.changes?.branch_id && user.branch_id && targetLog.changes.branch_id !== user.branch_id) {
+        throw new Error('Access denied: Cannot waive penalty belonging to another branch');
+      }
+    } else if (user.role === 'ho_admin') {
+      if (targetLog.changes?.head_office_id && user.head_office_id && targetLog.changes.head_office_id !== user.head_office_id) {
+        throw new Error('Access denied: Cannot waive penalty belonging to another Head Office');
+      }
+    }
+
     const updatedChanges = {
       ...targetLog.changes,
       status: 'waived',
@@ -202,17 +234,47 @@ class PenaltiesService {
   /**
    * Get unpaid manual penalties for a single tenant
    */
-  async getTenantActivePenalties(tenantId) {
+  async getTenantActivePenalties(tenantId, req = null) {
+    const { data: tenant, error: fetchErr } = await supabase
+      .from('tenants')
+      .select('id, branch_id, head_office_id')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    if (fetchErr || !tenant) return { all: [], unpaid: [], totalUnpaid: 0 };
+
+    if (req?.user) {
+      const u = req.user;
+      if ((u.role === 'branch_admin' || u.role === 'staff') && tenant.branch_id && u.branch_id && tenant.branch_id !== u.branch_id) {
+        throw new Error('Access denied: Unauthorized access to tenant penalties');
+      }
+      if (u.role === 'ho_admin' && tenant.head_office_id && u.head_office_id && tenant.head_office_id !== u.head_office_id) {
+        throw new Error('Access denied: Tenant penalties belong to another Head Office');
+      }
+    }
+
     const { data: logs } = await supabase
       .from('audit_logs')
       .select('*')
       .eq('entity_type', 'penalty')
       .eq('entity_id', tenantId);
 
-    const penalties = (logs || [])
-      .map(l => l.changes)
-      .filter(p => p && p.penalty_id);
+    const penaltyMap = new Map();
+    (logs || []).forEach(l => {
+      const p = l.changes;
+      if (p && p.penalty_id) {
+        if (!penaltyMap.has(p.penalty_id)) {
+          penaltyMap.set(p.penalty_id, { ...p });
+        } else {
+          const existing = penaltyMap.get(p.penalty_id);
+          if (l.action === 'PENALTY_WAIVED' || p.status === 'waived') {
+            existing.status = 'waived';
+          }
+        }
+      }
+    });
 
+    const penalties = Array.from(penaltyMap.values());
     const unpaid = penalties.filter(p => p.status === 'unpaid');
     const totalUnpaid = unpaid.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
 

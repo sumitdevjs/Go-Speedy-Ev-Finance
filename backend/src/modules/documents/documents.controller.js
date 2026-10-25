@@ -45,11 +45,18 @@ class DocumentsController {
         tenant_id, 
         doc_type, 
         req.file.buffer, 
-        req.file.mimetype
+        req.file.mimetype,
+        req
       );
 
       return successResponse(res, 201, data, 'Document uploaded successfully');
     } catch (error) {
+      if (error.message?.startsWith('Access denied')) {
+        return errorResponse(res, 403, error.message);
+      }
+      if (error.message === 'Tenant not found') {
+        return errorResponse(res, 404, error.message);
+      }
       next(error);
     }
   }

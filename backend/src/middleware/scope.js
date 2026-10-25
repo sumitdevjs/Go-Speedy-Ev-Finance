@@ -34,13 +34,13 @@ const getScope = (req) => {
 };
 
 const applyScope = (queryBuilder, req, options = {}) => {
-  if (!hasBranchSupport) {
-    return queryBuilder;
-  }
-
   const scope = getScope(req);
   const branchCol = options.branchColumn || 'branch_id';
   const hoCol = options.headOfficeColumn || 'head_office_id';
+
+  if (!hasBranchSupport && !scope.isSuperAdmin) {
+    return queryBuilder.eq('id', '00000000-0000-0000-0000-000000000000');
+  }
 
   const rawBranchId = req.query?.branch_id || req.headers?.['x-branch-id'];
   const rawHoId = req.query?.head_office_id || req.headers?.['x-head-office-id'];
@@ -63,6 +63,8 @@ const applyScope = (queryBuilder, req, options = {}) => {
   if (scope.isHoAdmin) {
     if (scope.userHeadOfficeId) {
       queryBuilder = queryBuilder.eq(hoCol, scope.userHeadOfficeId);
+    } else {
+      queryBuilder = queryBuilder.eq(hoCol, '00000000-0000-0000-0000-000000000000');
     }
     if (selectedBranchId) {
       queryBuilder = queryBuilder.eq(branchCol, selectedBranchId);
@@ -81,9 +83,6 @@ const applyScope = (queryBuilder, req, options = {}) => {
 };
 
 const resolveCreateScope = (req, payload = {}) => {
-  if (!hasBranchSupport) {
-    return { branch_id: null, head_office_id: null };
-  }
 
   const isValidId = (val) => val && typeof val === 'string' && val.trim() !== '' && val !== 'all' && val !== 'global' && val !== 'null' && val !== 'undefined';
   const rawBranchId = payload.branch_id || req.headers?.['x-branch-id'];

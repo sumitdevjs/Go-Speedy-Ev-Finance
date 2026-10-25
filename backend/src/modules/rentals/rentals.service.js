@@ -174,6 +174,28 @@ class RentalsService {
       }
     }
 
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    if (tenantData.status !== 'direct_purchase' && tenantData.start_date) {
+      const sDate = tenantData.start_date.split('T')[0];
+      if (sDate < todayStr) {
+        throw new Error('Contract Start Date cannot be in the past (back date not allowed).');
+      }
+    }
+
+    if (tenantData.amc_start_date) {
+      const amcStart = tenantData.amc_start_date.split('T')[0];
+      if (amcStart < todayStr) {
+        throw new Error('AMC Start Date cannot be in the past (back date not allowed).');
+      }
+      if (tenantData.amc_expire_date) {
+        const amcExpire = tenantData.amc_expire_date.split('T')[0];
+        if (amcExpire <= amcStart) {
+          throw new Error('AMC Expire Date must be strictly after AMC Start Date.');
+        }
+      }
+    }
+
     let modelTotalPrice = 0;
     let originalStockCount = 0;
     const isOldEv = Boolean(tenantData.old_ev_id);
@@ -214,28 +236,6 @@ class RentalsService {
 
       if (stockError) throw new Error('Failed to reserve stock. It might be exhausted.');
       modelTotalPrice = model.total_price;
-    }
-
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    if (tenantData.status !== 'direct_purchase' && tenantData.start_date) {
-      const sDate = tenantData.start_date.split('T')[0];
-      if (sDate < todayStr) {
-        throw new Error('Contract Start Date cannot be in the past (back date not allowed).');
-      }
-    }
-
-    if (tenantData.amc_start_date) {
-      const amcStart = tenantData.amc_start_date.split('T')[0];
-      if (amcStart < todayStr) {
-        throw new Error('AMC Start Date cannot be in the past (back date not allowed).');
-      }
-      if (tenantData.amc_expire_date) {
-        const amcExpire = tenantData.amc_expire_date.split('T')[0];
-        if (amcExpire <= amcStart) {
-          throw new Error('AMC Expire Date must be strictly after AMC Start Date.');
-        }
-      }
     }
 
     const startDate = tenantData.start_date ? new Date(tenantData.start_date) : new Date();
@@ -316,11 +316,28 @@ class RentalsService {
       }
     }
 
-    Object.keys(updates).forEach(key => {
-      if (updates[key] === '') {
-        updates[key] = null;
+    if (updates && 'status' in updates) {
+      throw new Error('status cannot be changed via a generic update — use the /complete or /cancel endpoints.');
+    }
+
+    const ALLOWED_UPDATE_FIELDS = new Set([
+      'name', 'phone', 'gender', 'address', 'vehicle_number', 'chassis_no',
+      'battery_number', 'charger_number', 'key_number', 'start_date', 'total_months',
+      'amc_start_date', 'amc_expire_date', 'scooty_insurance_start', 'scooty_policy_expiry',
+      'rider_insurance_start', 'rider_policy_expiry', 'has_pending_docs', 'notes',
+      'invoice_generated', 'invoice_doc_path', 'aadhar_path', 'pan_path', 'cheque_path',
+      'electricity_bill_path', 'tenant_photo_path', 'scooty_photo_path',
+      'rent_agreement_path', 'scooty_insurance_path', 'rider_insurance_path',
+      'rider_license_path', 'verification_doc', 'expected_end_date'
+    ]);
+
+    const sanitizedUpdates = {};
+    for (const [key, val] of Object.entries(updates)) {
+      if (ALLOWED_UPDATE_FIELDS.has(key)) {
+        sanitizedUpdates[key] = val === '' ? null : val;
       }
-    });
+    }
+    updates = sanitizedUpdates;
 
     const todayStr = new Date().toISOString().split('T')[0];
 

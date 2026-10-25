@@ -31,11 +31,18 @@ const requireAuth = async (req, res, next) => {
       return errorResponse(res, 401, 'Unauthorized - Account is deactivated');
     }
 
-    const isMasterAdmin = user.role === 'super_admin' || (user.role === 'admin' && !user.ward_area);
+    // Prevent ambiguous escalation: legacy 'admin' with head_office_id or branch_id is never super_admin
+    const hasBranch = Boolean(user.branch_id || (user.ward_area && !['ALL', 'HQ', 'Delhi / Ncr', 'Delhi/NCR', 'Delhi'].includes(user.ward_area)));
+    const hasHO = Boolean(user.head_office_id);
+    const isMasterAdmin = user.role === 'super_admin' || (user.role === 'admin' && !hasHO && !hasBranch);
 
     let effectiveRole = isMasterAdmin ? 'super_admin' : user.role;
-    if (!isMasterAdmin && (user.role === 'branch_admin' || (user.role === 'admin' && user.ward_area && !['ALL', 'HQ', 'Delhi / Ncr', 'Delhi/NCR', 'Delhi'].includes(user.ward_area)))) {
-      effectiveRole = 'branch_admin';
+    if (!isMasterAdmin) {
+      if (user.role === 'branch_admin' || (user.role === 'admin' && hasBranch)) {
+        effectiveRole = 'branch_admin';
+      } else if (user.role === 'ho_admin' || (user.role === 'admin' && hasHO)) {
+        effectiveRole = 'ho_admin';
+      }
     }
     const branchId = isMasterAdmin ? null : (user.branch_id || user.ward_area);
 

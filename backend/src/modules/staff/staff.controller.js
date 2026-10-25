@@ -32,6 +32,9 @@ class StaffController {
       if (error.message === 'Phone or email already exists') {
         return errorResponse(res, 409, error.message);
       }
+      if (error.message?.includes('Access denied') || error.message?.includes('Invalid role')) {
+        return errorResponse(res, 403, error.message);
+      }
       console.error(error);
       return errorResponse(res, 500, 'Internal Server Error');
     }
@@ -90,7 +93,7 @@ class StaffController {
     try {
       const { id } = req.params;
       const { is_active } = req.body;
-      const { data, diff } = await staffService.toggleActive(id, is_active, req.user.id);
+      const { data, diff } = await staffService.toggleActive(id, is_active, req.user);
       await logAudit({
         userId: req.user.id,
         userRole: req.user.role,
@@ -102,11 +105,14 @@ class StaffController {
       });
       return successResponse(res, 200, data, `Staff account ${is_active ? 'activated' : 'deactivated'}`);
     } catch (error) {
-      if (error.message === 'Cannot deactivate yourself') {
+      if (error.message?.includes('Access denied') || error.message === 'Cannot deactivate yourself') {
         return errorResponse(res, 403, error.message);
       }
+      if (error.message === 'User not found') {
+        return errorResponse(res, 404, error.message);
+      }
       console.error(error);
-      return errorResponse(res, 500, 'Internal Server Error');
+      return errorResponse(res, 400, error.message || 'Internal Server Error');
     }
   }
 }

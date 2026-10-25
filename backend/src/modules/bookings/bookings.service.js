@@ -95,6 +95,10 @@ class BookingsService {
     if (bookingError) throw bookingError;
     if (booking.status !== 'pending') throw new Error(`Booking status is ${booking.status}`);
 
+    if (req?.user) {
+      this.authorizeBooking(booking, req);
+    }
+
     // If tenantData doesn't have ev_model_id, use booking's
     if (!tenantData.ev_model_id && booking.ev_model_id) {
       tenantData.ev_model_id = booking.ev_model_id;
@@ -171,24 +175,55 @@ class BookingsService {
     }
   }
 
-  async cancelBooking(id) {
+  authorizeBooking(booking, req) {
+    if (!req?.user || !booking) return;
+    const user = req.user;
+    if (user.role === 'branch_admin' || user.role === 'staff') {
+      if (booking.branch_id && user.branch_id && booking.branch_id !== user.branch_id) {
+        throw new Error('Access denied: Booking belongs to another branch');
+      }
+    } else if (user.role === 'ho_admin') {
+      if (booking.head_office_id && user.head_office_id && booking.head_office_id !== user.head_office_id) {
+        throw new Error('Access denied: Booking belongs to another Head Office');
+      }
+    }
+  }
+
+  async cancelBooking(id, req = null) {
+    const { data: booking, error: fetchErr } = await supabase
+      .from('bookings')
+      .select('id, branch_id, head_office_id, status')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr || !booking) throw new Error('Booking not found');
+    this.authorizeBooking(booking, req);
+    if (booking.status !== 'pending') throw new Error('Booking is not pending');
+
     const { data, error } = await supabase
       .from('bookings')
       .update({ status: 'cancelled' })
       .eq('id', id)
-      .eq('status', 'pending')
       .select('*')
       .single();
 
     if (error) {
-      // Check if no rows were updated (meaning it wasn't pending)
       if (error.code === 'PGRST116') throw new Error('Booking not found or not pending');
       throw error;
     }
     return data;
   }
 
-  async updateBooking(id, updates) {
+  async updateBooking(id, updates, req = null) {
+    const { data: booking, error: fetchErr } = await supabase
+      .from('bookings')
+      .select('id, branch_id, head_office_id, status')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr || !booking) throw new Error('Booking not found');
+    this.authorizeBooking(booking, req);
+
     const { data, error } = await supabase
       .from('bookings')
       .update(updates)

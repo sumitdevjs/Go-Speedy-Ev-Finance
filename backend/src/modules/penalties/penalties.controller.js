@@ -10,6 +10,9 @@ class PenaltiesController {
         data: result
       });
     } catch (err) {
+      if (err.message?.startsWith('Access denied')) {
+        return res.status(403).json({ success: false, message: err.message });
+      }
       next(err);
     }
   }
@@ -23,6 +26,9 @@ class PenaltiesController {
         summary: result.summary
       });
     } catch (err) {
+      if (err.message?.startsWith('Access denied')) {
+        return res.status(403).json({ success: false, message: err.message });
+      }
       next(err);
     }
   }
@@ -38,6 +44,9 @@ class PenaltiesController {
         data: result
       });
     } catch (err) {
+      if (err.message?.startsWith('Access denied')) {
+        return res.status(403).json({ success: false, message: err.message });
+      }
       next(err);
     }
   }
@@ -45,12 +54,15 @@ class PenaltiesController {
   async getTenantPenalties(req, res, next) {
     try {
       const { tenantId } = req.params;
-      const result = await penaltiesService.getTenantActivePenalties(tenantId);
+      const result = await penaltiesService.getTenantActivePenalties(tenantId, req);
       res.status(200).json({
         success: true,
         data: result
       });
     } catch (err) {
+      if (err.message?.startsWith('Access denied')) {
+        return res.status(403).json({ success: false, message: err.message });
+      }
       next(err);
     }
   }

@@ -57,6 +57,12 @@ class TransfersService {
     if (!ev_model_id) throw new Error('EV Model is required');
     if (!quantity || Number(quantity) <= 0) throw new Error('Valid quantity is required');
 
+    if (user.role === 'branch_admin' || user.role === 'staff') {
+      if (user.branch_id && from_branch_id && user.branch_id !== from_branch_id) {
+        throw new Error('Access denied: Cannot initiate transfer from another branch');
+      }
+    }
+
     const transferId = `TRF-${Date.now()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
 
     const { data: model } = await supabase.from('ev_models').select('name').eq('id', ev_model_id).single();
@@ -81,20 +87,43 @@ class TransfersService {
       created_at: new Date().toISOString()
     };
 
-    const { data: logEntry, error } = await supabase
+    // 1. Persist in dedicated bike_transfers table
+    let entityUuid = null;
+    try {
+      const { data: bikeTransfer, error: btErr } = await supabase
+        .from('bike_transfers')
+        .insert([{
+          transfer_id: transferId,
+          from_branch_id: from_branch_id || null,
+          to_branch_id: to_branch_id || null,
+          ev_model_id,
+          quantity: Number(quantity),
+          status: 'requested',
+          dispatch_notes: notes || null,
+          initiated_by: user.id
+        }])
+        .select('*')
+        .single();
+
+      if (!btErr && bikeTransfer?.id) {
+        entityUuid = bikeTransfer.id;
+        payload.id = bikeTransfer.id;
+      }
+    } catch (_) { }
+
+    // 2. Insert into audit_logs with UUID entity reference (never string TRF-...)
+    const { error: auditErr } = await supabase
       .from('audit_logs')
       .insert([{
         user_id: user.id,
         user_role: user.role,
         action: 'INITIATED',
         entity_type: 'stock_transfer',
-        entity_id: transferId,
+        entity_id: entityUuid || (typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : null),
         changes: payload
-      }])
-      .select('*')
-      .single();
+      }]);
 
-    if (error) throw error;
+    if (auditErr) throw auditErr;
     return payload;
   }
 
@@ -110,6 +139,16 @@ class TransfersService {
     const targetLog = (logs || []).find(l => l.changes && l.changes.transfer_id === transferId);
     if (!targetLog) throw new Error('Transfer record not found');
 
+    if (targetLog.changes?.status !== 'requested') {
+      throw new Error(`Cannot dispatch transfer in '${targetLog.changes?.status}' status`);
+    }
+
+    if (user.role === 'branch_admin' || user.role === 'staff') {
+      if (user.branch_id && targetLog.changes?.from_branch_id && user.branch_id !== targetLog.changes.from_branch_id) {
+        throw new Error('Access denied: Only dispatching branch staff can dispatch this transfer');
+      }
+    }
+
     const updated = {
       ...targetLog.changes,
       status: 'in_transit',
@@ -123,6 +162,18 @@ class TransfersService {
     };
 
     await supabase.from('audit_logs').update({ changes: updated }).eq('id', targetLog.id);
+    try {
+      await supabase.from('bike_transfers').update({
+        status: 'in_transit',
+        dispatched_by: user.id,
+        dispatch_notes: dispatch_notes || null,
+        challan_number: updated.challan_number,
+        driver_name: driver_name || null,
+        driver_phone: driver_phone || null,
+        updated_at: new Date().toISOString()
+      }).eq('transfer_id', transferId);
+    } catch (_) {}
+
     return updated;
   }
 
@@ -138,6 +189,16 @@ class TransfersService {
     const targetLog = (logs || []).find(l => l.changes && l.changes.transfer_id === transferId);
     if (!targetLog) throw new Error('Transfer record not found');
 
+    if (targetLog.changes?.status !== 'in_transit') {
+      throw new Error(`Cannot receive transfer in '${targetLog.changes?.status}' status. Transfer must be in transit.`);
+    }
+
+    if (user.role === 'branch_admin' || user.role === 'staff') {
+      if (user.branch_id && targetLog.changes?.to_branch_id && user.branch_id !== targetLog.changes.to_branch_id) {
+        throw new Error('Access denied: Only receiving branch staff can receive this transfer');
+      }
+    }
+
     const updated = {
       ...targetLog.changes,
       status: 'received',
@@ -149,6 +210,15 @@ class TransfersService {
     };
 
     await supabase.from('audit_logs').update({ changes: updated }).eq('id', targetLog.id);
+    try {
+      await supabase.from('bike_transfers').update({
+        status: 'received',
+        received_by: user.id,
+        receive_notes: receive_notes || null,
+        condition_received: condition_received || 'Good',
+        updated_at: new Date().toISOString()
+      }).eq('transfer_id', transferId);
+    } catch (_) {}
 
     try {
       const modelId = updated.ev_model_id;
@@ -185,6 +255,16 @@ class TransfersService {
     const targetLog = (logs || []).find(l => l.changes && l.changes.transfer_id === transferId);
     if (!targetLog) throw new Error('Transfer record not found');
 
+    if (targetLog.changes?.status !== 'requested') {
+      throw new Error(`Cannot cancel transfer in '${targetLog.changes?.status}' status`);
+    }
+
+    if (user.role === 'branch_admin' || user.role === 'staff') {
+      if (user.branch_id && targetLog.changes?.from_branch_id && user.branch_id !== targetLog.changes.from_branch_id) {
+        throw new Error('Access denied: Cannot cancel transfer belonging to another branch');
+      }
+    }
+
     const updated = {
       ...targetLog.changes,
       status: 'cancelled',
@@ -195,6 +275,13 @@ class TransfersService {
     };
 
     await supabase.from('audit_logs').update({ changes: updated }).eq('id', targetLog.id);
+    try {
+      await supabase.from('bike_transfers').update({
+        status: 'cancelled',
+        updated_at: new Date().toISOString()
+      }).eq('transfer_id', transferId);
+    } catch (_) {}
+
     return updated;
   }
 }

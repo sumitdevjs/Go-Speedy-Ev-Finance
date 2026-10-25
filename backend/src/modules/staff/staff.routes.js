@@ -53,9 +53,10 @@ const validateBody = (schema) => (req, res, next) => {
     next();
   } catch (err) {
     if (err instanceof z.ZodError) {
+      const issues = err.issues || err.errors || [];
       return res.status(400).json({
         success: false,
-        message: err.errors.map(e => e.message).join(', '),
+        message: issues.map(e => e.message).join(', ') || err.message,
       });
     }
     next(err);

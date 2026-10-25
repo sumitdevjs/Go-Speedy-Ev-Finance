@@ -107,8 +107,28 @@ const updateRentalSchema = z.object({
 );
 
 const validateBody = (schema) => (req, res, next) => {
-  schema.parse(req.body);
-  next();
+  try {
+    if (req.body && typeof req.body === 'object' && 'status' in req.body) {
+      return res.status(400).json({
+        success: false,
+        message: 'status cannot be changed via a generic update — use the /complete or /cancel endpoints.'
+      });
+    }
+    req.body = schema.parse(req.body);
+    next();
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const issues = err.issues || err.errors || [];
+      return res.status(400).json({
+        success: false,
+        message: issues.map(e => e.message).join(', ') || err.message,
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      message: err.message || 'Validation error'
+    });
+  }
 };
 
 /**

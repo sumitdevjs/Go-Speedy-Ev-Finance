@@ -236,14 +236,20 @@ const { allowedOrigins, isAllowedOrigin } = require('../../config/allowedOrigins
 // Fallback when a requested redirect target isn't on the allow-list.
 const DEFAULT_FRONTEND_ORIGIN = allowedOrigins[0] || 'http://localhost:3000';
 
+const jwt = require('jsonwebtoken');
+
 // ─── One-time OAuth exchange store ────────────────────────────────────────────
-// Maps a short-lived random code → { accessToken, refreshToken, userId }
-// Each code expires after 60 seconds and can only be used once.
+// Multi-instance resilient: uses signed short-lived tokens with replay tracking
 const oauthCodeStore = new Map();
+const consumedCodes = new Set();
+
 function storeOAuthCode(accessToken, refreshToken, userId) {
-  const code = crypto.randomBytes(32).toString('hex');
+  const code = jwt.sign(
+    { accessToken, refreshToken, userId, type: 'oauth_exchange' },
+    env.JWT_SECRET,
+    { expiresIn: '60s' }
+  );
   oauthCodeStore.set(code, { accessToken, refreshToken, userId, expiresAt: Date.now() + 60_000 });
-  // Auto-cleanup after 65s
   setTimeout(() => oauthCodeStore.delete(code), 65_000);
   return code;
 }
@@ -275,10 +281,25 @@ router.get(
     }
     if (!isAllowedOrigin(clientOrigin)) clientOrigin = DEFAULT_FRONTEND_ORIGIN;
 
+    const nonce = crypto.randomBytes(16).toString('hex');
+    const isProduction = env.NODE_ENV === 'production';
+    res.cookie('oauth_nonce', nonce, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 10 * 60 * 1000,
+    });
+
+    const statePayload = jwt.sign(
+      { origin: clientOrigin, nonce, type: 'oauth_state' },
+      env.JWT_SECRET,
+      { expiresIn: '10m' }
+    );
+
     passport.authenticate('google', {
       scope: ['profile', 'email'],
       session: false,
-      state: clientOrigin,
+      state: statePayload,
     })(req, res, next);
   }
 );
@@ -296,10 +317,30 @@ router.get(
 router.get(
   '/google/callback',
   (req, res, next) => {
-    // `state` is client-controlled on the wire — validate again, don't trust it.
-    const cleanOrigin = isAllowedOrigin(req.query.state)
-      ? String(req.query.state).replace(/\/+$/, '')
-      : DEFAULT_FRONTEND_ORIGIN;
+    let cleanOrigin = DEFAULT_FRONTEND_ORIGIN;
+    const expectedNonce = req.cookies?.oauth_nonce;
+
+    if (req.query.state) {
+      try {
+        const decodedState = jwt.verify(req.query.state, env.JWT_SECRET);
+        if (decodedState?.type === 'oauth_state') {
+          if (isAllowedOrigin(decodedState.origin)) {
+            cleanOrigin = String(decodedState.origin).replace(/\/+$/, '');
+          }
+          if (expectedNonce && decodedState.nonce && decodedState.nonce !== expectedNonce) {
+            console.warn('OAuth state nonce mismatch - potential CSRF attempt');
+            return res.redirect(`${cleanOrigin}/?error=oauth_csrf_detected`);
+          }
+        }
+      } catch (_) {
+        // Fallback if state is raw origin (backwards compatibility)
+        if (isAllowedOrigin(req.query.state)) {
+          cleanOrigin = String(req.query.state).replace(/\/+$/, '');
+        }
+      }
+    }
+
+    res.clearCookie('oauth_nonce');
 
     passport.authenticate('google', { session: false }, async (err, result) => {
       if (err || !result) {
@@ -357,17 +398,35 @@ router.post('/oauth/exchange', (req, res) => {
     return errorResponse(res, 400, 'Missing exchange code');
   }
 
-  const entry = oauthCodeStore.get(code);
+  if (consumedCodes.has(code)) {
+    return errorResponse(res, 400, 'OAuth code has already been consumed.');
+  }
+
+  let entry = oauthCodeStore.get(code);
+  if (!entry) {
+    // Multi-instance fallback: verify code as signed JWT
+    try {
+      const decoded = jwt.verify(code, env.JWT_SECRET);
+      if (decoded && decoded.type === 'oauth_exchange') {
+        entry = decoded;
+      }
+    } catch (_) {
+      // Invalid or expired JWT
+    }
+  }
+
   if (!entry) {
     return errorResponse(res, 400, 'Invalid or expired OAuth code. Please sign in again.');
   }
-  if (Date.now() > entry.expiresAt) {
+  if (entry.expiresAt && Date.now() > entry.expiresAt) {
     oauthCodeStore.delete(code);
     return errorResponse(res, 400, 'OAuth code has expired. Please sign in again.');
   }
 
   // Consume the code (one-time use)
   oauthCodeStore.delete(code);
+  consumedCodes.add(code);
+  setTimeout(() => consumedCodes.delete(code), 120_000);
 
   const { accessToken, refreshToken, userId } = entry;
   const isProduction = env.NODE_ENV === 'production';
