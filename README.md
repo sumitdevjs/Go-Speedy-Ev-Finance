@@ -3,7 +3,7 @@
 <div align="center">
 
 [![Status](https://img.shields.io/badge/Status-Production--Ready-059669?style=for-the-badge&logo=checkmarx&logoColor=white)](https://github.com)
-[![Next.js](https://img.shields.io/badge/Next.js%2014-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js%2016-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![Express.js](https://img.shields.io/badge/Express%205-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
 [![Supabase](https://img.shields.io/badge/Supabase%20Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS%203-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
@@ -104,10 +104,10 @@ sequenceDiagram
     participant API as Express API Server
     participant DB as Supabase PostgreSQL
 
-    User->>FE: Enter Phone/Email + Password or Google Sign-In
-    FE->>Proxy: POST /api/auth/login or /api/auth/google
+    User->>FE: Enter Phone/Email + Password
+    FE->>Proxy: POST /api/auth/login
     Proxy->>API: Forward credentials
-    API->>DB: Query user by phone/email or OAuth ID
+    API->>DB: Query user by phone/email
     DB-->>API: User record + hashed credentials
     API->>API: Verify password (bcrypt) & generate JWT Access Token (15m) + Refresh Token (7d)
     API->>DB: Store hashed refresh token
@@ -123,7 +123,7 @@ sequenceDiagram
 
 | Category | Technology | Version | Purpose & Implementation Details |
 | :--- | :--- | :--- | :--- |
-| **Framework** | [Next.js](https://nextjs.org/) | `14.2.35` | React framework with App Router, server-side route proxy rewrites, and fast compilation. |
+| **Framework** | [Next.js](https://nextjs.org/) | `16.4.3` | React framework with App Router, server-side route proxy rewrites, and fast compilation. |
 | **Core UI Library** | [React](https://react.dev/) / [React DOM](https://react.dev/) | `18.3.1` | Declarative component UI engine with modern hooks and concurrent rendering. |
 | **Styling & CSS** | [Tailwind CSS](https://tailwindcss.com/) | `3.4.4` | Utility-first CSS framework with dynamic dark/light mode theming and custom extensions. |
 | **CSS Processing** | [PostCSS](https://postcss.org/) / [Autoprefixer](https://github.com/postcss/autoprefixer) | `8.4.39` / `10.4.19` | Automated CSS prefixing, optimization, and Tailwind AST compilation. |
@@ -132,11 +132,11 @@ sequenceDiagram
 | **Smooth Scrolling** | [Lenis](https://lenis.darkroom.engineering/) | `1.3.26` | Butter-smooth inertial scrolling physics across all dashboard interfaces. |
 | **State Management** | [Zustand](https://github.com/pmndrs/zustand) | `4.5.4` | Lightweight, scalable state management for authentication, modals, branch switching, and UI state. |
 | **Forms & Validation** | [React Hook Form](https://react-hook-form.com/) | `7.52.1` | High-speed, un-controlled form state manager minimizing unnecessary re-renders. |
-| **Schema Validation** | [Zod](https://zod.dev/) & [@hookform/resolvers](https://github.com/react-hook-form/resolvers) | `3.23.8` / `3.9.0` | Strict schema validation sharing identical rules between frontend forms and backend controllers. |
+| **Schema Validation** | [Zod](https://zod.dev/) & [@hookform/resolvers](https://github.com/react-hook-form/resolvers) | `4.6.7` / `5.x` | Strict schema validation sharing identical rules between frontend forms and backend controllers. |
 | **Icons** | [Lucide React](https://lucide.dev/) | `0.400.0` | Clean, modern iconography system covering financial, vehicular, and administrative actions. |
 | **HTTP Client** | [Axios](https://axios-http.com/) | `1.7.2` | Intercepted HTTP client handling automated token refreshes, queue retries, and `X-HTTP-Method-Override: PATCH`. |
 | **Image Compression** | [browser-image-compression](https://github.com/Donaldcwl/browser-image-compression) | `2.0.2` | Client-side compression of customer KYC photos, PAN, Aadhaar, and vehicle images before upload. |
-| **Report Exporting** | [XLSX (SheetJS)](https://sheetjs.com/) | `0.18.5` | Client-side generation and instant export of detailed Excel spreadsheets for fleet and collections audits. |
+| **Report Exporting** | [XLSX (SheetJS)](https://sheetjs.com/) | `0.20.3` | Client-side generation and instant export of detailed Excel spreadsheets for fleet and collections audits. |
 
 ---
 
@@ -144,17 +144,15 @@ sequenceDiagram
 
 | Category | Technology | Version | Purpose & Implementation Details |
 | :--- | :--- | :--- | :--- |
-| **Runtime Environment** | [Node.js](https://nodejs.org/) | `>= 18.x` | Cross-platform JavaScript runtime powering fast asynchronous I/O operations. |
+| **Runtime Environment** | [Node.js](https://nodejs.org/) | `>= 20.9` | Cross-platform JavaScript runtime powering fast asynchronous I/O operations. |
 | **Server Framework** | [Express.js](https://expressjs.com/) | `5.2.1` | RESTful API server structuring modular routes, middleware, and controllers. |
 | **Database & ORM Client** | [@supabase/supabase-js](https://supabase.com/docs/reference/javascript/introduction) | `2.115.0` | Official client interacting with Supabase PostgreSQL via privileged Service Role Key. |
 | **Database Engine** | [PostgreSQL](https://www.postgresql.org/) (Supabase) | `15+` | Relational database utilizing `pg_trgm` (trigram ILIKE search) and Row-Level Security (RLS). |
 | **Object Storage** | [Supabase Storage](https://supabase.com/storage) | Built-in | Private storage buckets storing KYC, contracts, and insurance docs with pre-signed short-lived URLs. |
 | **Authentication & Tokens**| [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken) | `9.0.3` | Dual-token authentication issuing stateless 15-minute Access Tokens and verified payload claims. |
 | **Password & Token Hash** | [bcryptjs](https://github.com/dcodeIO/bcrypt.js) | `3.0.3` | Multi-round salt hashing for user passwords and persistent database-stored refresh tokens. |
-| **OAuth 2.0 Integration** | [Passport.js](https://www.passportjs.org/) / `passport-google-oauth20` | `0.7.0` / `2.0.0` | Google Single Sign-On (SSO) authentication for staff and administrative personnel. |
 | **HTTP Security Headers** | [Helmet](https://helmetjs.github.io/) | `8.3.0` | Secures Express apps by setting essential HTTP headers, disabling iframe sniffing, and mitigating XSS. |
 | **CORS Management** | [CORS](https://github.com/expressjs/cors) | `2.8.6` | Configurable origin whitelist ensuring cross-site requests are strictly guarded. |
-| **Session Middleware** | [express-session](https://github.com/expressjs/session) | `1.19.0` | Ephemeral session state utilized exclusively during Google OAuth callback redirects. |
 | **Cookie Parsing** | [cookie-parser](https://github.com/expressjs/cookie-parser) | `1.4.7` | Parses cryptographically secure, HttpOnly cookies containing authentication tokens. |
 | **Rate Limiting** | [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) | `8.7.0` | Defense-in-depth against brute-force attacks and DDoS by throttling high-frequency API endpoints. |
 | **File Upload Handling** | [Multer](https://github.com/expressjs/multer) | `2.3.0` | Multipart/form-data handler managing in-memory file buffers before passing to validation and Supabase. |
@@ -292,8 +290,6 @@ The backend provides a modular RESTful API organized by domain. In local develop
 - `POST /api/auth/logout` - Revoke active refresh token and invalidate authentication cookies.
 - `POST /api/auth/forgot-password` - Request a 6-digit OTP sent to registered email.
 - `POST /api/auth/reset-password` - Verify OTP and set a new password.
-- `GET /api/auth/google` - Initialize Google OAuth 2.0 single sign-on redirect.
-- `GET /api/auth/google/callback` - Google OAuth callback handling and cookie exchange.
 
 ### Head Offices & Zonal Analytics (`/api/head-offices`)
 - `GET /api/head-offices` - List all registered regional Head Offices.
@@ -364,7 +360,6 @@ Go Speedy Ev Finance Scheme/
 │   │   ├── config/
 │   │   │   ├── cors.js                   # Cross-Origin Whitelist Policy
 │   │   │   ├── env.js                    # Zod-validated Environment Schema
-│   │   │   ├── passport.js               # Google OAuth 2.0 Passport Strategy
 │   │   │   ├── supabase.js               # Supabase Client with Service Role Key
 │   │   │   └── swagger.js                # OpenAPI 3.0 JSDoc Specifications
 │   │   ├── middleware/
@@ -402,7 +397,7 @@ Go Speedy Ev Finance Scheme/
 │   ├── index.js                          # Express Application Entry Point
 │   └── package.json                      # Backend Dependencies & Scripts
 │
-├── frontend/                             # Next.js 14 Web Application
+├── frontend/                             # Next.js 16 Web Application
 │   ├── public/                           # Static Web Assets, Branding, Favicons
 │   ├── src/
 │   │   ├── app/                          # Next.js App Router Structure
@@ -415,7 +410,6 @@ Go Speedy Ev Finance Scheme/
 │   │   │   │   ├── purchases/            # Direct Sales Directory & New Sale Wizard
 │   │   │   │   ├── rentals/              # Rental Contracts & New Lease Wizard
 │   │   │   │   └── staff/                # Staff & Personnel Management
-│   │   │   ├── oauth-callback/           # OAuth Token Handshake Receiver
 │   │   │   ├── globals.css               # Tailwind CSS Base & Theme Directives
 │   │   │   ├── layout.js                 # Global Root HTML & Theme Wrapper
 │   │   │   └── page.js                   # Landing Page (Interactive 3D Molten Metal Shader)
@@ -454,7 +448,7 @@ Go Speedy Ev Finance Scheme/
 ## Quick Start & Installation
 
 ### Prerequisites
-- **Node.js**: `v18.x` or `v20.x` LTS
+- **Node.js**: `v20.9+` (Node 24 verified)
 - **Package Manager**: `npm` (comes with Node.js) or `yarn` / `pnpm`
 - **Database**: Active [Supabase](https://supabase.com) project with PostgreSQL and Storage enabled.
 
@@ -485,7 +479,6 @@ Go Speedy Ev Finance Scheme/
    PORT=5000
    NODE_ENV=development
    FRONTEND_URL=http://localhost:3001
-   BACKEND_URL=http://localhost:5000
 
    # Supabase Credentials
    SUPABASE_URL=https://your-project.supabase.co
@@ -493,15 +486,10 @@ Go Speedy Ev Finance Scheme/
 
    # Security Secrets
    JWT_SECRET=super_strong_custom_jwt_secret_key_32_chars_min
-   SESSION_SECRET=session_secret_for_oauth
 
    # Swagger Documentation (true for development)
    SWAGGER_ENABLED=true
 
-   # Google OAuth (Optional - Cloud Console)
-   GOOGLE_CLIENT_ID=your-google-client-id
-   GOOGLE_CLIENT_SECRET=your-google-client-secret
-   GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
    ```
 4. Start the backend development server:
    ```bash
@@ -572,15 +560,10 @@ npm run lint
 | `PORT` | Optional | `5000` | Port on which the Express server listens. |
 | `NODE_ENV` | Optional | `development` | Environment mode (`development`, `production`, `test`). |
 | `FRONTEND_URL` | Yes | `http://localhost:3001` | Origin URL permitted by CORS policy to receive credentials. |
-| `BACKEND_URL` | Optional | `http://localhost:5000` | Fully qualified backend URL for OAuth callback redirects. |
 | `SUPABASE_URL` | **Yes** | - | Supabase PostgreSQL project URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Yes** | - | Privileged Supabase Service Role Key for server-side queries. |
 | `JWT_SECRET` | **Yes** | - | Cryptographic secret used to sign 15-minute access tokens. |
-| `SESSION_SECRET` | Optional | - | Ephemeral secret key for temporary OAuth sessions. |
 | `SWAGGER_ENABLED` | Optional | `true` | Enables Swagger UI documentation at `/api/docs` in non-production. |
-| `GOOGLE_CLIENT_ID` | Optional | - | OAuth client ID obtained from Google Cloud Console. |
-| `GOOGLE_CLIENT_SECRET` | Optional | - | OAuth client secret obtained from Google Cloud Console. |
-| `GOOGLE_CALLBACK_URL` | Optional | - | OAuth callback URL matching the Google Cloud configuration. |
 
 ### Frontend (`/frontend/.env.local`)
 

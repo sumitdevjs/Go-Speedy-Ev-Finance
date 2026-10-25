@@ -2,38 +2,8 @@ const supabase = require('../../config/db');
 const { calcBalance } = require('../../utils/balanceCalc');
 const { applyScope } = require('../../middleware/scope');
 
-async function fetchAll(buildQuery) {
-  const PAGE_SIZE = 1000;
-  let allRows = [];
-  let from = 0;
-
-  try {
-    const q = buildQuery();
-    if (typeof q.range !== 'function') {
-      const { data, error } = await q;
-      if (error) throw error;
-      return data || [];
-    }
-
-    while (true) {
-      const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1);
-      if (error) {
-        const { data: directData, error: directErr } = await buildQuery();
-        if (directErr) throw directErr;
-        return directData || [];
-      }
-      if (!data || data.length === 0) break;
-      allRows.push(...data);
-      if (data.length < PAGE_SIZE) break;
-      from += PAGE_SIZE;
-    }
-    return allRows;
-  } catch (err) {
-    const { data: directData, error: directErr } = await buildQuery();
-    if (directErr) throw directErr;
-    return directData || [];
-  }
-}
+const { fetchAll } = require('../../utils/fetchAll');
+const penaltiesService = require('../penalties/penalties.service');
 
 class ReportsService {
   async getCollectionReport(query = {}, req = null) {
@@ -131,28 +101,9 @@ class ReportsService {
       }
     }
 
-    let penaltiesByTenant = {};
-    const { data: pLogs, error: pLogsErr } = await supabase
-      .from('audit_logs')
-      .select('*')
-      .eq('entity_type', 'penalty');
-
-    if (pLogsErr) {
-      throw new Error(`Failed to fetch penalties for overdue report: ${pLogsErr.message || pLogsErr}`);
-    }
-
-    const penaltyMap = new Map();
-    (pLogs || []).forEach(l => {
-      const p = l.changes;
-      if (p && p.tenant_id && p.status === 'unpaid') {
-        const penId = p.penalty_id || l.id;
-        if (!penaltyMap.has(penId)) {
-          penaltyMap.set(penId, p);
-        }
-      }
-    });
-
-    for (const p of penaltyMap.values()) {
+    const penaltiesByTenant = {};
+    const { data: penalties } = await penaltiesService.getPenalties({ status: 'unpaid' }, req);
+    for (const p of penalties) {
       penaltiesByTenant[p.tenant_id] = (penaltiesByTenant[p.tenant_id] || 0) + Number(p.amount || 0);
     }
 

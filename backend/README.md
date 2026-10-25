@@ -35,10 +35,8 @@ It connects to **Supabase PostgreSQL** as its primary relational store and **Sup
 | **Object Storage** | [Supabase Storage](https://supabase.com/storage) | Built-in | Private storage buckets storing KYC, contracts, and insurance docs with pre-signed short-lived URLs. |
 | **Authentication & Tokens**| [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken) | `9.0.3` | Dual-token authentication issuing stateless 15-minute Access Tokens and verified payload claims. |
 | **Password & Token Hash** | [bcryptjs](https://github.com/dcodeIO/bcrypt.js) | `3.0.3` | Multi-round salt hashing for user passwords and persistent database-stored refresh tokens. |
-| **OAuth 2.0 Integration** | [Passport.js](https://www.passportjs.org/) / `passport-google-oauth20` | `0.7.0` / `2.0.0` | Google Single Sign-On (SSO) authentication for administrative and field personnel. |
 | **HTTP Security Headers** | [Helmet](https://helmetjs.github.io/) | `8.3.0` | Secures Express apps by setting essential HTTP headers, disabling iframe sniffing, and mitigating XSS. |
 | **CORS Management** | [CORS](https://github.com/expressjs/cors) | `2.8.6` | Configurable origin whitelist ensuring cross-site requests are strictly guarded. |
-| **Session Middleware** | [express-session](https://github.com/expressjs/session) | `1.19.0` | Ephemeral session state utilized exclusively during Google OAuth callback redirects. |
 | **Cookie Parsing** | [cookie-parser](https://github.com/expressjs/cookie-parser) | `1.4.7` | Parses cryptographically secure, HttpOnly cookies containing authentication tokens. |
 | **Rate Limiting** | [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) | `8.7.0` | Defense-in-depth against brute-force attacks and DDoS by throttling high-frequency API endpoints. |
 | **File Upload Handling** | [Multer](https://github.com/expressjs/multer) | `2.3.0` | Multipart/form-data handler managing in-memory file buffers before passing to validation and Supabase. |
@@ -105,7 +103,6 @@ backend/
 │   ├── config/
 │   │   ├── cors.js                   # Cross-Origin Whitelist Policy
 │   │   ├── env.js                    # Zod-validated Environment Schema
-│   │   ├── passport.js               # Google OAuth 2.0 Passport Strategy
 │   │   ├── supabase.js               # Supabase Client with Service Role Key
 │   │   └── swagger.js                # OpenAPI 3.0 JSDoc Specifications
 │   ├── middleware/
@@ -153,7 +150,7 @@ In development mode, interactive OpenAPI 3.0 documentation is available at:
 
 | Prefix | Module | Key Endpoints | Description |
 | :--- | :--- | :--- | :--- |
-| `/api/auth` | Authentication | `POST /login`, `GET /me`, `POST /refresh`, `POST /logout`, `GET /google` | User sessions, dual-token rotation, and Google OAuth. |
+| `/api/auth` | Authentication | `POST /login`, `GET /me`, `POST /refresh`, `POST /logout` | Password login, user sessions, and dual-token rotation. |
 | `/api/head-offices` | Zonal Command | `GET /`, `GET /my-dashboard`, `GET /:id/dashboard`, `POST /` | Regional headquarters analytics and branch listings. |
 | `/api/branches` | Ward Depots | `GET /`, `GET /:id`, `POST /`, `PATCH /:id` | Ward branches management and depot profiles. |
 | `/api/staff` | Staff & Users | `GET /`, `POST /`, `PATCH /:id`, `PATCH /:id/status` | Staff directory, role assignments, and branch pairing. |
@@ -189,7 +186,6 @@ Create or update `backend/.env`:
 PORT=5000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:3001
-BACKEND_URL=http://localhost:5000
 
 # Supabase Credentials
 SUPABASE_URL=https://your-project.supabase.co
@@ -197,15 +193,10 @@ SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 
 # Security Secrets
 JWT_SECRET=super_strong_custom_jwt_secret_key_32_chars_min
-SESSION_SECRET=session_secret_for_oauth
 
 # Swagger Documentation (true for development)
 SWAGGER_ENABLED=true
 
-# Google OAuth (Optional - Cloud Console)
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
 ```
 
 ### 3. Install Dependencies & Run
@@ -225,15 +216,10 @@ The server starts on `http://localhost:5000` with hot-reloading via Nodemon.
 | `PORT` | Optional | `5000` | Port on which the Express server listens. |
 | `NODE_ENV` | Optional | `development` | Environment mode (`development`, `production`, `test`). |
 | `FRONTEND_URL` | Yes | `http://localhost:3001` | Origin URL permitted by CORS policy to receive credentials. |
-| `BACKEND_URL` | Optional | `http://localhost:5000` | Fully qualified backend URL for OAuth callback redirects. |
 | `SUPABASE_URL` | **Yes** | - | Supabase PostgreSQL project URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Yes** | - | Privileged Supabase Service Role Key for server-side queries. |
 | `JWT_SECRET` | **Yes** | - | Cryptographic secret used to sign 15-minute access tokens. |
-| `SESSION_SECRET` | Optional | - | Ephemeral secret key for temporary OAuth sessions. |
 | `SWAGGER_ENABLED` | Optional | `true` | Enables Swagger UI documentation at `/api/docs` in non-production. |
-| `GOOGLE_CLIENT_ID` | Optional | - | OAuth client ID obtained from Google Cloud Console. |
-| `GOOGLE_CLIENT_SECRET` | Optional | - | OAuth client secret obtained from Google Cloud Console. |
-| `GOOGLE_CALLBACK_URL` | Optional | - | OAuth callback URL matching the Google Cloud configuration. |
 
 ---
 
@@ -254,3 +240,5 @@ npm test
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+
+Google sign-in has been removed. Accounts without a password must set one through the password reset API or their administrator before using password login. Existing OAuth identity columns in the database are retained for compatibility and are no longer used for authentication.

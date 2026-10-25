@@ -3,7 +3,8 @@ const crypto = require('crypto');
 const { getPaginationOptions, getPaginationMeta } = require('../../utils/pagination');
 const { buildSearchFilter } = require('../../utils/searchFilter');
 const { resolveCreateScope } = require('../../middleware/scope');
-const { ALL_WARDS } = require('../branches/delhiWardsData');
+const { fetchAll } = require('../../utils/fetchAll');
+const { loadModelStock, presentModelStock } = require('../../utils/modelStock');
 
 let dbBranchesCache = [];
 let lastCacheRefresh = 0;
@@ -41,15 +42,16 @@ function findWard(targetIdOrName, branchesList = null) {
   ) || null;
 }
 
-function isLogForWard(log, targetWard) {
-  if (!log || !targetWard) return false;
-  if (log.branch_id && targetWard.id) {
-    return String(log.branch_id).trim().toLowerCase() === String(targetWard.id).trim().toLowerCase();
-  }
-  if (!log.branch_id && targetWard.ward_no && log.ward_no) {
-    return Number(targetWard.ward_no) === Number(log.ward_no);
-  }
-  return false;
+function resolveWard(req, branches) {
+  const user = req?.user;
+  const restricted = ['branch_admin', 'staff'].includes(user?.role);
+  if (restricted && !user.branch_id) throw new Error('Access denied: No assigned branch');
+  if (user?.role === 'ho_admin' && !user.head_office_id) throw new Error('Access denied: No assigned Head Office');
+  const selected = restricted ? user.branch_id : req?.query?.branch_id || req?.headers?.['x-branch-id'];
+  const branch = findWard(selected, branches);
+  if (selected && !['all', 'global'].includes(selected) && !branch) throw new Error('Invalid branch selection');
+  if (user?.role === 'ho_admin' && branch && branch.head_office_id !== user.head_office_id) throw new Error('Access denied: Branch belongs to another Head Office');
+  return branch;
 }
 
 class ModelsService {
@@ -58,13 +60,7 @@ class ModelsService {
     const branches = await getLiveBranches();
 
     // Determine if a specific branch/ward is currently scoped
-    const branchHeader = req?.headers?.['x-branch-id'];
-    const branchQuery = req?.query?.branch_id;
-    const userBranch = req?.user?.role === 'branch_admin' ? req?.user?.branch_id : null;
-    const userWardArea = req?.user?.role === 'branch_admin' ? req?.user?.ward_area : null;
-
-    const targetBranchIdentifier = branchHeader || branchQuery || userBranch || userWardArea;
-    const scopedWard = findWard(targetBranchIdentifier, branches);
+    const scopedWard = resolveWard(req, branches);
 
     let queryBuilder = supabase
       .from('ev_models')
@@ -94,36 +90,11 @@ class ModelsService {
       }
     }
 
-    let { data, error } = await queryBuilder;
-
-    if (error) throw error;
+    let data = await fetchAll(() => queryBuilder);
 
     if (data && Array.isArray(data)) {
-      data.forEach(m => {
-        const storedStock = Number(m.stock_count) || 0;
-        m.total_global_stock = storedStock;
-        m.stock_count = storedStock;
-
-        const modelLogs = Array.isArray(m.stock_logs) ? m.stock_logs : [];
-        if (scopedWard) {
-          const wardLogs = modelLogs.filter(log => isLogForWard(log, scopedWard));
-          const wardNetStock = wardLogs.reduce((acc, l) => acc + (Number(l.stock_added) || 0), 0);
-          m.stock_count = Math.min(storedStock, Math.max(0, wardNetStock));
-          m.scoped_ward = { id: scopedWard.id, name: scopedWard.name, ward_no: scopedWard.ward_no };
-        } else {
-          const wardSummaryMap = {};
-          modelLogs.forEach(log => {
-            const matched = findWard(log.branch_id || log.ward_no || log.ward_area, branches);
-            if (matched) {
-              const label = matched.ward_no ? `Ward ${matched.ward_no}: ${matched.name}` : matched.name;
-              const added = Number(log.stock_added) || 0;
-              wardSummaryMap[label] = (wardSummaryMap[label] || 0) + added;
-            }
-          });
-          m.ward_stock_summary = Object.entries(wardSummaryMap).map(([ward_label, stock]) => ({ ward_label, stock }));
-          m.scoped_ward = null;
-        }
-      });
+      const balances = await loadModelStock(data);
+      data.forEach(m => presentModelStock(m, scopedWard, branches, balances));
 
       // When a ward is scoped, filter stockStatus on the ward-calculated stock count:
       if (scopedWard && query.stockStatus) {
@@ -155,29 +126,13 @@ class ModelsService {
       queryBuilder = queryBuilder.eq('head_office_id', req.user.head_office_id);
     }
 
-    const { data, error } = await queryBuilder;
-    if (error) throw error;
+    const data = await fetchAll(() => queryBuilder);
 
-    const branchHeader = req?.headers?.['x-branch-id'];
-    const branchQuery = req?.query?.branch_id;
-    const userBranch = req?.user?.role === 'branch_admin' ? req?.user?.branch_id : null;
-    const userWardArea = req?.user?.role === 'branch_admin' ? req?.user?.ward_area : null;
-
-    const targetBranchIdentifier = branchHeader || branchQuery || userBranch || userWardArea;
-    const scopedWard = findWard(targetBranchIdentifier, branches);
+    const scopedWard = resolveWard(req, branches);
 
     if (data) {
-      data.forEach(m => {
-        const storedStock = Number(m.stock_count) || 0;
-        const modelLogs = Array.isArray(m.stock_logs) ? m.stock_logs : [];
-        if (scopedWard) {
-          const wardLogs = modelLogs.filter(log => isLogForWard(log, scopedWard));
-          const wardNetStock = wardLogs.reduce((acc, l) => acc + (Number(l.stock_added) || 0), 0);
-          m.stock_count = Math.min(storedStock, Math.max(0, wardNetStock));
-        } else {
-          m.stock_count = storedStock;
-        }
-      });
+      const balances = await loadModelStock(data);
+      data.forEach(m => presentModelStock(m, scopedWard, branches, balances));
     }
 
     return data;
@@ -278,41 +233,9 @@ class ModelsService {
     if (error) throw error;
     if (!data) throw new Error('Model not found');
 
-    const branchHeader = req?.headers?.['x-branch-id'];
-    const branchQuery = req?.query?.branch_id;
-    const userBranch = req?.user?.role === 'branch_admin' ? req?.user?.branch_id : null;
-    const userWardArea = req?.user?.role === 'branch_admin' ? req?.user?.ward_area : null;
+    const scopedWard = resolveWard(req, branches);
 
-    const targetBranchIdentifier = branchHeader || branchQuery || userBranch || userWardArea;
-    const scopedWard = findWard(targetBranchIdentifier, branches);
-
-    const modelLogs = Array.isArray(data.stock_logs) ? data.stock_logs : [];
-
-    if (scopedWard) {
-      const wardLogs = modelLogs.filter(log => isLogForWard(log, scopedWard));
-      const wardStockCount = wardLogs.reduce((acc, l) => acc + (Number(l.stock_added) || 0), 0);
-      data.stock_count = Math.max(0, wardStockCount);
-      data.total_global_stock = modelLogs.reduce((acc, l) => {
-        return findWard(l.branch_id || l.ward_no || l.ward_area, branches) ? acc + (Number(l.stock_added) || 0) : acc;
-      }, 0);
-      data.scoped_ward = { id: scopedWard.id, name: scopedWard.name, ward_no: scopedWard.ward_no };
-    } else {
-      const wardSummaryMap = {};
-      let validTotalStock = 0;
-      modelLogs.forEach(log => {
-        const matched = findWard(log.branch_id || log.ward_no || log.ward_area, branches);
-        if (matched) {
-          const label = matched.ward_no ? `Ward ${matched.ward_no}: ${matched.name}` : matched.name;
-          const added = Number(log.stock_added) || 0;
-          wardSummaryMap[label] = (wardSummaryMap[label] || 0) + added;
-          validTotalStock += added;
-        }
-      });
-      data.ward_stock_summary = Object.entries(wardSummaryMap).map(([ward_label, stock]) => ({ ward_label, stock }));
-      data.stock_count = validTotalStock;
-      data.total_global_stock = validTotalStock;
-      data.scoped_ward = null;
-    }
+    presentModelStock(data, scopedWard, branches, await loadModelStock([data]));
 
     return data;
   }
@@ -356,23 +279,10 @@ class ModelsService {
       ward_no: targetWard.ward_no ? Number(targetWard.ward_no) : null,
     };
     
-    const existingLogs = Array.isArray(model.stock_logs) ? model.stock_logs : [];
-    const updatedLogs = [...existingLogs, newLog];
-
-    const addedUnits = Number(stock_added) || 0;
-    const currentStock = Number(model.stock_count) || 0;
-    const newCount = currentStock + addedUnits;
-
-    const { data, error } = await supabase
-      .from('ev_models')
-      .update({ 
-        stock_count: newCount,
-        stock_logs: updatedLogs,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .select('*')
-      .single();
+    if (req?.user?.role === 'ho_admin' && (!req.user.head_office_id || targetWard.head_office_id !== req.user.head_office_id)) {
+      throw new Error('Access denied: Branch belongs to another Head Office');
+    }
+    const { data, error } = await supabase.rpc('edit_model_inventory', { p_model: id, p_patch: {}, p_append: newLog });
 
     if (error) throw error;
     return data;
@@ -417,14 +327,6 @@ class ModelsService {
         throw new Error('Stock log date cannot be set to a past date (back date not allowed).');
       }
 
-      const branches = await getLiveBranches();
-      let validStock = 0;
-      updateData.stock_logs.forEach(l => {
-        if (findWard(l.branch_id || l.ward_no || l.ward_area, branches)) {
-          validStock += (Number(l.stock_added) || 0);
-        }
-      });
-      updateData.stock_count = validStock;
     }
 
     const payload = {
@@ -432,24 +334,7 @@ class ModelsService {
       updated_at: new Date().toISOString()
     };
 
-    let { data, error } = await supabase
-      .from('ev_models')
-      .update(payload)
-      .eq('id', id)
-      .select('*')
-      .single();
-
-    if (error && (error.code === '42703' || error.message?.includes('kilometres'))) {
-      delete payload.kilometres;
-      const retry = await supabase
-        .from('ev_models')
-        .update(payload)
-        .eq('id', id)
-        .select('*')
-        .single();
-      data = retry.data;
-      error = retry.error;
-    }
+    const { data, error } = await supabase.rpc('edit_model_inventory', { p_model: id, p_patch: payload });
 
     if (error) {
       if (error.code === '23505') {
@@ -482,16 +367,7 @@ class ModelsService {
   }
 
   async resetModelStock(id) {
-    const { data, error } = await supabase
-      .from('ev_models')
-      .update({
-        stock_count: 0,
-        stock_logs: [],
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .select('*')
-      .single();
+    const { data, error } = await supabase.rpc('edit_model_inventory', { p_model: id, p_patch: {}, p_reset: true });
 
     if (error) throw error;
     return data;
@@ -503,18 +379,8 @@ class ModelsService {
    */
   async getWardStockBreakdown(query = {}, user = null) {
     const branches = await getLiveBranches();
-    const { data: allModels, error: mError } = await supabase
-      .from('ev_models')
-      .select('id, name, company, total_price, stock_count, stock_logs, is_active')
-      .eq('is_active', true);
-
-    if (mError) throw mError;
-
-    // Fetch active rentals count grouped by branch
-    const { data: activeRentals } = await supabase
-      .from('tenants')
-      .select('id, branch_id, ev_model_id')
-      .eq('status', 'rented');
+    const allModels = await fetchAll(() => supabase.from('ev_models').select('id, name, company, total_price, stock_count, stock_logs, is_active').eq('is_active', true));
+    const activeRentals = await fetchAll(() => supabase.from('tenants').select('id, branch_id, ev_model_id').eq('status', 'rented'));
 
     const rentalsByBranch = {};
     (activeRentals || []).forEach(r => {
@@ -526,27 +392,26 @@ class ModelsService {
     // If caller is branch_admin, filter to their branch only; if ho_admin, filter to their HO branches
     let targetBranches = branches;
     if (user && (user.role === 'branch_admin' || user.role === 'staff')) {
-      targetBranches = branches.filter(b => b.id === user.branch_id || b.ward_area === user.ward_area);
-    } else if (user && user.role === 'ho_admin' && user.head_office_id) {
-      targetBranches = branches.filter(b => b.head_office_id === user.head_office_id);
+      targetBranches = branches.filter(b => user.branch_id && b.id === user.branch_id);
+    } else if (user && user.role === 'ho_admin') {
+      targetBranches = branches.filter(b => user.head_office_id && b.head_office_id === user.head_office_id);
     }
 
+    const balances = await loadModelStock(allModels || []);
     const breakdown = targetBranches.map(b => {
       const modelsBreakdown = (allModels || []).map(m => {
-        const logs = Array.isArray(m.stock_logs) ? m.stock_logs : [];
-        const wardLogs = logs.filter(l => isLogForWard(l, b));
-        const stock = wardLogs.reduce((acc, l) => acc + (Number(l.stock_added) || 0), 0);
+        const stock = Number(balances.get(m.id)?.branches[b.id]) || 0;
         return {
           id: m.id,
           name: m.name,
           company: m.company,
-          stock: Math.min(Number(m.stock_count) || 0, Math.max(0, stock)),
+          stock,
         };
       });
 
       const totalStock = modelsBreakdown.reduce((sum, mb) => sum + mb.stock, 0);
       const activeRentalCount = rentalsByBranch[b.id] || 0;
-      const availableStock = Math.max(0, totalStock - activeRentalCount);
+      const availableStock = totalStock;
 
       return {
         id: b.id,

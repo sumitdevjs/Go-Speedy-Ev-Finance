@@ -1,6 +1,7 @@
 const supabase = require('../../config/db');
 const { applyScope } = require('../../middleware/scope');
 const crypto = require('crypto');
+const { fetchAll } = require('../../utils/fetchAll');
 
 class PenaltiesService {
   /**
@@ -26,11 +27,11 @@ class PenaltiesService {
     }
 
     if (user.role === 'branch_admin' || user.role === 'staff') {
-      if (tenant.branch_id && user.branch_id && tenant.branch_id !== user.branch_id) {
+      if (!tenant.branch_id || !user.branch_id || tenant.branch_id !== user.branch_id) {
         throw new Error('Access denied: Customer belongs to another branch');
       }
     } else if (user.role === 'ho_admin') {
-      if (tenant.head_office_id && user.head_office_id && tenant.head_office_id !== user.head_office_id) {
+      if (!tenant.head_office_id || !user.head_office_id || tenant.head_office_id !== user.head_office_id) {
         throw new Error('Access denied: Customer belongs to another Head Office');
       }
     }
@@ -81,14 +82,7 @@ class PenaltiesService {
    * Get all penalties with optional scoping and filters
    */
   async getPenalties(query = {}, req = null) {
-    let queryBuilder = supabase
-      .from('audit_logs')
-      .select('*')
-      .eq('entity_type', 'penalty')
-      .order('created_at', { ascending: false });
-
-    const { data: logs, error } = await queryBuilder;
-    if (error) throw error;
+    const logs = await fetchAll(() => supabase.from('audit_logs').select('*').eq('entity_type', 'penalty').order('created_at', { ascending: false }));
 
     // Deduplicate audit events by canonical penalty_id to prevent inflated metrics,
     // ensuring immutable ownership and tenant fields are preserved from levy events.
@@ -147,7 +141,7 @@ class PenaltiesService {
       const effectiveRole = role === 'super_admin' || (role === 'admin' && !req.user.ward_area) ? 'super_admin' : role;
       
       if (effectiveRole === 'branch_admin' || effectiveRole === 'staff') {
-        const userBranch = branch_id || req.headers['x-branch-id'];
+        const userBranch = branch_id;
         if (!userBranch) {
           penalties = [];
         } else {
@@ -168,7 +162,7 @@ class PenaltiesService {
     }
 
     // Apply status filter
-    if (query.status) {
+    if (query.status && query.status !== 'all') {
       penalties = penalties.filter(p => p.status === query.status);
     }
 
@@ -205,63 +199,9 @@ class PenaltiesService {
    * Waive a penalty (Super Admin / Authorized admin)
    */
   async waivePenalty(penaltyId, user, waiveReason = '') {
-    // Find the log entry with this penalty_id
-    const { data: logs, error } = await supabase
-      .from('audit_logs')
-      .select('*')
-      .eq('entity_type', 'penalty')
-      .order('created_at', { ascending: false });
-
+    const { data, error } = await supabase.rpc('waive_penalty', { p_penalty: penaltyId, p_actor: user.id, p_reason: waiveReason });
     if (error) throw error;
-
-    const targetLog = (logs || []).find(l => l.changes && l.changes.penalty_id === penaltyId);
-    if (!targetLog) {
-      throw new Error('Penalty not found');
-    }
-
-    if (user.role === 'branch_admin' || user.role === 'staff') {
-      if (targetLog.changes?.branch_id && user.branch_id && targetLog.changes.branch_id !== user.branch_id) {
-        throw new Error('Access denied: Cannot waive penalty belonging to another branch');
-      }
-    } else if (user.role === 'ho_admin') {
-      if (targetLog.changes?.head_office_id && user.head_office_id && targetLog.changes.head_office_id !== user.head_office_id) {
-        throw new Error('Access denied: Cannot waive penalty belonging to another Head Office');
-      }
-    }
-
-    const updatedChanges = {
-      ...targetLog.changes,
-      status: 'waived',
-      waived_by: user.id,
-      waived_by_name: user.name || 'Super Admin',
-      waived_at: new Date().toISOString(),
-      waived_reason: waiveReason || 'Waived by Super Admin'
-    };
-
-    const { error: updateError } = await supabase
-      .from('audit_logs')
-      .update({ changes: updatedChanges })
-      .eq('id', targetLog.id);
-
-    if (updateError) throw updateError;
-
-    // Log the waiver action
-    await supabase.from('audit_logs').insert([{
-      user_id: user.id,
-      user_role: user.role,
-      action: 'PENALTY_WAIVED',
-      entity_type: 'penalty',
-      entity_id: updatedChanges.tenant_id,
-      changes: {
-        penalty_id: penaltyId,
-        amount: updatedChanges.amount,
-        waived_by: user.id,
-        waived_by_name: user.name,
-        reason: waiveReason
-      }
-    }]);
-
-    return { success: true, penalty: updatedChanges };
+    return data;
   }
 
   /**
@@ -292,28 +232,7 @@ class PenaltiesService {
       }
     }
 
-    const { data: logs } = await supabase
-      .from('audit_logs')
-      .select('*')
-      .eq('entity_type', 'penalty')
-      .eq('entity_id', tenantId);
-
-    const penaltyMap = new Map();
-    (logs || []).forEach(l => {
-      const p = l.changes;
-      if (p && p.penalty_id) {
-        if (!penaltyMap.has(p.penalty_id)) {
-          penaltyMap.set(p.penalty_id, { ...p });
-        } else {
-          const existing = penaltyMap.get(p.penalty_id);
-          if (l.action === 'PENALTY_WAIVED' || p.status === 'waived') {
-            existing.status = 'waived';
-          }
-        }
-      }
-    });
-
-    const penalties = Array.from(penaltyMap.values());
+    const { data: penalties } = await this.getPenalties({ tenant_id: tenantId }, req);
     const unpaid = penalties.filter(p => p.status === 'unpaid');
     const totalUnpaid = unpaid.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
 

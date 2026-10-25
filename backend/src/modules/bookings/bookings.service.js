@@ -108,99 +108,23 @@ class BookingsService {
       throw new Error('ev_model_id is required to convert a booking into a rental');
     }
 
-    // 2. Fetch Model & Stock Check with atomic CAS retry loop
-    let reserved = false;
-    let attempts = 0;
-    while (!reserved && attempts < 5) {
-      attempts++;
-      const { data: model, error: modelError } = await supabase
-        .from('ev_models')
-        .select('total_price, stock_count')
-        .eq('id', tenantData.ev_model_id)
-        .single();
-
-      if (modelError || !model) throw new Error('EV Model not found');
-      if (model.stock_count <= 0) throw new Error('EV Model out of stock');
-
-      const currentStock = model.stock_count;
-
-      const { data: updatedStock, error: stockError } = await supabase
-        .from('ev_models')
-        .update({ stock_count: currentStock - 1 })
-        .eq('id', tenantData.ev_model_id)
-        .eq('stock_count', currentStock)
-        .gt('stock_count', 0)
-        .select('id, stock_count');
-
-      if (!stockError && updatedStock && updatedStock.length > 0) {
-        reserved = true;
-        break;
-      }
+    const startDate = tenantData.start_date ? new Date(tenantData.start_date) : new Date();
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + (Number(tenantData.total_months) || 24));
+    if (tenantData.status !== 'direct_purchase' && startDate.toISOString().split('T')[0] < new Date().toISOString().split('T')[0]) {
+      throw new Error('Contract Start Date cannot be in the past');
     }
-
-    if (!reserved) {
-      throw new Error('EV Model out of stock');
-    }
-
-    try {
-      // 4. Create Rental
-      const startDate = tenantData.start_date ? new Date(tenantData.start_date) : new Date();
-      const totalMonths = Number(tenantData.total_months) || 24;
-      const expectedEndDate = new Date(startDate);
-      expectedEndDate.setMonth(expectedEndDate.getMonth() + totalMonths);
-
-      const { data: tenant, error: tenantError } = await supabase
-        .from('tenants')
-        .insert([{
-          ...tenantData,
-          branch_id: tenantData.branch_id || booking.branch_id || null,
-          head_office_id: tenantData.head_office_id || booking.head_office_id || null,
-          total_price: model.total_price,
-          booking_amount: booking.booking_amount,
-          name: tenantData.name || booking.name,
-          phone: tenantData.phone || booking.phone,
-          start_date: startDate.toISOString().split('T')[0],
-          expected_end_date: expectedEndDate.toISOString().split('T')[0],
-          created_by: createdBy
-        }])
-        .select('*')
-        .single();
-
-      if (tenantError) throw tenantError;
-
-      // 5. Update Booking Status
-      await supabase
-        .from('bookings')
-        .update({ status: 'converted', converted_to: tenant.id, converted_type: tenantData.status === 'direct_purchase' ? 'direct_purchase' : 'rental' })
-        .eq('id', id);
-
-      return tenant;
-    } catch (error) {
-      // Rollback stock with atomic CAS retry loop
-      for (let r = 0; r < 5; r++) {
-        const { data: freshModel } = await supabase
-          .from('ev_models')
-          .select('stock_count')
-          .eq('id', tenantData.ev_model_id)
-          .single();
-        if (freshModel) {
-          const currentStock = freshModel.stock_count;
-          const { data: rb } = await supabase
-            .from('ev_models')
-            .update({ stock_count: currentStock + 1 })
-            .eq('id', tenantData.ev_model_id)
-            .eq('stock_count', currentStock)
-            .select('id');
-          if (rb && rb.length > 0) break;
-        }
-      }
-
-      if (error.code === '23505') {
-        console.error('[convertBooking] Unique constraint violation:', error);
-        throw new Error('Unique constraint violation: a record with this value already exists.');
-      }
-      throw error;
-    }
+    const { data, error } = await supabase.rpc('create_contract', {
+      p_actor: createdBy, p_booking: id,
+      p_tenant: {
+        ...tenantData, name: tenantData.name || booking.name, phone: tenantData.phone || booking.phone,
+        start_date: tenantData.status === 'direct_purchase' ? null : startDate.toISOString().split('T')[0],
+        expected_end_date: tenantData.status === 'direct_purchase' ? null : endDate.toISOString().split('T')[0],
+      },
+    });
+    if (error?.code === '23505') throw new Error('Unique constraint violation: an active contract already uses this phone or hardware.');
+    if (error) throw error;
+    return data;
   }
 
   authorizeBooking(booking, req) {
@@ -235,6 +159,7 @@ class BookingsService {
       .from('bookings')
       .update({ status: 'cancelled' })
       .eq('id', id)
+      .eq('status', 'pending')
       .select('*')
       .single();
 

@@ -1,8 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  devIndicators: {
-    buildActivity: false,
-  },
+  outputFileTracingRoot: __dirname,
+  devIndicators: false,
   compiler: {
     removeConsole: true,
   },

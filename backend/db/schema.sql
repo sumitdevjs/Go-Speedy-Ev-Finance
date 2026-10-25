@@ -253,7 +253,7 @@ ALTER TABLE tenants ADD COLUMN IF NOT EXISTS include_gst BOOLEAN NOT NULL DEFAUL
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS gst_percent NUMERIC(5,2) NOT NULL DEFAULT 0.00;
 
 -- Unique partial indexes (scoped to active contracts to allow re-rental and repeat customers)
-CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_phone_active      ON tenants(phone) WHERE phone IS NOT NULL AND status IN ('rented', 'direct_purchase');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_phone_active      ON tenants(phone) WHERE phone IS NOT NULL AND status = 'rented';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_chassis_active    ON tenants(chassis_no) WHERE chassis_no IS NOT NULL AND status IN ('rented', 'direct_purchase');
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_motor_active      ON tenants(motor_no) WHERE motor_no IS NOT NULL AND status IN ('rented', 'direct_purchase');
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_controller_active ON tenants(controller_no) WHERE controller_no IS NOT NULL AND status IN ('rented', 'direct_purchase');

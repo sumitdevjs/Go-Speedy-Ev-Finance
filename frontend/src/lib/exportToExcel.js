@@ -98,9 +98,8 @@ export const fetchAllForExport = async (api, endpoint, params = {}, chunkSize = 
   let allRecords = [];
   let currentPage = 1;
   let hasMore = true;
-  const maxPages = 40;
 
-  while (hasMore && currentPage <= maxPages) {
+  while (hasMore) {
     const res = await api.get(endpoint, {
       params: {
         ...params,
@@ -117,15 +116,15 @@ export const fetchAllForExport = async (api, endpoint, params = {}, chunkSize = 
       const totalPages =
         res.data.pagination?.totalPages ||
         res.data.meta?.totalPages ||
-        1;
+        null;
 
-      if (currentPage >= totalPages || records.length < chunkSize) {
+      if ((totalPages && currentPage >= totalPages) || records.length < chunkSize) {
         hasMore = false;
       } else {
         currentPage++;
       }
     } else {
-      hasMore = false;
+      throw new Error('Export request failed; incomplete data was not exported.');
     }
   }
 

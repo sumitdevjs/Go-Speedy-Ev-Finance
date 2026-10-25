@@ -231,7 +231,7 @@ class StaffService {
         if (before.role !== 'branch_admin' && before.role !== 'staff') {
           throw new Error('Access denied: Head Office Admins can only edit Branch/Ward Admins and Staff.');
         }
-        if (before.head_office_id && before.head_office_id !== req?.user?.head_office_id) {
+        if (!before.head_office_id || !req?.user?.head_office_id || before.head_office_id !== req.user.head_office_id) {
           throw new Error('Access denied: Cannot edit users belonging to another Head Office');
         }
         if (updates.role && updates.role !== 'branch_admin' && updates.role !== 'staff') {
@@ -242,7 +242,7 @@ class StaffService {
         if (before.role !== 'staff') {
           throw new Error('Access denied: Ward Admins can only edit Staff members.');
         }
-        if (before.branch_id && before.branch_id !== req?.user?.branch_id) {
+        if (!before.branch_id || !req?.user?.branch_id || before.branch_id !== req.user.branch_id) {
           throw new Error('Access denied: Cannot edit staff belonging to another Branch');
         }
         if (updates.role && updates.role !== 'staff') {
@@ -311,7 +311,7 @@ class StaffService {
           if (targetUser.role !== 'branch_admin' && targetUser.role !== 'staff') {
             throw new Error('Access denied: Head Office Admin can only change passwords for Branch/Ward Admins and Staff.');
           }
-          if (targetUser.head_office_id && targetUser.head_office_id !== requestingUser.head_office_id) {
+          if (!targetUser.head_office_id || !requestingUser.head_office_id || targetUser.head_office_id !== requestingUser.head_office_id) {
             throw new Error('Access denied: User does not belong to your Head Office.');
           }
         }
@@ -320,7 +320,7 @@ class StaffService {
           if (targetUser.role !== 'staff') {
             throw new Error('Access denied: Ward Admin can only change passwords for Ward Staff.');
           }
-          if (targetUser.branch_id && targetUser.branch_id !== requestingUser.branch_id) {
+          if (!targetUser.branch_id || !requestingUser.branch_id || targetUser.branch_id !== requestingUser.branch_id) {
             throw new Error('Access denied: Staff does not belong to your Ward/Branch.');
           }
         } else {
@@ -359,14 +359,14 @@ class StaffService {
           if (targetUser.role === 'super_admin' || targetUser.role === 'ho_admin' || targetUser.role === 'admin') {
             throw new Error('Access denied: Head Office Admin cannot modify Super Admin or HO Admin accounts');
           }
-          if (targetUser.head_office_id && requestingUser.head_office_id && targetUser.head_office_id !== requestingUser.head_office_id) {
+          if (!targetUser.head_office_id || !requestingUser.head_office_id || targetUser.head_office_id !== requestingUser.head_office_id) {
             throw new Error('Access denied: User does not belong to your Head Office');
           }
         } else if (requesterRole === 'branch_admin') {
           if (targetUser.role !== 'staff') {
             throw new Error('Access denied: Branch Admin can only modify Staff members');
           }
-          if (targetUser.branch_id && requestingUser.branch_id && targetUser.branch_id !== requestingUser.branch_id) {
+          if (!targetUser.branch_id || !requestingUser.branch_id || targetUser.branch_id !== requestingUser.branch_id) {
             throw new Error('Access denied: Staff does not belong to your Branch');
           }
         } else {

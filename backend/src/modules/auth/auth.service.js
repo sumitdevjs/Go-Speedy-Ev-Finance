@@ -42,7 +42,7 @@ class AuthService {
     }
 
     if (!user.password_hash) {
-      throw new Error('No password set for this account. Please use Forgot / Reset Password.');
+      throw new Error('No password set for this account. Please reset your password or contact your administrator.');
     }
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
@@ -99,6 +99,7 @@ class AuthService {
 
     const accessToken = generateAccessToken({
       id: user.id,
+      auth_version: user.auth_version || 0,
       role: effectiveRole,
       name: user.name,
       email: user.email,
@@ -111,15 +112,17 @@ class AuthService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
-    const { error } = await supabase
+    const { data: sessionRows, error } = await supabase
       .from('users')
       .update({
         refresh_token_hash: refreshTokenHash,
         refresh_token_expires_at: expiresAt.toISOString(),
       })
-      .eq('id', user.id);
+      .eq('id', user.id)
+      .eq('auth_version', user.auth_version || 0)
+      .select('id');
 
-    if (error) {
+    if (error || !sessionRows?.length) {
       throw new Error('Failed to create session');
     }
 
@@ -138,7 +141,6 @@ class AuthService {
       refreshToken,
     };
   }
-
   async requestPasswordReset(email) {
     if (!email) {
       throw new Error('Email address is required.');
