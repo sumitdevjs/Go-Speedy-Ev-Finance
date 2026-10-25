@@ -25,9 +25,12 @@ class BookingsController {
   async convert(req, res) {
     try {
       const { id } = req.params;
-      const data = await bookingsService.convertBooking(id, req.body, req.user.id);
+      const data = await bookingsService.convertBooking(id, req.body, req.user.id, req);
       return successResponse(res, 200, data, 'Booking converted to rental successfully');
     } catch (error) {
+      if (error.message?.startsWith('Access denied')) {
+        return errorResponse(res, 403, error.message);
+      }
       if (error.message.startsWith('Booking status is') || error.message.includes('ev_model_id is required') || error.message.includes('out of stock') || error.message.includes('Unique constraint violation')) {
         return errorResponse(res, 400, error.message);
       }
@@ -39,10 +42,13 @@ class BookingsController {
   async cancel(req, res) {
     try {
       const { id } = req.params;
-      const data = await bookingsService.cancelBooking(id);
+      const data = await bookingsService.cancelBooking(id, req);
       return successResponse(res, 200, data, 'Booking cancelled successfully');
     } catch (error) {
-      if (error.message.includes('not pending')) {
+      if (error.message?.startsWith('Access denied')) {
+        return errorResponse(res, 403, error.message);
+      }
+      if (error.message.includes('not pending') || error.message === 'Booking not found') {
         return errorResponse(res, 400, error.message);
       }
       console.error(error);
@@ -53,9 +59,12 @@ class BookingsController {
   async update(req, res) {
     try {
       const { id } = req.params;
-      const data = await bookingsService.updateBooking(id, req.body);
+      const data = await bookingsService.updateBooking(id, req.body, req);
       return successResponse(res, 200, data, 'Booking updated successfully');
     } catch (error) {
+      if (error.message?.startsWith('Access denied')) {
+        return errorResponse(res, 403, error.message);
+      }
       if (error.message === 'Booking not found') {
         return errorResponse(res, 404, error.message);
       }

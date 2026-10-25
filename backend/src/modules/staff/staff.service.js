@@ -5,6 +5,17 @@ const { getPaginationOptions, getPaginationMeta } = require('../../utils/paginat
 const { buildSearchFilter } = require('../../utils/searchFilter');
 const { applyScope, resolveCreateScope } = require('../../middleware/scope');
 
+const sanitizeUser = (user) => {
+  if (!user) return null;
+  const safe = { ...user };
+  delete safe.password_hash;
+  delete safe.refresh_token_hash;
+  delete safe.reset_otp_hash;
+  delete safe.reset_otp_expires_at;
+  delete safe.refresh_token_expires_at;
+  return safe;
+};
+
 class StaffService {
   async getAllStaff(query = {}, req = null) {
     const { page, limit, offset } = getPaginationOptions(query);
@@ -93,21 +104,37 @@ class StaffService {
     }
 
     const meta = getPaginationMeta(count, page, limit);
-    return { data, meta };
+    return { data: (data || []).map(sanitizeUser), meta };
   }
 
   async createStaff({ name, phone, email, password, role, ward_area, branch_id, head_office_id, verification_doc }, createdBy, req = null) {
     const requesterRole = req?.user?.role;
+    const VALID_ROLES = ['super_admin', 'ho_admin', 'branch_admin', 'staff'];
+    const targetRole = role || 'staff';
+
+    if (!VALID_ROLES.includes(targetRole)) {
+      throw new Error(`Access denied: Invalid role '${targetRole}'. Allowed roles: ${VALID_ROLES.join(', ')}`);
+    }
+
+    if (requesterRole === 'staff') {
+      throw new Error('Access denied: Staff members cannot create accounts');
+    }
+
     if (requesterRole === 'branch_admin') {
-      if (role && role !== 'staff') {
+      if (targetRole !== 'staff') {
         throw new Error('Access denied: Branch Admins can only create Staff members');
       }
       role = 'staff';
+      branch_id = req.user.branch_id;
+      head_office_id = req.user.head_office_id;
     } else if (requesterRole === 'ho_admin') {
-      if (role === 'super_admin' || role === 'ho_admin') {
+      if (targetRole !== 'branch_admin' && targetRole !== 'staff') {
         throw new Error('Access denied: Head Office Admins can only create Branch Admins and Staff');
       }
+      role = targetRole;
       head_office_id = req.user.head_office_id;
+    } else {
+      role = targetRole;
     }
 
     const password_hash = await bcrypt.hash(password, 10);
@@ -129,7 +156,7 @@ class StaffService {
       phone,
       email: email || null,
       password_hash,
-      role: role || 'staff',
+      role,
       ward_area: ward_area || assignedBranchId || null,
       verification_doc: verification_doc || null,
       is_active: true,
@@ -163,7 +190,7 @@ class StaffService {
       throw error;
     }
     
-    return data;
+    return sanitizeUser(data);
   }
 
   async updateStaff(id, updates, requestingUserId, req = null) {
@@ -257,7 +284,7 @@ class StaffService {
     }
 
     const diff = buildDiff(before || {}, updates);
-    return { data, diff };
+    return { data: sanitizeUser(data), diff };
   }
 
   async changePassword(id, newPassword, requestingUser = null) {
@@ -312,17 +339,41 @@ class StaffService {
     if (error) throw error;
   }
 
-  async toggleActive(id, is_active, requestingUserId) {
+  async toggleActive(id, is_active, requestingUser) {
+    const requestingUserId = typeof requestingUser === 'object' ? requestingUser.id : requestingUser;
     if (id === requestingUserId) {
       throw new Error('Cannot deactivate yourself');
     }
 
-    const { data: before, error: fetchError } = await supabase
+    const { data: targetUser, error: fetchError } = await supabase
       .from('users')
-      .select('is_active')
+      .select('id, role, branch_id, head_office_id, is_active')
       .eq('id', id)
       .single();
-    if (fetchError) throw fetchError;
+    if (fetchError || !targetUser) throw new Error('User not found');
+
+    if (requestingUser && typeof requestingUser === 'object') {
+      const requesterRole = requestingUser.role;
+      if (requesterRole !== 'super_admin') {
+        if (requesterRole === 'ho_admin') {
+          if (targetUser.role === 'super_admin' || targetUser.role === 'ho_admin' || targetUser.role === 'admin') {
+            throw new Error('Access denied: Head Office Admin cannot modify Super Admin or HO Admin accounts');
+          }
+          if (targetUser.head_office_id && requestingUser.head_office_id && targetUser.head_office_id !== requestingUser.head_office_id) {
+            throw new Error('Access denied: User does not belong to your Head Office');
+          }
+        } else if (requesterRole === 'branch_admin') {
+          if (targetUser.role !== 'staff') {
+            throw new Error('Access denied: Branch Admin can only modify Staff members');
+          }
+          if (targetUser.branch_id && requestingUser.branch_id && targetUser.branch_id !== requestingUser.branch_id) {
+            throw new Error('Access denied: Staff does not belong to your Branch');
+          }
+        } else {
+          throw new Error('Access denied: Unauthorized to modify user status');
+        }
+      }
+    }
 
     const { data, error } = await supabase
       .from('users')
@@ -333,7 +384,7 @@ class StaffService {
 
     if (error) throw error;
 
-    const diff = buildDiff(before, { is_active });
+    const diff = buildDiff(targetUser, { is_active });
     return { data, diff };
   }
 }

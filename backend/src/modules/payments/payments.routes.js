@@ -13,12 +13,28 @@ const recordPaymentSchema = z.object({
   payment_date: z.string(), // YYYY-MM-DD
   mode: z.enum(['cash', 'online']),
   notes: z.string().nullable().optional(),
-  gst_amount: z.number().min(0).optional()
+  gst_amount: z.number().min(0).optional(),
+  late_fee_paid: z.number().min(0, 'late_fee_paid cannot be negative').optional(),
+  is_penalty_waiver: z.boolean().optional()
 });
 
 const validateBody = (schema) => (req, res, next) => {
-  schema.parse(req.body);
-  next();
+  try {
+    req.body = schema.parse(req.body);
+    next();
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const issues = err.issues || err.errors || [];
+      return res.status(400).json({
+        success: false,
+        message: issues.map(e => e.message).join(', ') || err.message,
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      message: err.message || 'Validation error'
+    });
+  }
 };
 
 /**

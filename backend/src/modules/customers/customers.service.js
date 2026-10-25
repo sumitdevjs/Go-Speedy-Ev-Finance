@@ -204,26 +204,29 @@ class CustomersService {
     const customerPhone = primaryTenant.phone;
 
     // Fetch all contracts for this phone
-    const { data: allContracts } = await supabase
+    const { data: allContracts, error: contractsError } = await supabase
       .from('tenants')
       .select('*, ev_models(name, company), branches(id, name, code)')
       .eq('phone', customerPhone);
+    if (contractsError) throw contractsError;
 
     const contractIds = (allContracts || [primaryTenant]).map(c => c.id);
 
     // Fetch all payments across their contracts
-    const { data: allPayments } = await supabase
+    const { data: allPayments, error: paymentsError } = await supabase
       .from('payments')
       .select('*, users(name)')
       .in('tenant_id', contractIds)
       .order('payment_date', { ascending: false });
+    if (paymentsError) throw paymentsError;
 
     // Fetch all penalties levied
-    const { data: pLogs } = await supabase
+    const { data: pLogs, error: pLogsError } = await supabase
       .from('audit_logs')
       .select('*')
       .eq('entity_type', 'penalty')
       .in('entity_id', contractIds);
+    if (pLogsError) throw pLogsError;
 
     const penalties = (pLogs || []).map(l => ({
       ...l.changes,

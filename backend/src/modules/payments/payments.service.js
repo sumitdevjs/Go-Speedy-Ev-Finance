@@ -7,8 +7,28 @@ class PaymentsService {
     let query = supabase.from('payments').select('*, users(id, name, phone, role)');
     
     if (tenantId) {
+      const { data: tenant, error: tErr } = await supabase
+        .from('tenants')
+        .select('id, branch_id, head_office_id')
+        .eq('id', tenantId)
+        .maybeSingle();
+
+      if (tErr || !tenant) return [];
+
+      if (req?.user) {
+        const u = req.user;
+        if ((u.role === 'branch_admin' || u.role === 'staff') && tenant.branch_id && u.branch_id && tenant.branch_id !== u.branch_id) {
+          throw new Error('Access denied: Unauthorized access to tenant payments');
+        }
+        if (u.role === 'ho_admin' && tenant.head_office_id && u.head_office_id && tenant.head_office_id !== u.head_office_id) {
+          throw new Error('Access denied: Tenant payments belong to another Head Office');
+        }
+      }
+
       query = query.eq('tenant_id', tenantId);
-    } else if (req) {
+    }
+
+    if (req) {
       query = applyScope(query, req);
     }
 
@@ -130,8 +150,22 @@ class PaymentsService {
     };
     if (tenant.branch_id) insertPayload.branch_id = tenant.branch_id;
     if (tenant.head_office_id) insertPayload.head_office_id = tenant.head_office_id;
-    if (late_fee_paid) insertPayload.late_fee_paid = late_fee_paid;
-    if (is_penalty_waiver !== undefined) insertPayload.is_penalty_waiver = Boolean(is_penalty_waiver);
+
+    if (late_fee_paid !== undefined && late_fee_paid !== null) {
+      const numLate = Number(late_fee_paid);
+      if (isNaN(numLate) || numLate < 0) {
+        throw new Error('late_fee_paid cannot be negative');
+      }
+      insertPayload.late_fee_paid = numLate;
+    }
+
+    if (is_penalty_waiver) {
+      const callerRole = req?.user?.role;
+      if (callerRole !== 'super_admin' && callerRole !== 'ho_admin') {
+        throw new Error('Access denied: Only Head Office or Super Admin can grant penalty waivers');
+      }
+      insertPayload.is_penalty_waiver = true;
+    }
 
     const { data: newPayment, error: paymentError } = await supabase
       .from('payments')

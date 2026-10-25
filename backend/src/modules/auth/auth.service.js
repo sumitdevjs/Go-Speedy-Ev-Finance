@@ -298,13 +298,12 @@ class AuthService {
 
     const updatePayload = {
       password_hash: newPasswordHash,
+      refresh_token_hash: null,
+      refresh_token_expires_at: null,
+      reset_otp_hash: null,
+      reset_otp_expires_at: null,
       updated_at: new Date().toISOString(),
     };
-
-    try {
-      updatePayload.reset_otp_hash = null;
-      updatePayload.reset_otp_expires_at = null;
-    } catch (_) { }
 
     let { error: updateErr } = await supabase
       .from('users')
@@ -314,6 +313,8 @@ class AuthService {
     if (updateErr && updateErr.message?.includes('reset_otp')) {
       const fallbackPayload = {
         password_hash: newPasswordHash,
+        refresh_token_hash: null,
+        refresh_token_expires_at: null,
         updated_at: new Date().toISOString(),
       };
       const retry = await supabase
@@ -441,8 +442,11 @@ class AuthService {
       throw new Error('User not found');
     }
 
-    if (currentPassword) {
-      const match = await bcrypt.compare(currentPassword, user.password_hash || '');
+    if (user.password_hash) {
+      if (!currentPassword) {
+        throw new Error('Current password is required');
+      }
+      const match = await bcrypt.compare(currentPassword, user.password_hash);
       if (!match) {
         throw new Error('Current password is incorrect');
       }
@@ -454,6 +458,8 @@ class AuthService {
       .from('users')
       .update({
         password_hash: newHash,
+        refresh_token_hash: null,
+        refresh_token_expires_at: null,
         updated_at: new Date().toISOString()
       })
       .eq('id', userId);

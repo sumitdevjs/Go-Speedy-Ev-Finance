@@ -100,29 +100,27 @@ class ModelsService {
 
     if (data && Array.isArray(data)) {
       data.forEach(m => {
-        const modelLogs = Array.isArray(m.stock_logs) ? m.stock_logs : [];
-        m.total_global_stock = m.stock_count;
+        const storedStock = Number(m.stock_count) || 0;
+        m.total_global_stock = storedStock;
+        m.stock_count = storedStock;
 
+        const modelLogs = Array.isArray(m.stock_logs) ? m.stock_logs : [];
         if (scopedWard) {
           const wardLogs = modelLogs.filter(log => isLogForWard(log, scopedWard));
-          const wardStockCount = wardLogs.reduce((acc, l) => acc + (Number(l.stock_added) || 0), 0);
-          m.stock_count = Math.max(0, wardStockCount);
+          const wardNetStock = wardLogs.reduce((acc, l) => acc + (Number(l.stock_added) || 0), 0);
+          m.stock_count = Math.min(storedStock, Math.max(0, wardNetStock));
           m.scoped_ward = { id: scopedWard.id, name: scopedWard.name, ward_no: scopedWard.ward_no };
         } else {
           const wardSummaryMap = {};
-          let validTotalStock = 0;
           modelLogs.forEach(log => {
             const matched = findWard(log.branch_id || log.ward_no || log.ward_area, branches);
             if (matched) {
               const label = matched.ward_no ? `Ward ${matched.ward_no}: ${matched.name}` : matched.name;
               const added = Number(log.stock_added) || 0;
               wardSummaryMap[label] = (wardSummaryMap[label] || 0) + added;
-              validTotalStock += added;
             }
           });
           m.ward_stock_summary = Object.entries(wardSummaryMap).map(([ward_label, stock]) => ({ ward_label, stock }));
-          m.stock_count = validTotalStock;
-          m.total_global_stock = validTotalStock;
           m.scoped_ward = null;
         }
       });
@@ -365,12 +363,9 @@ class ModelsService {
     const existingLogs = Array.isArray(model.stock_logs) ? model.stock_logs : [];
     const updatedLogs = [...existingLogs, newLog];
 
-    let newCount = 0;
-    updatedLogs.forEach(l => {
-      if (findWard(l.branch_id || l.ward_no || l.ward_area, branches)) {
-        newCount += (Number(l.stock_added) || 0);
-      }
-    });
+    const addedUnits = Number(stock_added) || 0;
+    const currentStock = Number(model.stock_count) || 0;
+    const newCount = currentStock + addedUnits;
 
     const { data, error } = await supabase
       .from('ev_models')

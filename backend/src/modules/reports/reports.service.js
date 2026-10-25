@@ -2,25 +2,59 @@ const supabase = require('../../config/db');
 const { calcBalance } = require('../../utils/balanceCalc');
 const { applyScope } = require('../../middleware/scope');
 
+async function fetchAll(buildQuery) {
+  const PAGE_SIZE = 1000;
+  let allRows = [];
+  let from = 0;
+
+  try {
+    const q = buildQuery();
+    if (typeof q.range !== 'function') {
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    }
+
+    while (true) {
+      const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1);
+      if (error) {
+        const { data: directData, error: directErr } = await buildQuery();
+        if (directErr) throw directErr;
+        return directData || [];
+      }
+      if (!data || data.length === 0) break;
+      allRows.push(...data);
+      if (data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+    }
+    return allRows;
+  } catch (err) {
+    const { data: directData, error: directErr } = await buildQuery();
+    if (directErr) throw directErr;
+    return directData || [];
+  }
+}
+
 class ReportsService {
   async getCollectionReport(query = {}, req = null) {
-    let paymentsQuery = supabase
-      .from('payments')
-      .select('*, users(name), branches(name, code)');
+    const payments = await fetchAll(() => {
+      let q = supabase
+        .from('payments')
+        .select('*, users(name), branches(name, code)');
 
-    if (req) {
-      paymentsQuery = applyScope(paymentsQuery, req);
-    }
+      if (req) {
+        q = applyScope(q, req);
+      }
 
-    if (query.start_date) {
-      paymentsQuery = paymentsQuery.gte('payment_date', query.start_date);
-    }
-    if (query.end_date) {
-      paymentsQuery = paymentsQuery.lte('payment_date', query.end_date);
-    }
+      if (query.start_date) {
+        q = q.gte('payment_date', query.start_date);
+      }
+      if (query.end_date) {
+        q = q.lte('payment_date', query.end_date);
+      }
 
-    const { data: payments, error } = await paymentsQuery.order('payment_date', { ascending: false });
-    if (error) throw error;
+      return q.order('payment_date', { ascending: false });
+    });
 
     let totalCollected = 0;
     let cashTotal = 0;
@@ -65,38 +99,62 @@ class ReportsService {
   }
 
   async getOverdueReport(query = {}, req = null) {
-    let tenantsQuery = supabase
-      .from('tenants')
-      .select('*, ev_models(name, company), branches(id, name, code)')
-      .eq('status', 'rented');
+    const tenants = await fetchAll(() => {
+      let q = supabase
+        .from('tenants')
+        .select('*, ev_models(name, company), branches(id, name, code)')
+        .eq('status', 'rented');
 
-    if (req) {
-      tenantsQuery = applyScope(tenantsQuery, req);
+      if (req) {
+        q = applyScope(q, req);
+      }
+      return q;
+    });
+
+    const tenantIds = (tenants || []).map(t => t.id).filter(Boolean);
+    const paymentsByTenant = {};
+
+    if (tenantIds.length > 0) {
+      const CHUNK_SIZE = 200;
+      for (let i = 0; i < tenantIds.length; i += CHUNK_SIZE) {
+        const chunk = tenantIds.slice(i, i + CHUNK_SIZE);
+        const payments = await fetchAll(() => {
+          return supabase
+            .from('payments')
+            .select('tenant_id, amount')
+            .in('tenant_id', chunk);
+        });
+
+        (payments || []).forEach(p => {
+          paymentsByTenant[p.tenant_id] = (paymentsByTenant[p.tenant_id] || 0) + Number(p.amount || 0);
+        });
+      }
     }
 
-    const { data: tenants, error } = await tenantsQuery;
-    if (error) throw error;
-
-    const { data: payments } = await supabase.from('payments').select('tenant_id, amount');
-    const paymentsByTenant = (payments || []).reduce((acc, p) => {
-      acc[p.tenant_id] = (acc[p.tenant_id] || 0) + Number(p.amount);
-      return acc;
-    }, {});
-
     let penaltiesByTenant = {};
-    try {
-      const { data: pLogs } = await supabase
-        .from('audit_logs')
-        .select('*')
-        .eq('entity_type', 'penalty');
+    const { data: pLogs, error: pLogsErr } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .eq('entity_type', 'penalty');
 
-      (pLogs || []).forEach(l => {
-        const p = l.changes;
-        if (p && p.tenant_id && p.status === 'unpaid') {
-          penaltiesByTenant[p.tenant_id] = (penaltiesByTenant[p.tenant_id] || 0) + Number(p.amount);
+    if (pLogsErr) {
+      throw new Error(`Failed to fetch penalties for overdue report: ${pLogsErr.message || pLogsErr}`);
+    }
+
+    const penaltyMap = new Map();
+    (pLogs || []).forEach(l => {
+      const p = l.changes;
+      if (p && p.tenant_id && p.status === 'unpaid') {
+        const penId = p.penalty_id || l.id;
+        if (!penaltyMap.has(penId)) {
+          penaltyMap.set(penId, p);
         }
-      });
-    } catch (e) { }
+      }
+    });
+
+    for (const p of penaltyMap.values()) {
+      penaltiesByTenant[p.tenant_id] = (penaltiesByTenant[p.tenant_id] || 0) + Number(p.amount || 0);
+    }
 
     const buckets = {
       b1_15: { label: '1 - 15 Days', count: 0, total_due: 0, customers: [] },
@@ -167,23 +225,24 @@ class ReportsService {
   }
 
   async getSalesPerformanceReport(query = {}, req = null) {
-    let tenantsQuery = supabase
-      .from('tenants')
-      .select('id, name, status, total_price, downpayment_paid, booking_amount, created_at, branch_id, ev_model_id, ev_models(name), branches(name)');
+    const records = await fetchAll(() => {
+      let q = supabase
+        .from('tenants')
+        .select('id, name, status, total_price, downpayment_paid, booking_amount, created_at, branch_id, ev_model_id, ev_models(name), branches(name)');
 
-    if (req) {
-      tenantsQuery = applyScope(tenantsQuery, req);
-    }
+      if (req) {
+        q = applyScope(q, req);
+      }
 
-    if (query.start_date) {
-      tenantsQuery = tenantsQuery.gte('created_at', query.start_date);
-    }
-    if (query.end_date) {
-      tenantsQuery = tenantsQuery.lte('created_at', query.end_date);
-    }
+      if (query.start_date) {
+        q = q.gte('created_at', query.start_date);
+      }
+      if (query.end_date) {
+        q = q.lte('created_at', query.end_date);
+      }
 
-    const { data: records, error } = await tenantsQuery;
-    if (error) throw error;
+      return q;
+    });
 
     let rentalCount = 0;
     let completedSalesCount = 0;

@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS tenants (
 
   -- Personal
   name           TEXT NOT NULL,
-  phone          VARCHAR(10) UNIQUE CHECK (phone IS NULL OR phone ~ '^[0-9]{10}$'),
+  phone          VARCHAR(10) CHECK (phone IS NULL OR phone ~ '^[0-9]{10}$'),
   gender         TEXT NOT NULL CHECK (gender IN ('male','female')),
   address        TEXT,
   has_pending_docs BOOLEAN NOT NULL DEFAULT false,
@@ -252,12 +252,13 @@ ALTER TABLE tenants ADD COLUMN IF NOT EXISTS invoice_doc_path TEXT;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS include_gst BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS gst_percent NUMERIC(5,2) NOT NULL DEFAULT 0.00;
 
--- Unique partial indexes
-CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_chassis    ON tenants(chassis_no) WHERE chassis_no IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_motor      ON tenants(motor_no) WHERE motor_no IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_controller ON tenants(controller_no) WHERE controller_no IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_charger    ON tenants(charger_no) WHERE charger_no IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_battery    ON tenants(battery_no) WHERE battery_no IS NOT NULL;
+-- Unique partial indexes (scoped to active contracts to allow re-rental and repeat customers)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_phone_active      ON tenants(phone) WHERE phone IS NOT NULL AND status IN ('rented', 'direct_purchase');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_chassis_active    ON tenants(chassis_no) WHERE chassis_no IS NOT NULL AND status IN ('rented', 'direct_purchase');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_motor_active      ON tenants(motor_no) WHERE motor_no IS NOT NULL AND status IN ('rented', 'direct_purchase');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_controller_active ON tenants(controller_no) WHERE controller_no IS NOT NULL AND status IN ('rented', 'direct_purchase');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_charger_active    ON tenants(charger_no) WHERE charger_no IS NOT NULL AND status IN ('rented', 'direct_purchase');
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_battery_active    ON tenants(battery_no) WHERE battery_no IS NOT NULL AND status IN ('rented', 'direct_purchase');
 
 -- Query indexes
 CREATE INDEX IF NOT EXISTS idx_tenants_model     ON tenants(ev_model_id);
