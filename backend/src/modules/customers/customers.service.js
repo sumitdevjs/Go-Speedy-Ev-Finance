@@ -185,6 +185,7 @@ class CustomersService {
       throw new Error('Customer not found');
     }
 
+    let authorizedTenants = tenants;
     if (req?.user) {
       const user = req.user;
       const isSuper = user.role === 'super_admin' || (user.role === 'admin' && !user.ward_area);
@@ -193,23 +194,24 @@ class CustomersService {
           if (!user.branch_id) {
             throw new Error('Access denied: Staff has no assigned branch');
           }
-          const hasBranchContract = tenants.some(t => t.branch_id === user.branch_id || t.ward_area === user.ward_area);
-          if (!hasBranchContract) {
+          authorizedTenants = tenants.filter(t => t.branch_id === user.branch_id || t.ward_area === user.ward_area);
+          if (authorizedTenants.length === 0) {
             throw new Error('Access denied: Customer does not belong to your assigned branch');
           }
         } else if (user.role === 'ho_admin') {
           if (!user.head_office_id) {
             throw new Error('Access denied: HO admin has no assigned Head Office');
           }
-          const hasHoContract = tenants.some(t => t.head_office_id === user.head_office_id);
-          if (!hasHoContract) {
+          authorizedTenants = tenants.filter(t => t.head_office_id === user.head_office_id);
+          if (authorizedTenants.length === 0) {
             throw new Error('Access denied: Customer does not belong to your assigned Head Office');
           }
         }
       }
     }
 
-    const primaryTenant = tenants[0];
+    // Select primaryTenant ONLY from authorizedTenants
+    const primaryTenant = authorizedTenants.find(t => t.status === 'rented') || authorizedTenants[0];
     const customerPhone = primaryTenant.phone;
 
     // Fetch all contracts for this phone scoped to the caller's authorized boundary
@@ -225,7 +227,7 @@ class CustomersService {
     const { data: allContracts, error: contractsError } = await contractsQuery;
     if (contractsError) throw contractsError;
 
-    const contractIds = (allContracts || [primaryTenant]).map(c => c.id);
+    const contractIds = (allContracts && allContracts.length > 0 ? allContracts : [primaryTenant]).map(c => c.id);
 
     // Fetch all payments across their contracts
     const { data: allPayments, error: paymentsError } = await supabase

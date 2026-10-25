@@ -845,7 +845,7 @@ export default function StaffPage() {
           />
 
           <Input
-            label="Email Address (Required for Google Sign-In)"
+            label="Email Address"
             type="email"
             placeholder="staff@example.com"
             value={email}

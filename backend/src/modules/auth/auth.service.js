@@ -42,7 +42,7 @@ class AuthService {
     }
 
     if (!user.password_hash) {
-      throw new Error('No password set for this account. Please use Google Sign-In or Reset Password.');
+      throw new Error('No password set for this account. Please use Forgot / Reset Password.');
     }
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
@@ -137,61 +137,6 @@ class AuthService {
       accessToken,
       refreshToken,
     };
-  }
-  async findOrCreateOAuthUser(profile) {
-    const email = profile.emails?.[0]?.value || null;
-    const oauthId = String(profile.id);
-    const name = profile.displayName || profile.name?.givenName || 'Google User';
-
-    try {
-      const { data: byOAuth, error: oauthErr } = await supabase
-        .from('users')
-        .select('*')
-        .eq('oauth_id', oauthId)
-        .maybeSingle();
-
-      if (!oauthErr && byOAuth) {
-        if (!byOAuth.is_active) {
-          const err = new Error('Account is deactivated. Kindly contact the administrator.');
-          err.code = 'ACCOUNT_DEACTIVATED';
-          throw err;
-        }
-        return this._generateTokens(byOAuth);
-      }
-    } catch (e) {
-      if (e.code === 'ACCOUNT_DEACTIVATED') throw e;
-      console.warn('[OAuth] oauth_id lookup skipped:', e.message);
-    }
-
-    if (email) {
-      const { data: byEmail, error: emailErr } = await supabase
-        .from('users')
-        .select('*')
-        .ilike('email', email)
-        .maybeSingle();
-
-      if (!emailErr && byEmail) {
-        if (!byEmail.is_active) {
-          const err = new Error('Account is deactivated. Kindly contact the administrator.');
-          err.code = 'ACCOUNT_DEACTIVATED';
-          throw err;
-        }
-
-        try {
-          await supabase
-            .from('users')
-            .update({ oauth_provider: 'google', oauth_id: oauthId })
-            .eq('id', byEmail.id);
-        } catch (_) {
-        }
-
-        return this._generateTokens({ ...byEmail, oauth_provider: 'google', oauth_id: oauthId });
-      }
-    }
-
-    const notRegErr = new Error('Access denied. Your email is not registered. Kindly contact admin.');
-    notRegErr.code = 'NOT_REGISTERED';
-    throw notRegErr;
   }
 
   async requestPasswordReset(email) {

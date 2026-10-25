@@ -1,14 +1,10 @@
 const express = require('express');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
-const session = require('express-session');
-const swaggerUi = require('swagger-ui-express');
-
 const env = require('./src/config/env');
 const cors = require('./src/config/cors');
 const swaggerSpec = require('./src/config/swagger');
 const errorHandler = require('./src/middleware/errorHandler');
-const passport = require('./src/config/passport');
 
 const app = express();
 
@@ -33,18 +29,6 @@ app.use((req, res, next) => {
 });
 
 app.use(cookieParser());
-
-// Session — used briefly during OAuth redirect (not for general auth)
-app.use(session({
-  secret: env.SESSION_SECRET || env.JWT_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: env.NODE_ENV === 'production', maxAge: 5 * 60 * 1000 }, // 5 min
-}));
-
-// Passport (OAuth only)
-app.use(passport.initialize());
-app.use(passport.session());
 
 // Swagger Docs: strictly enabled ONLY in local testing/development; completely disabled in live production
 const isProduction = env.NODE_ENV === 'production' || process.env.VERCEL === '1';

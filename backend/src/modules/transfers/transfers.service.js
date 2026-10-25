@@ -242,7 +242,7 @@ class TransfersService {
     if (targetLog.changes?.status !== 'in_transit') {
       throw new Error(`Cannot receive transfer in '${targetLog.changes?.status}' status. Transfer must be in transit.`);
     }
-
+    const isSuper = user.role === 'super_admin' || (user.role === 'admin' && !user.ward_area);
     if (!isSuper) {
       if (user.role === 'branch_admin' || user.role === 'staff') {
         if (!user.branch_id || !targetLog.changes?.to_branch_id || user.branch_id !== targetLog.changes.to_branch_id) {
@@ -322,6 +322,7 @@ class TransfersService {
       throw new Error(`Cannot cancel transfer in '${targetLog.changes?.status}' status`);
     }
 
+    const isSuper = user.role === 'super_admin' || (user.role === 'admin' && !user.ward_area);
     if (!isSuper) {
       if (user.role === 'branch_admin' || user.role === 'staff') {
         if (!user.branch_id || !targetLog.changes?.from_branch_id || user.branch_id !== targetLog.changes.from_branch_id) {

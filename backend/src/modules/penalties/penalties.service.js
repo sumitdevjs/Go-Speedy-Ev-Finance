@@ -162,6 +162,16 @@ class PenaltiesService {
       }
     }
 
+    // Apply tenant_id filter
+    if (query.tenant_id) {
+      penalties = penalties.filter(p => p.tenant_id === query.tenant_id);
+    }
+
+    // Apply status filter
+    if (query.status) {
+      penalties = penalties.filter(p => p.status === query.status);
+    }
+
     // Apply search filter
     if (query.search) {
       const s = query.search.toLowerCase();

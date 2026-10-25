@@ -168,18 +168,14 @@ class ModelsService {
 
     if (data) {
       data.forEach(m => {
+        const storedStock = Number(m.stock_count) || 0;
         const modelLogs = Array.isArray(m.stock_logs) ? m.stock_logs : [];
         if (scopedWard) {
           const wardLogs = modelLogs.filter(log => isLogForWard(log, scopedWard));
-          m.stock_count = Math.max(0, wardLogs.reduce((acc, l) => acc + (Number(l.stock_added) || 0), 0));
+          const wardNetStock = wardLogs.reduce((acc, l) => acc + (Number(l.stock_added) || 0), 0);
+          m.stock_count = Math.min(storedStock, Math.max(0, wardNetStock));
         } else {
-          let validTotalStock = 0;
-          modelLogs.forEach(log => {
-            if (findWard(log.branch_id || log.ward_no || log.ward_area, branches)) {
-              validTotalStock += (Number(log.stock_added) || 0);
-            }
-          });
-          m.stock_count = validTotalStock;
+          m.stock_count = storedStock;
         }
       });
     }
@@ -544,7 +540,7 @@ class ModelsService {
           id: m.id,
           name: m.name,
           company: m.company,
-          stock: Math.max(0, stock),
+          stock: Math.min(Number(m.stock_count) || 0, Math.max(0, stock)),
         };
       });
 

@@ -108,25 +108,37 @@ class BookingsService {
       throw new Error('ev_model_id is required to convert a booking into a rental');
     }
 
-    // 2. Fetch Model & Stock Check
-    const { data: model, error: modelError } = await supabase
-      .from('ev_models')
-      .select('total_price, stock_count')
-      .eq('id', tenantData.ev_model_id)
-      .single();
+    // 2. Fetch Model & Stock Check with atomic CAS retry loop
+    let reserved = false;
+    let attempts = 0;
+    while (!reserved && attempts < 5) {
+      attempts++;
+      const { data: model, error: modelError } = await supabase
+        .from('ev_models')
+        .select('total_price, stock_count')
+        .eq('id', tenantData.ev_model_id)
+        .single();
 
-    if (modelError || !model) throw new Error('EV Model not found');
-    if (model.stock_count <= 0) throw new Error('EV Model out of stock');
+      if (modelError || !model) throw new Error('EV Model not found');
+      if (model.stock_count <= 0) throw new Error('EV Model out of stock');
 
-    // 3. Decrement Stock conditionally with affected row check
-    const { data: updatedStock, error: stockError } = await supabase
-      .from('ev_models')
-      .update({ stock_count: model.stock_count - 1 })
-      .eq('id', tenantData.ev_model_id)
-      .gt('stock_count', 0)
-      .select('id, stock_count');
+      const currentStock = model.stock_count;
 
-    if (stockError || !updatedStock || updatedStock.length === 0) {
+      const { data: updatedStock, error: stockError } = await supabase
+        .from('ev_models')
+        .update({ stock_count: currentStock - 1 })
+        .eq('id', tenantData.ev_model_id)
+        .eq('stock_count', currentStock)
+        .gt('stock_count', 0)
+        .select('id, stock_count');
+
+      if (!stockError && updatedStock && updatedStock.length > 0) {
+        reserved = true;
+        break;
+      }
+    }
+
+    if (!reserved) {
       throw new Error('EV Model out of stock');
     }
 
@@ -164,17 +176,23 @@ class BookingsService {
 
       return tenant;
     } catch (error) {
-      // Rollback stock incrementally
-      const { data: freshModel } = await supabase
-        .from('ev_models')
-        .select('stock_count')
-        .eq('id', tenantData.ev_model_id)
-        .single();
-      if (freshModel) {
-        await supabase
+      // Rollback stock with atomic CAS retry loop
+      for (let r = 0; r < 5; r++) {
+        const { data: freshModel } = await supabase
           .from('ev_models')
-          .update({ stock_count: (Number(freshModel.stock_count) || 0) + 1 })
-          .eq('id', tenantData.ev_model_id);
+          .select('stock_count')
+          .eq('id', tenantData.ev_model_id)
+          .single();
+        if (freshModel) {
+          const currentStock = freshModel.stock_count;
+          const { data: rb } = await supabase
+            .from('ev_models')
+            .update({ stock_count: currentStock + 1 })
+            .eq('id', tenantData.ev_model_id)
+            .eq('stock_count', currentStock)
+            .select('id');
+          if (rb && rb.length > 0) break;
+        }
       }
 
       if (error.code === '23505') {
