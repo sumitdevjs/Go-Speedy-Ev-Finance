@@ -17,13 +17,16 @@ class DocumentsService {
 
     if (req?.user) {
       const user = req.user;
-      if (user.role === 'branch_admin' || user.role === 'staff') {
-        if (tenant.branch_id && user.branch_id && tenant.branch_id !== user.branch_id) {
-          throw new Error('Access denied: Unauthorized access to tenant documents');
-        }
-      } else if (user.role === 'ho_admin') {
-        if (tenant.head_office_id && user.head_office_id && tenant.head_office_id !== user.head_office_id) {
-          throw new Error('Access denied: Tenant documents belong to another Head Office');
+      const isSuper = user.role === 'super_admin' || (user.role === 'admin' && !user.ward_area);
+      if (!isSuper) {
+        if (user.role === 'branch_admin' || user.role === 'staff') {
+          if (!user.branch_id || !tenant.branch_id || tenant.branch_id !== user.branch_id) {
+            throw new Error('Access denied: Unauthorized access to tenant documents');
+          }
+        } else if (user.role === 'ho_admin') {
+          if (!user.head_office_id || !tenant.head_office_id || tenant.head_office_id !== user.head_office_id) {
+            throw new Error('Access denied: Tenant documents belong to another Head Office');
+          }
         }
       }
     }
@@ -76,13 +79,16 @@ class DocumentsService {
 
       if (req?.user) {
         const user = req.user;
-        if (user.role === 'branch_admin' || user.role === 'staff') {
-          if (tenant.branch_id && user.branch_id && tenant.branch_id !== user.branch_id) {
-            throw new Error('Access denied: Unauthorized access to tenant documents');
-          }
-        } else if (user.role === 'ho_admin') {
-          if (tenant.head_office_id && user.head_office_id && tenant.head_office_id !== user.head_office_id) {
-            throw new Error('Access denied: Tenant documents belong to another Head Office');
+        const isSuper = user.role === 'super_admin' || (user.role === 'admin' && !user.ward_area);
+        if (!isSuper) {
+          if (user.role === 'branch_admin' || user.role === 'staff') {
+            if (!user.branch_id || !tenant.branch_id || tenant.branch_id !== user.branch_id) {
+              throw new Error('Access denied: Unauthorized access to tenant documents');
+            }
+          } else if (user.role === 'ho_admin') {
+            if (!user.head_office_id || !tenant.head_office_id || tenant.head_office_id !== user.head_office_id) {
+              throw new Error('Access denied: Tenant documents belong to another Head Office');
+            }
           }
         }
       }

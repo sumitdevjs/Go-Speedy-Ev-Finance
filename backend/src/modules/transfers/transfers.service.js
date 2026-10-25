@@ -28,10 +28,27 @@ class TransfersService {
     }
 
     if (req && req.user) {
-      const { role, branch_id } = req.user;
+      const { role, branch_id, head_office_id } = req.user;
       const isSuper = role === 'super_admin' || (role === 'admin' && !req.user.ward_area);
-      if (!isSuper && (role === 'branch_admin' || role === 'staff') && branch_id) {
-        transfers = transfers.filter(t => t.from_branch_id === branch_id || t.to_branch_id === branch_id);
+      if (!isSuper) {
+        if (role === 'branch_admin' || role === 'staff') {
+          if (!branch_id) {
+            transfers = [];
+          } else {
+            transfers = transfers.filter(t => t.from_branch_id === branch_id || t.to_branch_id === branch_id);
+          }
+        } else if (role === 'ho_admin') {
+          if (!head_office_id) {
+            transfers = [];
+          } else {
+            const { data: hoBranches } = await supabase.from('branches').select('id').eq('head_office_id', head_office_id);
+            const hoBranchIds = new Set((hoBranches || []).map(b => b.id));
+            transfers = transfers.filter(t => 
+              (t.from_branch_id && hoBranchIds.has(t.from_branch_id)) ||
+              (t.to_branch_id && hoBranchIds.has(t.to_branch_id))
+            );
+          }
+        }
       }
     }
 
@@ -57,9 +74,28 @@ class TransfersService {
     if (!ev_model_id) throw new Error('EV Model is required');
     if (!quantity || Number(quantity) <= 0) throw new Error('Valid quantity is required');
 
-    if (user.role === 'branch_admin' || user.role === 'staff') {
-      if (user.branch_id && from_branch_id && user.branch_id !== from_branch_id) {
-        throw new Error('Access denied: Cannot initiate transfer from another branch');
+    const isSuper = user.role === 'super_admin' || (user.role === 'admin' && !user.ward_area);
+    if (!isSuper) {
+      if (user.role === 'branch_admin' || user.role === 'staff') {
+        if (!user.branch_id || !from_branch_id || user.branch_id !== from_branch_id) {
+          throw new Error('Access denied: Cannot initiate transfer from another branch');
+        }
+      } else if (user.role === 'ho_admin') {
+        if (!user.head_office_id) {
+          throw new Error('Access denied: HO admin has no assigned Head Office');
+        }
+        if (from_branch_id) {
+          const { data: fb } = await supabase.from('branches').select('head_office_id').eq('id', from_branch_id).single();
+          if (fb?.head_office_id && fb.head_office_id !== user.head_office_id) {
+            throw new Error('Access denied: Source branch belongs to another Head Office');
+          }
+        }
+        if (to_branch_id) {
+          const { data: tb } = await supabase.from('branches').select('head_office_id').eq('id', to_branch_id).single();
+          if (tb?.head_office_id && tb.head_office_id !== user.head_office_id) {
+            throw new Error('Access denied: Destination branch belongs to another Head Office');
+          }
+        }
       }
     }
 
@@ -143,9 +179,23 @@ class TransfersService {
       throw new Error(`Cannot dispatch transfer in '${targetLog.changes?.status}' status`);
     }
 
-    if (user.role === 'branch_admin' || user.role === 'staff') {
-      if (user.branch_id && targetLog.changes?.from_branch_id && user.branch_id !== targetLog.changes.from_branch_id) {
-        throw new Error('Access denied: Only dispatching branch staff can dispatch this transfer');
+    const isSuper = user.role === 'super_admin' || (user.role === 'admin' && !user.ward_area);
+    if (!isSuper) {
+      if (user.role === 'branch_admin' || user.role === 'staff') {
+        if (!user.branch_id || !targetLog.changes?.from_branch_id || user.branch_id !== targetLog.changes.from_branch_id) {
+          throw new Error('Access denied: Only dispatching branch staff can dispatch this transfer');
+        }
+      } else if (user.role === 'ho_admin') {
+        if (!user.head_office_id) {
+          throw new Error('Access denied: HO admin has no assigned Head Office');
+        }
+        const fromBranchId = targetLog.changes?.from_branch_id;
+        if (fromBranchId) {
+          const { data: fb } = await supabase.from('branches').select('head_office_id').eq('id', fromBranchId).single();
+          if (fb?.head_office_id && fb.head_office_id !== user.head_office_id) {
+            throw new Error('Access denied: Transfer belongs to another Head Office');
+          }
+        }
       }
     }
 
@@ -193,9 +243,22 @@ class TransfersService {
       throw new Error(`Cannot receive transfer in '${targetLog.changes?.status}' status. Transfer must be in transit.`);
     }
 
-    if (user.role === 'branch_admin' || user.role === 'staff') {
-      if (user.branch_id && targetLog.changes?.to_branch_id && user.branch_id !== targetLog.changes.to_branch_id) {
-        throw new Error('Access denied: Only receiving branch staff can receive this transfer');
+    if (!isSuper) {
+      if (user.role === 'branch_admin' || user.role === 'staff') {
+        if (!user.branch_id || !targetLog.changes?.to_branch_id || user.branch_id !== targetLog.changes.to_branch_id) {
+          throw new Error('Access denied: Only receiving branch staff can receive this transfer');
+        }
+      } else if (user.role === 'ho_admin') {
+        if (!user.head_office_id) {
+          throw new Error('Access denied: HO admin has no assigned Head Office');
+        }
+        const toBranchId = targetLog.changes?.to_branch_id;
+        if (toBranchId) {
+          const { data: tb } = await supabase.from('branches').select('head_office_id').eq('id', toBranchId).single();
+          if (tb?.head_office_id && tb.head_office_id !== user.head_office_id) {
+            throw new Error('Access denied: Transfer belongs to another Head Office');
+          }
+        }
       }
     }
 
@@ -259,9 +322,22 @@ class TransfersService {
       throw new Error(`Cannot cancel transfer in '${targetLog.changes?.status}' status`);
     }
 
-    if (user.role === 'branch_admin' || user.role === 'staff') {
-      if (user.branch_id && targetLog.changes?.from_branch_id && user.branch_id !== targetLog.changes.from_branch_id) {
-        throw new Error('Access denied: Cannot cancel transfer belonging to another branch');
+    if (!isSuper) {
+      if (user.role === 'branch_admin' || user.role === 'staff') {
+        if (!user.branch_id || !targetLog.changes?.from_branch_id || user.branch_id !== targetLog.changes.from_branch_id) {
+          throw new Error('Access denied: Cannot cancel transfer belonging to another branch');
+        }
+      } else if (user.role === 'ho_admin') {
+        if (!user.head_office_id) {
+          throw new Error('Access denied: HO admin has no assigned Head Office');
+        }
+        const fromBranchId = targetLog.changes?.from_branch_id;
+        if (fromBranchId) {
+          const { data: fb } = await supabase.from('branches').select('head_office_id').eq('id', fromBranchId).single();
+          if (fb?.head_office_id && fb.head_office_id !== user.head_office_id) {
+            throw new Error('Access denied: Transfer belongs to another Head Office');
+          }
+        }
       }
     }
 

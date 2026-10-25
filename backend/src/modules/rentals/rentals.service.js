@@ -212,10 +212,16 @@ class RentalsService {
 
       modelTotalPrice = Number(oldEv.price) || 0;
 
-      await supabase
+      const { data: updatedOldEv, error: oldEvUpdateErr } = await supabase
         .from('old_evs')
         .update({ status: tenantData.status === 'direct_purchase' ? 'sold' : 'rented' })
-        .eq('id', tenantData.old_ev_id);
+        .eq('id', tenantData.old_ev_id)
+        .eq('status', 'available')
+        .select('id');
+
+      if (oldEvUpdateErr || !updatedOldEv || updatedOldEv.length === 0) {
+        throw new Error('Selected used EV is no longer available');
+      }
     } else {
       const { data: model, error: modelError } = await supabase
         .from('ev_models')
@@ -228,13 +234,16 @@ class RentalsService {
 
       originalStockCount = model.stock_count;
 
-      const { error: stockError } = await supabase
+      const { data: updatedStock, error: stockError } = await supabase
         .from('ev_models')
         .update({ stock_count: model.stock_count - 1 })
         .eq('id', tenantData.ev_model_id)
-        .gt('stock_count', 0);
+        .gt('stock_count', 0)
+        .select('id, stock_count');
 
-      if (stockError) throw new Error('Failed to reserve stock. It might be exhausted.');
+      if (stockError || !updatedStock || updatedStock.length === 0) {
+        throw new Error('EV Model out of stock');
+      }
       modelTotalPrice = model.total_price;
     }
 
@@ -275,10 +284,17 @@ class RentalsService {
       return data;
     } catch (error) {
       if (!isOldEv && tenantData.ev_model_id) {
-        await supabase
+        const { data: freshModel } = await supabase
           .from('ev_models')
-          .update({ stock_count: originalStockCount })
-          .eq('id', tenantData.ev_model_id);
+          .select('stock_count')
+          .eq('id', tenantData.ev_model_id)
+          .single();
+        if (freshModel) {
+          await supabase
+            .from('ev_models')
+            .update({ stock_count: (Number(freshModel.stock_count) || 0) + 1 })
+            .eq('id', tenantData.ev_model_id);
+        }
       } else if (isOldEv && tenantData.old_ev_id) {
         await supabase
           .from('old_evs')

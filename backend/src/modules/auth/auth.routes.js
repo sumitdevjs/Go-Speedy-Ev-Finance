@@ -228,6 +228,7 @@ router.patch('/change-password', requireAuth, resetPasswordLimiter, authControll
 
 const passport = require('../../config/passport');
 const authService = require('./auth.service');
+const supabase = require('../../config/db');
 const { errorResponse, successResponse } = require('../../utils/response');
 const env = require('../../config/env');
 const crypto = require('crypto');
@@ -239,19 +240,32 @@ const DEFAULT_FRONTEND_ORIGIN = allowedOrigins[0] || 'http://localhost:3000';
 const jwt = require('jsonwebtoken');
 
 // ─── One-time OAuth exchange store ────────────────────────────────────────────
-// Multi-instance resilient: uses signed short-lived tokens with replay tracking
+// ─── One-time OAuth exchange store ────────────────────────────────────────────
+// Opaque random token with atomic database consumption across instances
 const oauthCodeStore = new Map();
-const consumedCodes = new Set();
 
-function storeOAuthCode(accessToken, refreshToken, userId) {
-  const code = jwt.sign(
-    { accessToken, refreshToken, userId, type: 'oauth_exchange' },
-    env.JWT_SECRET,
-    { expiresIn: '60s' }
-  );
-  oauthCodeStore.set(code, { accessToken, refreshToken, userId, expiresAt: Date.now() + 60_000 });
-  setTimeout(() => oauthCodeStore.delete(code), 65_000);
-  return code;
+async function storeOAuthCode(accessToken, refreshToken, userId) {
+  const rawCode = crypto.randomBytes(32).toString('hex');
+  const codeHash = crypto.createHash('sha256').update(rawCode).digest('hex');
+  const expiresAt = Date.now() + 60_000;
+
+  const payload = { code_hash: codeHash, accessToken, refreshToken, userId, expiresAt };
+  oauthCodeStore.set(rawCode, payload);
+  setTimeout(() => oauthCodeStore.delete(rawCode), 65_000);
+
+  try {
+    await supabase.from('audit_logs').insert([{
+      action: 'OAUTH_EXCHANGE_CODE',
+      entity_type: 'oauth_code',
+      user_id: userId,
+      changes: payload,
+      created_at: new Date().toISOString()
+    }]);
+  } catch (err) {
+    console.error('Failed to persist OAuth exchange code to DB:', err);
+  }
+
+  return rawCode;
 }
 
 /**
@@ -271,8 +285,6 @@ router.get(
       return res.status(503).json({ success: false, message: 'Google OAuth is not configured on this server.' });
     }
 
-    // Only trust an origin on our allow-list — letting client input pick the
-    // redirect target is an open-redirect straight to account takeover.
     let clientOrigin = req.query.origin;
     if (!isAllowedOrigin(clientOrigin) && req.headers.referer) {
       try {
@@ -317,27 +329,28 @@ router.get(
 router.get(
   '/google/callback',
   (req, res, next) => {
-    let cleanOrigin = DEFAULT_FRONTEND_ORIGIN;
+    const rawState = req.query.state;
     const expectedNonce = req.cookies?.oauth_nonce;
 
-    if (req.query.state) {
-      try {
-        const decodedState = jwt.verify(req.query.state, env.JWT_SECRET);
-        if (decodedState?.type === 'oauth_state') {
-          if (isAllowedOrigin(decodedState.origin)) {
-            cleanOrigin = String(decodedState.origin).replace(/\/+$/, '');
-          }
-          if (expectedNonce && decodedState.nonce && decodedState.nonce !== expectedNonce) {
-            console.warn('OAuth state nonce mismatch - potential CSRF attempt');
-            return res.redirect(`${cleanOrigin}/?error=oauth_csrf_detected`);
-          }
-        }
-      } catch (_) {
-        // Fallback if state is raw origin (backwards compatibility)
-        if (isAllowedOrigin(req.query.state)) {
-          cleanOrigin = String(req.query.state).replace(/\/+$/, '');
-        }
+    // Strict validation: state and nonce cookie MUST be present and valid
+    if (!rawState || !expectedNonce) {
+      console.warn('OAuth callback missing state or nonce cookie - potential CSRF attempt');
+      return res.redirect(`${DEFAULT_FRONTEND_ORIGIN}/?error=oauth_csrf_detected`);
+    }
+
+    let cleanOrigin = DEFAULT_FRONTEND_ORIGIN;
+    try {
+      const decodedState = jwt.verify(rawState, env.JWT_SECRET);
+      if (decodedState?.type !== 'oauth_state' || !decodedState.nonce || decodedState.nonce !== expectedNonce) {
+        console.warn('OAuth state nonce mismatch or invalid type - potential CSRF attempt');
+        return res.redirect(`${DEFAULT_FRONTEND_ORIGIN}/?error=oauth_csrf_detected`);
       }
+      if (isAllowedOrigin(decodedState.origin)) {
+        cleanOrigin = String(decodedState.origin).replace(/\/+$/, '');
+      }
+    } catch (err) {
+      console.warn('OAuth state verification failed:', err.message);
+      return res.redirect(`${DEFAULT_FRONTEND_ORIGIN}/?error=oauth_csrf_detected`);
     }
 
     res.clearCookie('oauth_nonce');
@@ -356,11 +369,7 @@ router.get(
 
       try {
         const { accessToken, refreshToken, user } = result;
-        // Generate a short-lived one-time code instead of setting cookies directly.
-        // Cookies set during a cross-domain redirect (backend → frontend) are blocked
-        // by the browser. The frontend will exchange this code via a same-site AJAX
-        // call (through the Next.js proxy) which CAN set cookies correctly.
-        const code = storeOAuthCode(accessToken, refreshToken, user.id);
+        const code = await storeOAuthCode(accessToken, refreshToken, user.id);
         return res.redirect(`${cleanOrigin}/oauth-callback?code=${code}`);
       } catch (error) {
         console.error('OAuth callback error:', error);
@@ -392,41 +401,45 @@ router.get(
  *       400:
  *         description: Invalid or expired code
  */
-router.post('/oauth/exchange', (req, res) => {
+router.post('/oauth/exchange', async (req, res) => {
   const { code } = req.body;
-  if (!code) {
+  if (!code || typeof code !== 'string') {
     return errorResponse(res, 400, 'Missing exchange code');
   }
 
-  if (consumedCodes.has(code)) {
-    return errorResponse(res, 400, 'OAuth code has already been consumed.');
+  // 1. Atomic consumption in database to prevent multi-instance replays
+  const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+  let entry = null;
+
+  try {
+    const { data: deletedRows, error: delErr } = await supabase
+      .from('audit_logs')
+      .delete()
+      .eq('entity_type', 'oauth_code')
+      .eq('action', 'OAUTH_EXCHANGE_CODE')
+      .filter('changes->>code_hash', 'eq', codeHash)
+      .select('changes');
+
+    if (!delErr && deletedRows && deletedRows.length > 0) {
+      entry = deletedRows[0].changes;
+    }
+  } catch (err) {
+    console.error('DB exchange lookup error:', err);
   }
 
-  let entry = oauthCodeStore.get(code);
-  if (!entry) {
-    // Multi-instance fallback: verify code as signed JWT
-    try {
-      const decoded = jwt.verify(code, env.JWT_SECRET);
-      if (decoded && decoded.type === 'oauth_exchange') {
-        entry = decoded;
-      }
-    } catch (_) {
-      // Invalid or expired JWT
-    }
+  // Fallback to in-memory store if DB query double doesn't match
+  if (!entry && oauthCodeStore.has(code)) {
+    entry = oauthCodeStore.get(code);
+    oauthCodeStore.delete(code);
   }
 
   if (!entry) {
     return errorResponse(res, 400, 'Invalid or expired OAuth code. Please sign in again.');
   }
+
   if (entry.expiresAt && Date.now() > entry.expiresAt) {
-    oauthCodeStore.delete(code);
     return errorResponse(res, 400, 'OAuth code has expired. Please sign in again.');
   }
-
-  // Consume the code (one-time use)
-  oauthCodeStore.delete(code);
-  consumedCodes.add(code);
-  setTimeout(() => consumedCodes.delete(code), 120_000);
 
   const { accessToken, refreshToken, userId } = entry;
   const isProduction = env.NODE_ENV === 'production';

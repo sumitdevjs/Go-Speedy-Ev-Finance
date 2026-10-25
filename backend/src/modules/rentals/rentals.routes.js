@@ -106,7 +106,26 @@ const updateRentalSchema = z.object({
   { message: 'status cannot be changed via a generic update — use the /complete or /cancel endpoints.' }
 );
 
-const validateBody = (schema) => (req, res, next) => {
+const validateCreate = (schema) => (req, res, next) => {
+  try {
+    req.body = schema.parse(req.body);
+    next();
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const issues = err.issues || err.errors || [];
+      return res.status(400).json({
+        success: false,
+        message: issues.map(e => e.message).join(', ') || err.message,
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      message: err.message || 'Validation error'
+    });
+  }
+};
+
+const validateUpdate = (schema) => (req, res, next) => {
   try {
     if (req.body && typeof req.body === 'object' && 'status' in req.body) {
       return res.status(400).json({
@@ -228,7 +247,7 @@ router.get('/:id', rentalsController.getById.bind(rentalsController));
  */
 router.post(
   '/', 
-  validateBody(createRentalSchema), 
+  validateCreate(createRentalSchema), 
   requestLogger('tenants', 'CREATE_RENTAL'), 
   rentalsController.create.bind(rentalsController)
 );
@@ -256,7 +275,7 @@ router.post(
  */
 router.patch(
   '/:id', 
-  validateBody(updateRentalSchema), 
+  validateUpdate(updateRentalSchema), 
   requestLogger('tenants', 'UPDATE_RENTAL'), 
   rentalsController.update.bind(rentalsController)
 );

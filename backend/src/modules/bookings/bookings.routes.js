@@ -26,7 +26,7 @@ const updateBookingSchema = z.object({
   model_name_raw: z.string().optional().nullable(),
   booking_amount: z.number().min(0).optional(),
   notes: z.string().nullable().optional(),
-});
+}).strict();
 
 const convertBookingSchema = z.object({
   ev_model_id: z.string().uuid().optional(),
@@ -34,8 +34,22 @@ const convertBookingSchema = z.object({
 }).passthrough(); // Needs all the tenant fields
 
 const validateBody = (schema) => (req, res, next) => {
-  schema.parse(req.body);
-  next();
+  try {
+    req.body = schema.parse(req.body);
+    next();
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      const issues = err.issues || err.errors || [];
+      return res.status(400).json({
+        success: false,
+        message: issues.map(e => e.message).join(', ') || err.message,
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      message: err.message || 'Validation error'
+    });
+  }
 };
 
 /**

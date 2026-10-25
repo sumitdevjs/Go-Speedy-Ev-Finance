@@ -187,15 +187,24 @@ class CustomersService {
 
     if (req?.user) {
       const user = req.user;
-      if (user.role === 'branch_admin' || user.role === 'staff') {
-        const hasBranchContract = tenants.some(t => t.branch_id === user.branch_id || t.ward_area === user.ward_area);
-        if (!hasBranchContract && user.branch_id) {
-          throw new Error('Access denied: Customer does not belong to your assigned branch');
-        }
-      } else if (user.role === 'ho_admin') {
-        const hasHoContract = tenants.some(t => t.head_office_id === user.head_office_id);
-        if (!hasHoContract && user.head_office_id) {
-          throw new Error('Access denied: Customer does not belong to your assigned Head Office');
+      const isSuper = user.role === 'super_admin' || (user.role === 'admin' && !user.ward_area);
+      if (!isSuper) {
+        if (user.role === 'branch_admin' || user.role === 'staff') {
+          if (!user.branch_id) {
+            throw new Error('Access denied: Staff has no assigned branch');
+          }
+          const hasBranchContract = tenants.some(t => t.branch_id === user.branch_id || t.ward_area === user.ward_area);
+          if (!hasBranchContract) {
+            throw new Error('Access denied: Customer does not belong to your assigned branch');
+          }
+        } else if (user.role === 'ho_admin') {
+          if (!user.head_office_id) {
+            throw new Error('Access denied: HO admin has no assigned Head Office');
+          }
+          const hasHoContract = tenants.some(t => t.head_office_id === user.head_office_id);
+          if (!hasHoContract) {
+            throw new Error('Access denied: Customer does not belong to your assigned Head Office');
+          }
         }
       }
     }
@@ -203,11 +212,17 @@ class CustomersService {
     const primaryTenant = tenants[0];
     const customerPhone = primaryTenant.phone;
 
-    // Fetch all contracts for this phone
-    const { data: allContracts, error: contractsError } = await supabase
+    // Fetch all contracts for this phone scoped to the caller's authorized boundary
+    let contractsQuery = supabase
       .from('tenants')
       .select('*, ev_models(name, company), branches(id, name, code)')
       .eq('phone', customerPhone);
+
+    if (req) {
+      contractsQuery = applyScope(contractsQuery, req);
+    }
+
+    const { data: allContracts, error: contractsError } = await contractsQuery;
     if (contractsError) throw contractsError;
 
     const contractIds = (allContracts || [primaryTenant]).map(c => c.id);

@@ -90,52 +90,75 @@ class PenaltiesService {
     const { data: logs, error } = await queryBuilder;
     if (error) throw error;
 
-    // Deduplicate audit events by canonical penalty_id to prevent inflated metrics
+    // Deduplicate audit events by canonical penalty_id to prevent inflated metrics,
+    // ensuring immutable ownership and tenant fields are preserved from levy events.
     const penaltyMap = new Map();
+
     (logs || []).forEach(l => {
       const p = l.changes;
-      if (p && p.penalty_id) {
-        if (!penaltyMap.has(p.penalty_id)) {
-          penaltyMap.set(p.penalty_id, {
-            ...p,
-            audit_log_id: l.id,
-            created_at: l.created_at || p.created_at
-          });
-        } else {
-          const existing = penaltyMap.get(p.penalty_id);
-          if (l.action === 'PENALTY_WAIVED' || p.status === 'waived') {
-            existing.status = 'waived';
-            existing.waived_reason = p.reason || p.waived_reason || existing.waived_reason;
-            existing.waived_by = p.waived_by || existing.waived_by;
-          }
+      if (!p || !p.penalty_id) return;
+      const penId = p.penalty_id;
+
+      if (!penaltyMap.has(penId)) {
+        penaltyMap.set(penId, {
+          penalty_id: penId,
+          tenant_id: p.tenant_id || l.entity_id || null,
+          tenant_name: p.tenant_name || null,
+          customer_phone: p.customer_phone || null,
+          vehicle_number: p.vehicle_number || null,
+          branch_id: p.branch_id || null,
+          head_office_id: p.head_office_id || null,
+          amount: Number(p.amount) || 0,
+          reason: p.reason || 'Penalty',
+          status: p.status || 'unpaid',
+          audit_log_id: l.id,
+          created_at: l.created_at || p.created_at,
+          waived_reason: p.waived_reason || null,
+          waived_by: p.waived_by || null,
+          waived_at: p.waived_at || null
+        });
+      } else {
+        const canonical = penaltyMap.get(penId);
+        // Backfill immutable ownership & customer fields if missing from newer event
+        if (!canonical.tenant_id && (p.tenant_id || l.entity_id)) {
+          canonical.tenant_id = p.tenant_id || l.entity_id;
         }
+        if (!canonical.branch_id && p.branch_id) canonical.branch_id = p.branch_id;
+        if (!canonical.head_office_id && p.head_office_id) canonical.head_office_id = p.head_office_id;
+        if (!canonical.tenant_name && p.tenant_name) canonical.tenant_name = p.tenant_name;
+        if (!canonical.customer_phone && p.customer_phone) canonical.customer_phone = p.customer_phone;
+        if (!canonical.vehicle_number && p.vehicle_number) canonical.vehicle_number = p.vehicle_number;
+      }
+
+      const canonical = penaltyMap.get(penId);
+      if (l.action === 'PENALTY_WAIVED' || p.status === 'waived') {
+        canonical.status = 'waived';
+        canonical.waived_reason = p.reason || p.waived_reason || canonical.waived_reason || 'Waived';
+        canonical.waived_by = p.waived_by || canonical.waived_by;
+        canonical.waived_at = p.waived_at || l.created_at || canonical.waived_at;
       }
     });
 
     let penalties = Array.from(penaltyMap.values());
 
-    // Apply tenant filter
-    if (query.tenant_id) {
-      penalties = penalties.filter(p => p.tenant_id === query.tenant_id);
-    }
-
-    // Apply status filter
-    if (query.status && query.status !== 'all') {
-      penalties = penalties.filter(p => p.status === query.status);
-    }
-
-    // Apply branch scope if user is branch restricted
+    // Apply strict branch/HO scope before returning records
     if (req && req.user) {
       const { role, branch_id, head_office_id } = req.user;
       const effectiveRole = role === 'super_admin' || (role === 'admin' && !req.user.ward_area) ? 'super_admin' : role;
       
       if (effectiveRole === 'branch_admin' || effectiveRole === 'staff') {
         const userBranch = branch_id || req.headers['x-branch-id'];
-        if (userBranch) {
-          penalties = penalties.filter(p => !p.branch_id || p.branch_id === userBranch);
+        if (!userBranch) {
+          penalties = [];
+        } else {
+          penalties = penalties.filter(p => p.branch_id && p.branch_id === userBranch);
         }
-      } else if (effectiveRole === 'ho_admin' && head_office_id) {
-        penalties = penalties.filter(p => !p.head_office_id || p.head_office_id === head_office_id);
+      } else if (effectiveRole === 'ho_admin') {
+        if (!head_office_id) {
+          penalties = [];
+        } else {
+          penalties = penalties.filter(p => p.head_office_id && p.head_office_id === head_office_id);
+        }
       }
     }
 
@@ -245,11 +268,17 @@ class PenaltiesService {
 
     if (req?.user) {
       const u = req.user;
-      if ((u.role === 'branch_admin' || u.role === 'staff') && tenant.branch_id && u.branch_id && tenant.branch_id !== u.branch_id) {
-        throw new Error('Access denied: Unauthorized access to tenant penalties');
-      }
-      if (u.role === 'ho_admin' && tenant.head_office_id && u.head_office_id && tenant.head_office_id !== u.head_office_id) {
-        throw new Error('Access denied: Tenant penalties belong to another Head Office');
+      const isSuper = u.role === 'super_admin' || (u.role === 'admin' && !u.ward_area);
+      if (!isSuper) {
+        if (u.role === 'branch_admin' || u.role === 'staff') {
+          if (!u.branch_id || !tenant.branch_id || tenant.branch_id !== u.branch_id) {
+            throw new Error('Access denied: Unauthorized access to tenant penalties');
+          }
+        } else if (u.role === 'ho_admin') {
+          if (!u.head_office_id || !tenant.head_office_id || tenant.head_office_id !== u.head_office_id) {
+            throw new Error('Access denied: Tenant penalties belong to another Head Office');
+          }
+        }
       }
     }
 

@@ -65,6 +65,9 @@ class BookingsController {
       if (error.message?.startsWith('Access denied')) {
         return errorResponse(res, 403, error.message);
       }
+      if (error.message?.includes('cannot be updated directly') || error.message?.includes('Cannot change booking')) {
+        return errorResponse(res, 400, error.message);
+      }
       if (error.message === 'Booking not found') {
         return errorResponse(res, 404, error.message);
       }

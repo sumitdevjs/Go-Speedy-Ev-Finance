@@ -73,7 +73,7 @@ class BookingsService {
     return data;
   }
 
-  async convertBooking(id, tenantData, createdBy) {
+  async convertBooking(id, tenantData, createdBy, req = null) {
     // Sanitize empty strings to undefined so they are not inserted as "" into numeric/date DB columns
     Object.keys(tenantData).forEach(key => {
       if (tenantData[key] === '') {
@@ -118,14 +118,17 @@ class BookingsService {
     if (modelError || !model) throw new Error('EV Model not found');
     if (model.stock_count <= 0) throw new Error('EV Model out of stock');
 
-    // 3. Decrement Stock
-    const { error: stockError } = await supabase
+    // 3. Decrement Stock conditionally with affected row check
+    const { data: updatedStock, error: stockError } = await supabase
       .from('ev_models')
       .update({ stock_count: model.stock_count - 1 })
       .eq('id', tenantData.ev_model_id)
-      .gt('stock_count', 0);
+      .gt('stock_count', 0)
+      .select('id, stock_count');
 
-    if (stockError) throw new Error('Failed to reserve stock.');
+    if (stockError || !updatedStock || updatedStock.length === 0) {
+      throw new Error('EV Model out of stock');
+    }
 
     try {
       // 4. Create Rental
@@ -161,11 +164,18 @@ class BookingsService {
 
       return tenant;
     } catch (error) {
-      // Rollback stock
-      await supabase
+      // Rollback stock incrementally
+      const { data: freshModel } = await supabase
         .from('ev_models')
-        .update({ stock_count: model.stock_count })
-        .eq('id', tenantData.ev_model_id);
+        .select('stock_count')
+        .eq('id', tenantData.ev_model_id)
+        .single();
+      if (freshModel) {
+        await supabase
+          .from('ev_models')
+          .update({ stock_count: (Number(freshModel.stock_count) || 0) + 1 })
+          .eq('id', tenantData.ev_model_id);
+      }
 
       if (error.code === '23505') {
         console.error('[convertBooking] Unique constraint violation:', error);
@@ -178,12 +188,15 @@ class BookingsService {
   authorizeBooking(booking, req) {
     if (!req?.user || !booking) return;
     const user = req.user;
+    const isSuper = user.role === 'super_admin' || (user.role === 'admin' && !user.ward_area);
+    if (isSuper) return;
+
     if (user.role === 'branch_admin' || user.role === 'staff') {
-      if (booking.branch_id && user.branch_id && booking.branch_id !== user.branch_id) {
+      if (!user.branch_id || !booking.branch_id || booking.branch_id !== user.branch_id) {
         throw new Error('Access denied: Booking belongs to another branch');
       }
     } else if (user.role === 'ho_admin') {
-      if (booking.head_office_id && user.head_office_id && booking.head_office_id !== user.head_office_id) {
+      if (!user.head_office_id || !booking.head_office_id || booking.head_office_id !== user.head_office_id) {
         throw new Error('Access denied: Booking belongs to another Head Office');
       }
     }
@@ -224,9 +237,30 @@ class BookingsService {
     if (fetchErr || !booking) throw new Error('Booking not found');
     this.authorizeBooking(booking, req);
 
+    if (updates.status !== undefined && updates.status !== booking.status) {
+      throw new Error('Booking status cannot be updated directly. Use convert or cancel endpoints.');
+    }
+    if (updates.branch_id !== undefined && updates.branch_id !== booking.branch_id) {
+      throw new Error('Cannot change booking branch assignment');
+    }
+    if (updates.head_office_id !== undefined && updates.head_office_id !== booking.head_office_id) {
+      throw new Error('Cannot change booking Head Office assignment');
+    }
+
+    const allowedFields = ['name', 'phone', 'ev_model_id', 'model_name_raw', 'booking_amount', 'notes'];
+    const safeUpdates = {};
+    for (const key of allowedFields) {
+      if (updates[key] !== undefined) {
+        safeUpdates[key] = updates[key];
+      }
+    }
+    if (Object.keys(safeUpdates).length === 0) {
+      return booking;
+    }
+
     const { data, error } = await supabase
       .from('bookings')
-      .update(updates)
+      .update(safeUpdates)
       .eq('id', id)
       .select('*')
       .single();
